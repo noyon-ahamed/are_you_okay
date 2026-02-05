@@ -1,0 +1,48 @@
+{
+    "app_name": "Are You Okay?",
+    "app_tagline": "Your safety, our responsibility",
+    "onboarding": {
+        "skip": "Skip",
+        "next": "Next",
+        "get_started": "Get Started",
+        "slide1_title": "Your Safety,\nOur Priority",
+        "slide1_subtitle": "Check-in regularly and let your loved ones know you're safe",
+        "slide2_title": "Add Emergency\nContacts",
+        "slide2_subtitle": "Add trusted people who can help you in case of emergency",
+        "slide3_title": "Automated Alert\nSystem",
+        "slide3_subtitle": "Your contacts will be automatically notified if you miss a check-in"
+    },
+    "auth": {
+        "login": "Login",
+        "register": "Register",
+        "phone_number": "Phone Number",
+        "enter_phone": "Enter your phone number",
+        "send_otp": "Send OTP",
+        "verify_otp": "Verify OTP",
+        "enter_otp": "Enter OTP code",
+        "resend_otp": "Resend OTP",
+        "name": "Name",
+        "enter_name": "Enter your name",
+        "email": "Email (Optional)",
+        "enter_email": "Enter your email",
+        "continue": "Continue",
+        "terms_agreement": "I agree to the Terms & Privacy Policy"
+    },
+    "home": {
+        "welcome": "Welcome",
+        "i_am_safe": "I'm Safe",
+        "time_remaining": "Time Remaining",
+        "hours": "hours",
+        "last_checkin": "Last Check-in"
+    },
+    "checkin": {
+        "success": "Check-in Successful!",
+        "success_message": "Your safety has been confirmed"
+    },
+    "common": {
+        "ok": "OK"
+    },
+    "errors": {
+        "invalid_phone": "Invalid phone number"
+    }
+}
