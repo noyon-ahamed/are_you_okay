@@ -1,5 +1,6 @@
 const cron = require('node-cron');
-const Subscription = require('../models/Subscription');
+const User = require('../model/User');
+const UsageLog = require('../model/UsageLog');
 const { logger } = require('../middleware/logger');
 
 // Reset monthly usage for all subscriptions

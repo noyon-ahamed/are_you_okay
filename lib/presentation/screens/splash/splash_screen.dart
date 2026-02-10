@@ -6,7 +6,7 @@ import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 import '../../../provider/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -75,19 +75,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (mounted) {
       final authState = ref.read(authProvider);
 
-      authState.when(
-        initial: () {},
-        loading: () {},
-        authenticated: (user) {
-          context.go(Routes.home);
-        },
-        unauthenticated: () {
-          context.go(Routes.onboarding);
-        },
-        error: (message) {
-          context.go(Routes.onboarding);
-        },
-      );
+      final state = authState;
+      if (state is AuthAuthenticated) {
+        context.go(Routes.home);
+      } else if (state is AuthUnauthenticated || state is AuthError) {
+        context.go(Routes.login); // Or onboarding
+      } else {
+        // Initial or Loading, do nothing or wait
+        // Maybe force login if stuck? Or onboarding?
+        context.go(Routes.login);
+      }
     }
   }
 

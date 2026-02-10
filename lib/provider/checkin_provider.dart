@@ -1,24 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../model/checkin_model.dart';
 import '../repository/checkin_repository.dart';
 
-part 'checkin_provider.freezed.dart';
-
 // CheckIn State
-@freezed
-class CheckInState with _$CheckInState {
-  const factory CheckInState.initial() = _Initial;
-  const factory CheckInState.loading() = _Loading;
-  const factory CheckInState.success(CheckInModel checkIn) = _Success;
-  const factory CheckInState.error(String message) = _Error;
+abstract class CheckInState {
+  const CheckInState();
+}
+
+class CheckInInitial extends CheckInState {
+  const CheckInInitial();
+}
+
+class CheckInLoading extends CheckInState {
+  const CheckInLoading();
+}
+
+class CheckInSuccess extends CheckInState {
+  final CheckInModel checkIn;
+  const CheckInSuccess(this.checkIn);
+}
+
+class CheckInError extends CheckInState {
+  final String message;
+  const CheckInError(this.message);
 }
 
 // CheckIn Notifier
 class CheckInNotifier extends StateNotifier<CheckInState> {
   final CheckInRepository _repository;
 
-  CheckInNotifier(this._repository) : super(const CheckInState.initial());
+  CheckInNotifier(this._repository) : super(const CheckInInitial());
 
   Future<void> performCheckIn({
     double? latitude,
@@ -27,7 +38,7 @@ class CheckInNotifier extends StateNotifier<CheckInState> {
     String? notes,
   }) async {
     try {
-      state = const CheckInState.loading();
+      state = const CheckInLoading();
       
       final checkIn = await _repository.performCheckIn(
         latitude: latitude,
@@ -36,30 +47,14 @@ class CheckInNotifier extends StateNotifier<CheckInState> {
         notes: notes,
       );
       
-      state = CheckInState.success(checkIn);
+      state = CheckInSuccess(checkIn);
       
       // Reset to initial after a delay
       await Future.delayed(const Duration(seconds: 2));
-      state = const CheckInState.initial();
+      state = const CheckInInitial();
     } catch (e) {
-      state = CheckInState.error(e.toString());
+      state = CheckInError(e.toString());
     }
-  }
-
-  CheckInModel? getLastCheckIn() {
-    return _repository.getLastCheckIn();
-  }
-
-  int? getHoursUntilNextCheckIn() {
-    return _repository.getHoursUntilNextCheckIn();
-  }
-
-  int? getMinutesUntilNextCheckIn() {
-    return _repository.getMinutesUntilNextCheckIn();
-  }
-
-  bool isCheckInOverdue() {
-    return _repository.isCheckInOverdue();
   }
 }
 
@@ -75,14 +70,6 @@ final checkinHistoryProvider = Provider<List<CheckInModel>>((ref) {
   return repository.getAllCheckIns();
 });
 
-// Provider for recent check-ins
-final recentCheckinsProvider = Provider.family<List<CheckInModel>, int>(
-  (ref, limit) {
-    final repository = ref.watch(checkinRepositoryProvider);
-    return repository.getRecentCheckIns(limit: limit);
-  },
-);
-
 // Provider for last check-in
 final lastCheckinProvider = Provider<CheckInModel?>((ref) {
   final repository = ref.watch(checkinRepositoryProvider);
@@ -93,10 +80,4 @@ final lastCheckinProvider = Provider<CheckInModel?>((ref) {
 final hoursUntilNextCheckinProvider = Provider<int?>((ref) {
   final repository = ref.watch(checkinRepositoryProvider);
   return repository.getHoursUntilNextCheckIn();
-});
-
-// Provider for check-in stats
-final checkinStatsProvider = Provider<Map<String, dynamic>>((ref) {
-  final repository = ref.watch(checkinRepositoryProvider);
-  return repository.getCheckInStats();
 });

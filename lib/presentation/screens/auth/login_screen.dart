@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../routes/app_router.dart';
+import '../../../services/api/auth_api_service.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_text_field.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,62 +16,64 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _authService = AuthApiService();
+  
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'errors.invalid_phone'.tr();
-    }
-    if (value.length != AppConstants.phoneNumberLength) {
-      return 'errors.invalid_phone'.tr();
-    }
-    if (!value.startsWith(AppConstants.phoneNumberPrefix)) {
-      return 'errors.invalid_phone'.tr();
-    }
-    return null;
-  }
-
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate()) return;
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
       if (mounted) {
-        setState(() => _isLoading = false);
-        
-        // Navigate to phone verification
-        context.push(
-          Routes.phoneVerification,
-          extra: _phoneController.text,
+        // Navigate to home screen
+        context.go('/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppColors.danger,
+          ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 40),
-
+                
                 // Logo
                 Center(
                   child: Container(
@@ -97,123 +97,111 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-
+                
                 const SizedBox(height: 32),
-
-                // Welcome Text
-                Text(
-                  AppConstants.appNameBangla,
-                  style: AppTextStyles.displayMedium(
+                
+                const Text(
+                  'Are You Okay?',
+                  style: TextStyle(
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-
                 const SizedBox(height: 8),
-
-                Text(
-                  AppConstants.appTaglineBangla,
-                  style: AppTextStyles.bodyLarge(
+                const Text(
+                  'আপনার নিরাপত্তা আমাদের অগ্রাধিকার',
+                  style: TextStyle(
+                    fontSize: 16,
                     color: AppColors.textSecondary,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-
+                
                 const SizedBox(height: 48),
-
-                // Phone Number Input
-                Text(
-                  'auth.phone_number'.tr(),
-                  style: AppTextStyles.labelLarge(
-                    fontWeight: FontWeight.w600,
-                  ),
+                
+                // Email field
+                CustomTextField(
+                  controller: _emailController,
+                  label: 'ইমেইল',
+                  hint: 'your@email.com',
+                  keyboardType: TextInputType.emailAddress,
+                  prefixIcon: Icons.email_outlined,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'ইমেইল দিন';
+                    }
+                    if (!value.contains('@')) {
+                      return 'সঠিক ইমেইল দিন';
+                    }
+                    return null;
+                  },
                 ),
-
+                
+                const SizedBox(height: 16),
+                
+                // Password field
+                CustomTextField(
+                  controller: _passwordController,
+                  label: 'পাসওয়ার্ড',
+                  hint: '••••••••',
+                  obscureText: _obscurePassword,
+                  prefixIcon: Icons.lock_outline,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'পাসওয়ার্ড দিন';
+                    }
+                    return null;
+                  },
+                ),
+                
                 const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  maxLength: AppConstants.phoneNumberLength,
-                  validator: _validatePhone,
-                  decoration: InputDecoration(
-                    hintText: 'auth.enter_phone'.tr(),
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    prefixText: '+880 ',
-                    counterText: '',
-                  ),
-                  onFieldSubmitted: (_) => _handleLogin(),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Login Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            'auth.send_otp'.tr(),
-                            style: AppTextStyles.buttonLarge,
-                          ),
+                
+                // Forgot password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.push('/forgot-password'),
+                    child: const Text('পাসওয়ার্ড ভুলে গেছেন?'),
                   ),
                 ),
-
+                
                 const SizedBox(height: 24),
-
-                // Divider with OR
+                
+                // Login button
+                CustomButton(
+                  text: 'লগইন',
+                  onPressed: _isLoading ? null : _handleLogin,
+                  isLoading: _isLoading,
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Register link
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'OR',
-                        style: AppTextStyles.labelSmall(
-                          color: AppColors.textTertiary,
-                        ),
+                    const Text(
+                      'অ্যাকাউন্ট নেই? ',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/register'),
+                      child: const Text(
+                        'নিবন্ধন করুন',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const Expanded(child: Divider()),
                   ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // Register Link
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Don't have an account? ",
-                        style: AppTextStyles.bodyMedium(),
-                      ),
-                      TextButton(
-                        onPressed: () => context.push(Routes.register),
-                        child: Text(
-                          'auth.register'.tr(),
-                          style: AppTextStyles.labelLarge(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

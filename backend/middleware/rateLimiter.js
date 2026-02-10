@@ -23,10 +23,7 @@ const checkInLimiter = rateLimit({
         error: 'Too many check-ins',
         message: 'You can only check in 5 times per day',
     },
-    keyGenerator: (req) => {
-        // Rate limit per user
-        return req.user?._id?.toString() || req.ip;
-    },
+    legacyHeaders: false,
 });
 
 // AI chat rate limiter
@@ -37,9 +34,7 @@ const aiChatLimiter = rateLimit({
         error: 'Too many AI requests',
         message: 'Please wait a moment before sending more messages',
     },
-    keyGenerator: (req) => {
-        return req.user?._id?.toString() || req.ip;
-    },
+    legacyHeaders: false,
 });
 
 // SOS alert rate limiter (prevent spam)
@@ -49,9 +44,6 @@ const sosLimiter = rateLimit({
     message: {
         error: 'Too many SOS alerts',
         message: 'Please wait before sending another SOS alert',
-    },
-    keyGenerator: (req) => {
-        return req.user?._id?.toString() || req.ip;
     },
     skipSuccessfulRequests: false, // Always count SOS attempts
 });
@@ -64,9 +56,7 @@ const paymentLimiter = rateLimit({
         error: 'Too many payment attempts',
         message: 'Please try again later',
     },
-    keyGenerator: (req) => {
-        return req.user?._id?.toString() || req.ip;
-    },
+    legacyHeaders: false,
 });
 
 // Auth rate limiter (prevent brute force)

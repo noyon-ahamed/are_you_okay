@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/authMiddleware');
-const CheckIn = require('../models/CheckIn');
-const User = require('../models/User');
+const CheckIn = require('../model/CheckIn');
+const User = require('../model/User');
 const { sendNotification } = require('../config/firebase');
 
 // Daily check-in

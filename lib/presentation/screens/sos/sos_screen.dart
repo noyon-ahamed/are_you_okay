@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../widgets/custom_button.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// SOS Screen

@@ -7,7 +7,7 @@ import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 
 class PhoneVerificationScreen extends ConsumerStatefulWidget {
   final String phoneNumber;

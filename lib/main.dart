@@ -1,55 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import 'core/config/firebase_config.dart';
-import 'core/config/theme_config.dart';
-import 'routes/app_routes.dart';
-import 'services/notification_service.dart';
-import 'providers/auth_provider.dart';
-import 'providers/user_provider.dart';
-import 'providers/checkin_provider.dart';
-import 'providers/subscription_provider.dart';
+import 'core/theme/app_colors.dart';
+import 'routes/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-  
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: FirebaseConfig.currentPlatform,
-  );
-  
-  // Initialize notification service
-  await NotificationService.initialize();
-  
-  runApp(const MyApp());
+  // Initialize Mobile Ads
+  await MobileAds.instance.initialize();
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => CheckInProvider()),
-        ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
-        // Add more providers...
-      ],
-      child: MaterialApp(
-        title: 'Are You Okay',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeConfig.lightTheme,
-        darkTheme: ThemeConfig.darkTheme,
-        initialRoute: AppRoutes.splash,
-        onGenerateRoute: RouteGenerator.generateRoute,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
+    return MaterialApp.router(
+      title: 'Are You Okay?',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          toolbarTextStyle: TextStyle(color: Colors.black87),
+          titleTextStyle: TextStyle(color: Colors.black87, fontSize: 20, fontWeight: FontWeight.bold),
+          iconTheme: IconThemeData(color: Colors.black87),
+        ),
       ),
+      routerConfig: router,
     );
   }
 }

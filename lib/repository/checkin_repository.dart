@@ -38,7 +38,7 @@ class CheckInRepository {
 
       final checkIn = CheckInModel(
         id: _uuid.v4(),
-        userId: user.uid,
+        userId: user.id,
         timestamp: DateTime.now(),
         latitude: latitude,
         longitude: longitude,

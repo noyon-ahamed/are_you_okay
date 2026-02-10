@@ -6,7 +6,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/loading_widget.dart';
 import '../../../provider/auth_provider.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 
 /// Edit Profile Screen
 /// Allows user to update their profile information

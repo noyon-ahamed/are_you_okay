@@ -6,7 +6,7 @@ import '../../../model/emergency_contact_model.dart';
 import '../../../provider/contact_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 
 /// Add Contact Screen
 /// Allows user to add a new emergency contact

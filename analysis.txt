@@ -1,3 +1,104 @@
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 67.0.0 (94.0.0 available)
+  _flutterfire_internals 1.3.25 (1.3.66 available)
+  analyzer 6.4.1 (10.0.2 available)
+  audio_session 0.1.25 (0.2.2 available)
+  build 2.4.1 (4.0.4 available)
+  build_config 1.1.2 (1.2.0 available)
+  build_resolvers 2.4.2 (3.0.4 available)
+  build_runner 2.4.13 (2.11.0 available)
+  build_runner_core 7.3.2 (9.3.2 available)
+  cached_network_image 3.4.0 (3.4.1 available)
+  cached_network_image_platform_interface 4.1.0 (4.1.1 available)
+  cached_network_image_web 1.3.0 (1.3.1 available)
+  characters 1.4.0 (1.4.1 available)
+  cloud_firestore 4.15.8 (6.1.2 available)
+  cloud_firestore_platform_interface 6.1.9 (7.0.6 available)
+  cloud_firestore_web 3.10.8 (5.1.2 available)
+  connectivity_plus 5.0.2 (7.0.0 available)
+  connectivity_plus_platform_interface 1.2.4 (2.0.1 available)
+  cross_file 0.3.3+8 (0.3.5+2 available)
+  dart_style 2.3.6 (3.1.5 available)
+  dbus 0.7.11 (0.7.12 available)
+  dio_web_adapter 1.1.1 (2.1.1 available)
+  firebase_core 2.27.0 (4.4.0 available)
+  firebase_core_platform_interface 5.4.2 (6.0.2 available)
+  firebase_core_web 2.11.5 (3.4.0 available)
+  firebase_messaging 14.7.19 (16.1.1 available)
+  firebase_messaging_platform_interface 4.5.27 (4.7.6 available)
+  firebase_messaging_web 3.6.8 (4.1.2 available)
+  firebase_storage 11.6.9 (13.0.6 available)
+  firebase_storage_platform_interface 5.1.12 (5.2.17 available)
+  firebase_storage_web 3.7.3 (3.11.2 available)
+  flutter_cache_manager 3.4.0 (3.4.1 available)
+  flutter_dotenv 5.2.1 (6.0.0 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_local_notifications 16.3.3 (20.0.0 available)
+  flutter_local_notifications_linux 4.0.1 (7.0.0 available)
+  flutter_local_notifications_platform_interface 7.2.0 (10.0.0 available)
+  flutter_riverpod 2.6.1 (3.2.1 available)
+  flutter_secure_storage 9.2.4 (10.0.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.0 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.0 available)
+  flutter_secure_storage_windows 3.1.2 (4.1.0 available)
+  freezed_annotation 2.4.4 (3.1.0 available)
+  geocoding 2.2.2 (4.0.0 available)
+  geocoding_android 3.3.1 (4.0.1 available)
+  geocoding_ios 2.3.0 (3.1.0 available)
+  geocoding_platform_interface 3.2.0 (5.0.0 available)
+  geolocator 10.1.1 (14.0.2 available)
+  geolocator_android 4.6.2 (5.0.2 available)
+  geolocator_web 2.2.1 (4.1.3 available)
+  go_router 13.2.5 (17.1.0 available)
+  google_fonts 6.3.3 (8.0.1 available)
+  google_maps 6.3.0 (8.2.0 available)
+  google_maps_flutter 2.5.3 (2.14.0 available)
+  google_maps_flutter_web 0.5.4+3 (0.5.14+3 available)
+  google_mobile_ads 4.0.0 (7.0.0 available)
+  hooks 1.0.0 (1.0.1 available)
+  http 1.2.0 (1.6.0 available)
+  image_picker 1.1.2 (1.2.1 available)
+  image_picker_for_web 3.0.2 (3.1.1 available)
+  js 0.6.7 (0.7.2 available)
+  json_annotation 4.9.0 (4.10.0 available)
+  just_audio 0.9.44 (0.10.5 available)
+  just_audio_web 0.4.11 (0.4.16 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.17 (0.12.18 available)
+  material_color_utilities 0.11.1 (0.13.0 available)
+  meta 1.17.0 (1.18.1 available)
+  mime 1.0.6 (2.0.0 available)
+  objective_c 9.2.5 (9.3.0 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  permission_handler_html 0.1.1 (0.1.3+5 available)
+  record 5.1.2 (6.2.0 available)
+  record_linux 0.7.2 (1.3.0 available)
+  record_web 1.0.5 (1.3.0 available)
+  riverpod 2.6.1 (3.2.1 available)
+  shared_preferences 2.2.3 (2.5.4 available)
+  shared_preferences_web 2.2.2 (2.4.3 available)
+  shelf_web_socket 2.0.1 (3.0.0 available)
+  socket_io_client 2.0.3+1 (3.1.4 available)
+  socket_io_common 2.0.3 (3.1.1 available)
+  source_gen 1.5.0 (4.2.0 available)
+  source_helper 1.3.5 (1.3.10 available)
+  source_span 1.10.1 (1.10.2 available)
+  test_api 0.7.7 (0.7.9 available)
+  timezone 0.9.4 (0.11.0 available)
+  url_launcher_web 2.2.3 (2.4.2 available)
+  web 0.4.2 (1.1.1 available)
+  web_socket_channel 2.4.3 (3.0.3 available)
+  webview_flutter 4.9.0 (4.13.1 available)
+  webview_flutter_android 3.16.9 (4.10.11 available)
+  webview_flutter_wkwebview 3.23.5 (3.23.6 available)
+  workmanager 0.5.2 (0.9.0+3 available)
+Got dependencies!
+96 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
 Analyzing are_you_okay...                                       
 
 warning • Unused import: 'package:google_fonts/google_fonts.dart' • lib/core/theme/app_text_styles.dart:2:8 • unused_import
@@ -12,72 +113,69 @@ warning • Unused import: 'package:google_fonts/google_fonts.dart' • lib/core
    info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:296:11 • deprecated_member_use
    info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:297:11 • deprecated_member_use
    info • 'surfaceVariant' is deprecated and shouldn't be used. Use surfaceContainerHighest instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:301:11 • deprecated_member_use
-warning • Duplicate import • lib/presentation/screens/auth/login_screen.dart:2:8 • duplicate_import
-warning • The value of the local variable 'size' isn't used • lib/presentation/screens/auth/login_screen.dart:64:11 • unused_local_variable
+warning • Unused import: 'package:go_router/go_router.dart' • lib/main.dart:3:8 • unused_import
+warning • Unused import: 'core/theme/app_colors.dart' • lib/main.dart:6:8 • unused_import
+  error • The argument type 'Future<void> Function()?' can't be assigned to the parameter type 'VoidCallback'.  • lib/presentation/screens/auth/forgot_password_screen.dart:135:30 • argument_type_not_assignable
    info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/auth/login_screen.dart:87:52 • deprecated_member_use
+  error • The argument type 'Future<void> Function()?' can't be assigned to the parameter type 'VoidCallback'.  • lib/presentation/screens/auth/login_screen.dart:183:30 • argument_type_not_assignable
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/auth/phone_verification_screen.dart:10:8 • uri_does_not_exist
 warning • The declaration '_onOtpBackspace' isn't referenced • lib/presentation/screens/auth/phone_verification_screen.dart:85:8 • unused_element
+  error • Undefined name 'Routes' • lib/presentation/screens/auth/phone_verification_screen.dart:107:18 • undefined_identifier
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/phone_verification_screen.dart:166:29 • prefer_const_constructors
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/phone_verification_screen.dart:170:24 • prefer_const_constructors
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/phone_verification_screen.dart:237:39 • prefer_const_constructors
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/phone_verification_screen.dart:244:39 • prefer_const_constructors
-warning • Duplicate import • lib/presentation/screens/auth/register_screen.dart:2:8 • duplicate_import
-   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/register_screen.dart:71:9 • prefer_const_constructors
-   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/auth/register_screen.dart:72:20 • prefer_const_constructors
+  error • The argument type 'Future<void> Function()?' can't be assigned to the parameter type 'VoidCallback'.  • lib/presentation/screens/auth/register_screen.dart:205:30 • argument_type_not_assignable
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/contacts/add_contact_screen.dart:4:8 • unused_import
 warning • Unused import: '../../../model/emergency_contact_model.dart' • lib/presentation/screens/contacts/add_contact_screen.dart:5:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/contacts/add_contact_screen.dart:9:8 • unused_import
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/contacts/add_contact_screen.dart:9:8 • uri_does_not_exist
    info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/presentation/screens/contacts/add_contact_screen.dart:159:17 • deprecated_member_use
    info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/presentation/screens/contacts/add_contact_screen.dart:166:17 • deprecated_member_use
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/contacts/emergency_contacts_screen.dart:4:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/contacts/emergency_contacts_screen.dart:10:8 • unused_import
-  error • The named parameter 'initial' is required, but there's no corresponding argument • lib/presentation/screens/contacts/emergency_contacts_screen.dart:25:27 • missing_required_argument
-  error • The named parameter 'loaded' is required, but there's no corresponding argument • lib/presentation/screens/contacts/emergency_contacts_screen.dart:25:27 • missing_required_argument
-  error • The named parameter 'data' isn't defined • lib/presentation/screens/contacts/emergency_contacts_screen.dart:26:9 • undefined_named_parameter
-  error • The argument type 'Center Function(String, dynamic)' can't be assigned to the parameter type 'Widget? Function(String)'.  • lib/presentation/screens/contacts/emergency_contacts_screen.dart:81:16 • argument_type_not_assignable
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:175:54 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:215:64 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:265:56 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:275:53 • deprecated_member_use
+warning • Unused import: '../../widgets/loading_widget.dart' • lib/presentation/screens/contacts/emergency_contacts_screen.dart:7:8 • unused_import
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/contacts/emergency_contacts_screen.dart:10:8 • uri_does_not_exist
+  error • The method 'when' isn't defined for the type 'ContactState' • lib/presentation/screens/contacts/emergency_contacts_screen.dart:25:27 • undefined_method
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:176:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:216:64 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:266:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/contacts/emergency_contacts_screen.dart:276:53 • deprecated_member_use
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/history/checkin_history_screen.dart:5:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/history/checkin_history_screen.dart:9:8 • unused_import
-  error • The named parameter 'initial' is required, but there's no corresponding argument • lib/presentation/screens/history/checkin_history_screen.dart:24:27 • missing_required_argument
-  error • The named parameter 'success' is required, but there's no corresponding argument • lib/presentation/screens/history/checkin_history_screen.dart:24:27 • missing_required_argument
-  error • The named parameter 'data' isn't defined • lib/presentation/screens/history/checkin_history_screen.dart:25:9 • undefined_named_parameter
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/history/checkin_history_screen.dart:67:52 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/history/checkin_history_screen.dart:131:32 • deprecated_member_use
-  error • The argument type 'Center Function(String, dynamic)' can't be assigned to the parameter type 'Widget? Function(String)'.  • lib/presentation/screens/history/checkin_history_screen.dart:151:16 • argument_type_not_assignable
-  error • Undefined name 'checkinProvider' • lib/presentation/screens/home/home_screen.dart:57:20 • undefined_identifier
-  error • Undefined name 'checkinProvider' • lib/presentation/screens/home/home_screen.dart:60:30 • undefined_identifier
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:87:44 • deprecated_member_use
-  error • Undefined name 'authProvider' • lib/presentation/screens/home/home_screen.dart:130:33 • undefined_identifier
-  error • Undefined name 'hoursUntilNextCheckinProvider' • lib/presentation/screens/home/home_screen.dart:131:33 • undefined_identifier
-  error • Undefined name 'lastCheckinProvider' • lib/presentation/screens/home/home_screen.dart:132:35 • undefined_identifier
-   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:138:21 • prefer_const_constructors
-   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:139:21 • prefer_const_constructors
-   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/presentation/screens/home/home_screen.dart:142:21 • prefer_const_literals_to_create_immutables
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:262:51 • deprecated_member_use
-   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:268:18 • prefer_const_constructors
-   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/presentation/screens/home/home_screen.dart:270:23 • prefer_const_literals_to_create_immutables
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:320:22 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:401:36 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:402:37 • deprecated_member_use
-warning • Duplicate import • lib/presentation/screens/onboarding/onboarding_screen.dart:2:8 • duplicate_import
+warning • Unused import: '../../widgets/loading_widget.dart' • lib/presentation/screens/history/checkin_history_screen.dart:7:8 • unused_import
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/history/checkin_history_screen.dart:9:8 • uri_does_not_exist
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/history/checkin_history_screen.dart:71:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/history/checkin_history_screen.dart:135:34 • deprecated_member_use
+warning • Unnecessary cast • lib/presentation/screens/history/checkin_history_screen.dart:155:39 • unnecessary_cast
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/home/home_screen.dart:10:8 • uri_does_not_exist
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:90:44 • deprecated_member_use
+   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:141:21 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:142:21 • prefer_const_constructors
+   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/presentation/screens/home/home_screen.dart:145:21 • prefer_const_literals_to_create_immutables
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:217:39 • undefined_identifier
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:267:51 • deprecated_member_use
+   info • Use 'const' with the constructor to improve performance • lib/presentation/screens/home/home_screen.dart:273:18 • prefer_const_constructors
+   info • Use 'const' literals as arguments to constructors of '@immutable' classes • lib/presentation/screens/home/home_screen.dart:275:23 • prefer_const_literals_to_create_immutables
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:325:22 • deprecated_member_use
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:372:39 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:378:39 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:384:39 • undefined_identifier
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:406:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/home/home_screen.dart:407:37 • deprecated_member_use
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:445:26 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:448:26 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/home/home_screen.dart:451:26 • undefined_identifier
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/onboarding/onboarding_screen.dart:10:8 • uri_does_not_exist
+  error • Undefined name 'Routes' • lib/presentation/screens/onboarding/onboarding_screen.dart:85:16 • undefined_identifier
    info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/onboarding/onboarding_screen.dart:188:54 • deprecated_member_use
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/profile/edit_profile_screen.dart:4:8 • unused_import
 warning • Unused import: '../../widgets/loading_widget.dart' • lib/presentation/screens/profile/edit_profile_screen.dart:7:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/profile/edit_profile_screen.dart:9:8 • unused_import
-  error • The getter 'value' isn't defined for the type 'AuthState' • lib/presentation/screens/profile/edit_profile_screen.dart:35:41 • undefined_getter
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/profile/edit_profile_screen.dart:70:58 • deprecated_member_use
-   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/presentation/screens/profile/edit_profile_screen.dart:132:17 • deprecated_member_use
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/profile/edit_profile_screen.dart:9:8 • uri_does_not_exist
+  error • The method 'maybeWhen' isn't defined for the type 'AuthState' • lib/presentation/screens/profile/edit_profile_screen.dart:35:41 • undefined_method
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/presentation/screens/profile/edit_profile_screen.dart:135:17 • deprecated_member_use
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/profile/profile_screen.dart:4:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/profile/profile_screen.dart:5:8 • unused_import
-  error • The named parameter 'authenticated' is required, but there's no corresponding argument • lib/presentation/screens/profile/profile_screen.dart:31:23 • missing_required_argument
-  error • The named parameter 'initial' is required, but there's no corresponding argument • lib/presentation/screens/profile/profile_screen.dart:31:23 • missing_required_argument
-  error • The named parameter 'unauthenticated' is required, but there's no corresponding argument • lib/presentation/screens/profile/profile_screen.dart:31:23 • missing_required_argument
-  error • The named parameter 'data' isn't defined • lib/presentation/screens/profile/profile_screen.dart:32:9 • undefined_named_parameter
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/profile/profile_screen.dart:49:60 • deprecated_member_use
-  error • The argument type 'Center Function(String, dynamic)' can't be assigned to the parameter type 'Widget? Function(String)'.  • lib/presentation/screens/profile/profile_screen.dart:168:16 • argument_type_not_assignable
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/profile/profile_screen.dart:192:40 • deprecated_member_use
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/profile/profile_screen.dart:5:8 • uri_does_not_exist
+warning • Unused import: '../../widgets/loading_widget.dart' • lib/presentation/screens/profile/profile_screen.dart:7:8 • unused_import
+  error • The method 'maybeWhen' isn't defined for the type 'AuthState' • lib/presentation/screens/profile/profile_screen.dart:31:23 • undefined_method
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/profile/profile_screen.dart:197:40 • deprecated_member_use
    info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/presentation/screens/settings/notification_settings_screen.dart:69:7 • deprecated_member_use
    info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/presentation/screens/settings/settings_screen.dart:48:15 • deprecated_member_use
    info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/presentation/screens/settings/settings_screen.dart:64:15 • deprecated_member_use
@@ -89,7 +187,7 @@ warning • Unused import: '../../routes/app_router.dart' • lib/presentation/s
    info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/presentation/screens/settings/settings_screen.dart:227:15 • deprecated_member_use
 warning • Unused import: '../../../core/theme/app_text_styles.dart' • lib/presentation/screens/sos/sos_screen.dart:4:8 • unused_import
 warning • Unused import: '../../widgets/custom_button.dart' • lib/presentation/screens/sos/sos_screen.dart:5:8 • unused_import
-warning • Unused import: '../../routes/app_router.dart' • lib/presentation/screens/sos/sos_screen.dart:6:8 • unused_import
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/sos/sos_screen.dart:6:8 • uri_does_not_exist
 warning • The value of the field '_isActivating' isn't used • lib/presentation/screens/sos/sos_screen.dart:22:8 • unused_field
    info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/sos/sos_screen.dart:60:32 • deprecated_member_use
    info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/sos/sos_screen.dart:76:46 • deprecated_member_use
@@ -121,23 +219,58 @@ warning • The value of the field '_isActivating' isn't used • lib/presentati
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/sos/sos_screen.dart:323:11 • prefer_const_constructors
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/sos/sos_screen.dart:324:22 • prefer_const_constructors
    info • Use 'const' with the constructor to improve performance • lib/presentation/screens/sos/sos_screen.dart:326:23 • prefer_const_constructors
-  error • The named parameter 'authenticated' is required, but there's no corresponding argument • lib/presentation/screens/splash/splash_screen.dart:78:17 • missing_required_argument
-  error • The named parameter 'initial' is required, but there's no corresponding argument • lib/presentation/screens/splash/splash_screen.dart:78:17 • missing_required_argument
-  error • The named parameter 'unauthenticated' is required, but there's no corresponding argument • lib/presentation/screens/splash/splash_screen.dart:78:17 • missing_required_argument
-  error • The named parameter 'data' isn't defined • lib/presentation/screens/splash/splash_screen.dart:79:9 • undefined_named_parameter
-  error • The argument type 'Null Function(String, dynamic)' can't be assigned to the parameter type 'Null Function(String)'.  • lib/presentation/screens/splash/splash_screen.dart:90:16 • argument_type_not_assignable
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/splash/splash_screen.dart:177:47 • deprecated_member_use
-   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/splash/splash_screen.dart:252:33 • deprecated_member_use
+  error • Target of URI doesn't exist: '../../routes/app_router.dart' • lib/presentation/screens/splash/splash_screen.dart:9:8 • uri_does_not_exist
+  error • Undefined name 'Routes' • lib/presentation/screens/splash/splash_screen.dart:80:20 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/splash/splash_screen.dart:82:20 • undefined_identifier
+  error • Undefined name 'Routes' • lib/presentation/screens/splash/splash_screen.dart:86:20 • undefined_identifier
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/splash/splash_screen.dart:171:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/screens/splash/splash_screen.dart:246:33 • deprecated_member_use
 warning • The value of the local variable 'theme' isn't used • lib/presentation/widgets/custom_button.dart:34:11 • unused_local_variable
    info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/empty_state_widget.dart:33:46 • deprecated_member_use
 warning • Unused import: '../model/user_model.dart' • lib/repository/checkin_repository.dart:4:8 • unused_import
+warning • Unused import: 'auth_repository.dart' • lib/repository/checkin_repository.dart:7:8 • unused_import
+warning • Unused import: 'auth_repository.dart' • lib/repository/contact_repository.dart:6:8 • unused_import
+  error • The named parameter 'userId' isn't defined • lib/repository/contact_repository.dart:45:9 • undefined_named_parameter
+  error • The getter 'uid' isn't defined for the type 'UserModel' • lib/repository/contact_repository.dart:45:22 • undefined_getter
+  error • The named parameter 'createdAt' isn't defined • lib/repository/contact_repository.dart:53:9 • undefined_named_parameter
 warning • Unused import: 'dart:ui' • lib/services/background_service.dart:2:8 • unused_import
+warning • Unused import: '../services/hive_service.dart' • lib/services/background_service.dart:5:8 • unused_import
+warning • Unused import: '../services/notification_service.dart' • lib/services/background_service.dart:6:8 • unused_import
 warning • Unused import: '../model/settings_model.dart' • lib/services/background_service.dart:7:8 • unused_import
 warning • Unused import: '../model/checkin_model.dart' • lib/services/background_service.dart:8:8 • unused_import
+warning • The declaration '_calculateInitialDelayFor9AM' isn't referenced • lib/services/background_service.dart:77:19 • unused_element
+   info • The imported package 'firebase_auth' isn't a dependency of the importing package • lib/services/firebase/firebase_auth_service.dart:1:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:firebase_auth/firebase_auth.dart' • lib/services/firebase/firebase_auth_service.dart:1:8 • uri_does_not_exist
+  error • Undefined class 'FirebaseAuth' • lib/services/firebase/firebase_auth_service.dart:7:9 • undefined_class
+  error • Undefined name 'FirebaseAuth' • lib/services/firebase/firebase_auth_service.dart:7:30 • undefined_identifier
+  error • Undefined class 'User' • lib/services/firebase/firebase_auth_service.dart:10:3 • undefined_class
+  error • The name 'User' isn't a type, so it can't be used as a type argument • lib/services/firebase/firebase_auth_service.dart:16:10 • non_type_as_type_argument
 warning • The value of the field '_verificationId' isn't used • lib/services/firebase/firebase_auth_service.dart:22:11 • unused_field
+  error • The name 'UserCredential' isn't a type, so it can't be used as a type argument • lib/services/firebase/firebase_auth_service.dart:26:10 • non_type_as_type_argument
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:35:10 • non_type_in_catch_clause
+  error • The name 'UserCredential' isn't a type, so it can't be used as a type argument • lib/services/firebase/firebase_auth_service.dart:41:10 • non_type_as_type_argument
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:50:10 • non_type_in_catch_clause
+  error • Undefined class 'PhoneAuthCredential' • lib/services/firebase/firebase_auth_service.dart:60:23 • undefined_class
+  error • Undefined class 'FirebaseAuthException' • lib/services/firebase/firebase_auth_service.dart:67:28 • undefined_class
+  error • The name 'UserCredential' isn't a type, so it can't be used as a type argument • lib/services/firebase/firebase_auth_service.dart:83:10 • non_type_as_type_argument
+  error • Undefined name 'PhoneAuthProvider' • lib/services/firebase/firebase_auth_service.dart:88:26 • undefined_identifier
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:93:10 • non_type_in_catch_clause
+  error • The name 'UserCredential' isn't a type, so it can't be used as a type argument • lib/services/firebase/firebase_auth_service.dart:99:10 • non_type_as_type_argument
+  error • Undefined class 'PhoneAuthCredential' • lib/services/firebase/firebase_auth_service.dart:100:5 • undefined_class
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:104:10 • non_type_in_catch_clause
+  error • Undefined class 'PhoneAuthCredential' • lib/services/firebase/firebase_auth_service.dart:110:32 • undefined_class
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:113:10 • non_type_in_catch_clause
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:122:10 • non_type_in_catch_clause
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:131:10 • non_type_in_catch_clause
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:140:10 • non_type_in_catch_clause
+  error • The name 'FirebaseAuthException' isn't a type and can't be used in an on-catch clause • lib/services/firebase/firebase_auth_service.dart:159:10 • non_type_in_catch_clause
+  error • Undefined class 'FirebaseAuthException' • lib/services/firebase/firebase_auth_service.dart:165:31 • undefined_class
+  error • Target of URI doesn't exist: '../../core/config/firebase_config.dart' • lib/services/firebase/firestore_service.dart:3:8 • uri_does_not_exist
+  error • Undefined name 'FirebaseConfig' • lib/services/firebase/firestore_service.dart:12:29 • undefined_identifier
+  error • Undefined name 'FirebaseConfig' • lib/services/firebase/firestore_service.dart:14:29 • undefined_identifier
+  error • Undefined name 'FirebaseConfig' • lib/services/firebase/firestore_service.dart:16:29 • undefined_identifier
+  error • Undefined name 'FirebaseConfig' • lib/services/firebase/firestore_service.dart:82:21 • undefined_identifier
+  error • Undefined name 'FirebaseConfig' • lib/services/firebase/firestore_service.dart:166:21 • undefined_identifier
    info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/services/notification_service.dart:3:8 • unnecessary_import
-warning • The asset directory 'assets/images/' doesn't exist • pubspec.yaml:100:7 • asset_directory_does_not_exist
-warning • The asset directory 'assets/icons/' doesn't exist • pubspec.yaml:101:7 • asset_directory_does_not_exist
-warning • The asset directory 'assets/lottie/' doesn't exist • pubspec.yaml:102:7 • asset_directory_does_not_exist
+warning • The asset directory 'assets/animations/' doesn't exist • pubspec.yaml:101:7 • asset_directory_does_not_exist
 
-139 issues found. (ran in 2.4s)

@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const axios = require('axios');
-const User = require('../models/User');
-const EarthquakeAlert = require('../models/EarthquakeAlert');
+const User = require('../model/User');
+const EarthquakeAlert = require('../model/EarthquakeAlert');
 const { sendNotification, sendMulticastNotification } = require('../config/firebase');
 const { EARTHQUAKE } = require('../config/constants');
 const { logger } = require('../middleware/logger');

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../routes/app_router.dart';
+import 'package:are_you_okay/routes/app_router.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/checkin_provider.dart';
@@ -60,13 +60,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     if (mounted) {
       final state = ref.read(checkinProvider);
-      state.maybeWhen(
-        success: (_) => _showSuccessDialog(),
-        error: (message) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ত্রুটি: $message'), backgroundColor: AppColors.danger),
-        ),
-        orElse: () {},
-      );
+      
+      if (state is CheckInSuccess) {
+        _showSuccessDialog();
+      } else if (state is CheckInError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ত্রুটি: ${state.message}'), backgroundColor: AppColors.danger),
+        );
+      }
     }
   }
 
@@ -193,6 +194,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               const Spacer(),
 
               _buildQuickActions(),
+
+              const SizedBox(height: 24),
 
               const BannerAdWidget(),
               const SizedBox(height: 8),

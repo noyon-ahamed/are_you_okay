@@ -23,8 +23,13 @@ const initializeFirebase = () => {
         return admin;
 
     } catch (error) {
-        console.error('❌ Firebase initialization error:', error.message);
-        throw error;
+        console.error('❌ Firebase initialization error (Check .env):', error.message);
+        // Do not throw error to allow server to start without Firebase
+        return {
+            auth: () => ({ verifyIdToken: () => Promise.reject('Firebase not initialized') }),
+            messaging: () => ({ send: () => Promise.resolve(), sendMulticast: () => Promise.resolve() }),
+            storage: () => ({ bucket: () => ({ file: () => ({ save: () => { }, delete: () => { } }) }) }),
+        };
     }
 };
 
@@ -41,6 +46,7 @@ module.exports = {
     // Helper functions
     verifyIdToken: async (token) => {
         try {
+            if (!firebaseAdmin.auth) throw new Error('Firebase Auth not initialized');
             const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
             return decodedToken;
         } catch (error) {

@@ -16,6 +16,7 @@ const paymentRoutes = require('./routes/payment');
 const aiRoutes = require('./routes/ai');
 const earthquakeRoutes = require('./routes/earthquake');
 const notificationRoutes = require('./routes/notification');
+const configRoutes = require('./routes/config');
 
 
 
@@ -25,6 +26,8 @@ const startEarthquakeMonitor = require('./jobs/earthquakeMonitor');
 const startSubscriptionExpiry = require('./jobs/subscriptionExpiry');
 const startUsageReset = require('./jobs/usageReset');
 const startCleanup = require('./jobs/cleanup');
+require('./jobs/notificationScheduler'); // Auto-starts cron jobs on require
+
 
 const app = express();
 const server = http.createServer(app);
@@ -73,28 +76,11 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/earthquake', earthquakeRoutes);
 app.use('/api/notification', notificationRoutes);
+app.use('/api/config', configRoutes);
 
 // Socket.io connection handling
-io.on('connection', (socket) => {
-    logger.info('Client connected', { socketId: socket.id });
-
-    // User joins their personal room
-    socket.on('join', (userId) => {
-        socket.join(`user_${userId}`);
-        logger.info('User joined room', { userId, socketId: socket.id });
-    });
-
-    // Handle real-time location updates
-    socket.on('location_update', async (data) => {
-        const { userId, latitude, longitude } = data;
-        // Broadcast to user's emergency contacts if needed
-        socket.to(`user_${userId}`).emit('location_updated', { latitude, longitude });
-    });
-
-    socket.on('disconnect', () => {
-        logger.info('Client disconnected', { socketId: socket.id });
-    });
-});
+const initSockets = require('./sockets/index');
+initSockets(io);
 
 // 404 handler
 app.use(notFound);

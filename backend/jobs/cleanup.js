@@ -1,7 +1,7 @@
 const cron = require('node-cron');
-const CheckIn = require('../models/CheckIn');
-const Notification = require('../models/Notification');
-const UsageLog = require('../models/UsageLog');
+const CheckIn = require('../model/CheckIn');
+const Notification = require('../model/Notification');
+const UsageLog = require('../model/UsageLog');
 const { logger } = require('../middleware/logger');
 
 // Clean up old records

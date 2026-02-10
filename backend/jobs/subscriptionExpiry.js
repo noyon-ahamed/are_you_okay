@@ -1,6 +1,6 @@
 const cron = require('node-cron');
-const Subscription = require('../models/Subscription');
-const User = require('../models/User');
+const Subscription = require('../model/Subscription');
+const User = require('../model/User');
 const { sendNotification } = require('../config/firebase');
 const { logger } = require('../middleware/logger');
 

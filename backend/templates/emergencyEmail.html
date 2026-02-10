@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .alert { color: red; font-weight: bold; font-size: 18px; }
+        .location { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2 class="alert">EMERGENCY ALERT: SOS Triggered</h2>
+    <p>This is an automated message from <strong>Are You Okay?</strong> app.</p>
+    <p>User <strong>{{userName}}</strong> has triggered an SOS alert.</p>
+    
+    <div class="location">
+        <p><strong>Last Known Location:</strong></p>
+        <p>Latitude: {{latitude}}</p>
+        <p>Longitude: {{longitude}}</p>
+        <p><a href="https://www.google.com/maps?q={{latitude}},{{longitude}}">View on Google Maps</a></p>
+    </div>
+
+    <p>Please try to contact them immediately.</p>
+</body>
+</html>

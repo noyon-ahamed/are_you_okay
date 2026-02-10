@@ -1,113 +1,97 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../model/user_model.dart';
 import '../repository/auth_repository.dart';
 
-part 'auth_provider.freezed.dart';
-
 // Auth State
-@freezed
-class AuthState with _$AuthState {
-  const factory AuthState.initial() = _Initial;
-  const factory AuthState.loading() = _Loading;
-  const factory AuthState.authenticated(UserModel user) = _Authenticated;
-  const factory AuthState.unauthenticated() = _Unauthenticated;
-  const factory AuthState.error(String message) = _Error;
+abstract class AuthState {
+  const AuthState();
+}
+
+class AuthInitial extends AuthState {
+  const AuthInitial();
+}
+
+class AuthLoading extends AuthState {
+  const AuthLoading();
+}
+
+class AuthAuthenticated extends AuthState {
+  final UserModel user;
+  const AuthAuthenticated(this.user);
+}
+
+class AuthUnauthenticated extends AuthState {
+  const AuthUnauthenticated();
+}
+
+class AuthError extends AuthState {
+  final String message;
+  const AuthError(this.message);
 }
 
 // Auth State Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
 
-  AuthNotifier(this._authRepository) : super(const AuthState.initial()) {
-    _checkAuthStatus();
+  AuthNotifier(this._authRepository) : super(const AuthInitial()) {
+    checkAuthStatus();
   }
 
-  void _checkAuthStatus() {
-    final user = _authRepository.getCurrentUser();
-    if (user != null && _authRepository.isLoggedIn) {
-      state = AuthState.authenticated(user);
-    } else {
-      state = const AuthState.unauthenticated();
+  Future<void> checkAuthStatus() async {
+    state = const AuthLoading();
+    try {
+      final user = await _authRepository.getCurrentUser();
+      if (user != null) {
+        state = AuthAuthenticated(user);
+      } else {
+        state = const AuthUnauthenticated();
+      }
+    } catch (e) {
+      state = const AuthUnauthenticated();
     }
   }
 
-  Future<void> sendOTP(String phoneNumber) async {
+  Future<void> login({required String email, required String password}) async {
+    state = const AuthLoading();
     try {
-      state = const AuthState.loading();
-      await _authRepository.sendOTP(phoneNumber);
-      state = const AuthState.unauthenticated();
+      final user = await _authRepository.login(email: email, password: password);
+      state = AuthAuthenticated(user);
     } catch (e) {
-      state = AuthState.error(e.toString());
-    }
-  }
-
-  Future<void> verifyOTP({
-    required String phoneNumber,
-    required String otp,
-    String? name,
-    String? email,
-  }) async {
-    try {
-      state = const AuthState.loading();
-      final user = await _authRepository.verifyOTP(
-        phoneNumber: phoneNumber,
-        otp: otp,
-        name: name,
-        email: email,
-      );
-      state = AuthState.authenticated(user);
-    } catch (e) {
-      state = AuthState.error(e.toString());
+      state = AuthError(e.toString());
+      // Reset to unauthenticated after error so UI can show login form again if needed
+      // Or keep error state depending on UI requirement. 
+      // Usually better to keep error state so UI can show snackbar and then reset.
     }
   }
 
   Future<void> register({
-    required String phoneNumber,
+    required String email,
+    required String password,
     required String name,
-    String? email,
+    String? phone,
   }) async {
+    state = const AuthLoading();
     try {
-      state = const AuthState.loading();
       final user = await _authRepository.register(
-        phoneNumber: phoneNumber,
-        name: name,
         email: email,
+        password: password,
+        name: name,
+        phone: phone,
       );
-      state = AuthState.authenticated(user);
+      state = AuthAuthenticated(user);
     } catch (e) {
-      state = AuthState.error(e.toString());
+      state = AuthError(e.toString());
     }
   }
 
   Future<void> logout() async {
+    state = const AuthLoading();
     try {
-      state = const AuthState.loading();
       await _authRepository.logout();
-      state = const AuthState.unauthenticated();
+      state = const AuthUnauthenticated();
     } catch (e) {
-      state = AuthState.error(e.toString());
+      state = AuthError(e.toString());
     }
-  }
-
-  Future<void> updateProfile(UserModel user) async {
-    try {
-      final updated = await _authRepository.updateProfile(user);
-      state = AuthState.authenticated(updated);
-    } catch (e) {
-      state = AuthState.error(e.toString());
-    }
-  }
-
-  UserModel? get currentUser {
-    return state.maybeWhen(
-      authenticated: (user) => user,
-      orElse: () => null,
-    );
-  }
-
-  bool get isAuthenticated {
-    return state is _Authenticated;
   }
 }
 
@@ -116,7 +100,11 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(ref.watch(authRepositoryProvider));
 });
 
-// Convenience provider for current user
+// Current User Provider
 final currentUserProvider = Provider<UserModel?>((ref) {
-  return ref.watch(authProvider.notifier).currentUser;
+  final state = ref.watch(authProvider);
+  if (state is AuthAuthenticated) {
+    return state.user;
+  }
+  return null;
 });

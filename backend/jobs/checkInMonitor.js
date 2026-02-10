@@ -1,7 +1,8 @@
 const cron = require('node-cron');
-const User = require('../models/User');
-const EmergencyContact = require('../models/EmergencyContact');
-const EmergencyAlert = require('../models/EmergencyAlert');
+const User = require('../model/User');
+const CheckIn = require('../model/CheckIn');
+const EmergencyContact = require('../model/EmergencyContact');
+const EmergencyAlert = require('../model/EmergencyAlert');
 const { sendNotification } = require('../config/firebase');
 const twilioClient = require('../config/twilio');
 const { ALERT_MESSAGES, CHECK_IN } = require('../config/constants');

@@ -1,35 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../model/emergency_contact_model.dart';
 import '../repository/contact_repository.dart';
 
-part 'contact_provider.freezed.dart';
-
 // Contact State
-@freezed
-class ContactState with _$ContactState {
-  const factory ContactState.initial() = _Initial;
-  const factory ContactState.loading() = _Loading;
-  const factory ContactState.loaded(List<EmergencyContactModel> contacts) =
-      _Loaded;
-  const factory ContactState.error(String message) = _Error;
+abstract class ContactState {
+  const ContactState();
+}
+
+class ContactInitial extends ContactState {
+  const ContactInitial();
+}
+
+class ContactLoading extends ContactState {
+  const ContactLoading();
+}
+
+class ContactLoaded extends ContactState {
+  final List<EmergencyContactModel> contacts;
+  const ContactLoaded(this.contacts);
+}
+
+class ContactError extends ContactState {
+  final String message;
+  const ContactError(this.message);
 }
 
 // Contact Notifier
 class ContactNotifier extends StateNotifier<ContactState> {
   final ContactRepository _repository;
 
-  ContactNotifier(this._repository) : super(const ContactState.initial()) {
+  ContactNotifier(this._repository) : super(const ContactInitial()) {
     loadContacts();
   }
 
   Future<void> loadContacts() async {
     try {
-      state = const ContactState.loading();
+      state = const ContactLoading();
       final contacts = _repository.getAllContacts();
-      state = ContactState.loaded(contacts);
+      state = ContactLoaded(contacts);
     } catch (e) {
-      state = ContactState.error(e.toString());
+      state = ContactError(e.toString());
     }
   }
 
@@ -43,7 +53,7 @@ class ContactNotifier extends StateNotifier<ContactState> {
     bool notifyViaApp = true,
   }) async {
     try {
-      state = const ContactState.loading();
+      state = const ContactLoading();
       
       await _repository.addContact(
         name: name,
@@ -57,37 +67,37 @@ class ContactNotifier extends StateNotifier<ContactState> {
       
       await loadContacts();
     } catch (e) {
-      state = ContactState.error(e.toString());
+      state = ContactError(e.toString());
     }
   }
 
   Future<void> updateContact(EmergencyContactModel contact) async {
     try {
-      state = const ContactState.loading();
+      state = const ContactLoading();
       await _repository.updateContact(contact);
       await loadContacts();
     } catch (e) {
-      state = ContactState.error(e.toString());
+      state = ContactError(e.toString());
     }
   }
 
   Future<void> deleteContact(String id) async {
     try {
-      state = const ContactState.loading();
+      state = const ContactLoading();
       await _repository.deleteContact(id);
       await loadContacts();
     } catch (e) {
-      state = ContactState.error(e.toString());
+      state = ContactError(e.toString());
     }
   }
 
   Future<void> reorderContacts(List<String> orderedIds) async {
     try {
-      state = const ContactState.loading();
+      state = const ContactLoading();
       await _repository.reorderContacts(orderedIds);
       await loadContacts();
     } catch (e) {
-      state = ContactState.error(e.toString());
+      state = ContactError(e.toString());
     }
   }
 
@@ -109,10 +119,10 @@ final contactProvider =
 // Provider for contact list
 final contactListProvider = Provider<List<EmergencyContactModel>>((ref) {
   final state = ref.watch(contactProvider);
-  return state.maybeWhen(
-    loaded: (contacts) => contacts,
-    orElse: () => [],
-  );
+  if (state is ContactLoaded) {
+    return state.contacts;
+  }
+  return [];
 });
 
 // Provider for single contact

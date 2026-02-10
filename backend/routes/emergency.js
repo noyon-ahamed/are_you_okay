@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/authMiddleware');
-const EmergencyContact = require('../models/EmergencyContact');
-const EmergencyAlert = require('../models/EmergencyAlert');
-const User = require('../models/User');
-const Subscription = require('../models/Subscription');
+const EmergencyContact = require('../model/EmergencyContact');
+const EmergencyAlert = require('../model/EmergencyAlert');
+const User = require('../model/User');
+const Subscription = require('../model/Subscription');
 const twilioClient = require('../config/twilio');
 const { PRICING, ALERT_MESSAGES } = require('../config/constants');
 
