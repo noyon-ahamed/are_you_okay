@@ -386,6 +386,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ],
       ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          _buildActionCard(
+            icon: Icons.chat_bubble_outline,
+            label: 'AI সাথী',
+            onTap: () => context.push(Routes.aiChat),
+          ),
+          const SizedBox(width: 12),
+          _buildActionCard(
+            icon: Icons.public,
+            label: 'ভূমিকম্প',
+            onTap: () => context.push(Routes.earthquake),
+          ),
+          const SizedBox(width: 12),
+          _buildActionCard(
+            icon: Icons.call,
+            label: 'ফেইক কল',
+            onTap: () => context.push(Routes.fakeCall),
+          ),
+        ],
+      ),
     );
   }
 

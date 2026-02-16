@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import '../auth/token_storage_service.dart';
+import '../shared_prefs_service.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -12,7 +12,7 @@ class AuthApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await TokenStorageService.getToken();
+          final token = await SharedPrefsService.getToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -21,7 +21,7 @@ class AuthApiService {
         onError: (error, handler) async {
           // Handle 401 Unauthorized - token expired
           if (error.response?.statusCode == 401) {
-            await TokenStorageService.clearAll();
+            await SharedPrefsService().clearAll();
             // Optionally navigate to login screen here
           }
           return handler.next(error);
@@ -52,8 +52,8 @@ class AuthApiService {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
         
-        await TokenStorageService.saveToken(token);
-        await TokenStorageService.saveUserId(userId);
+        await SharedPrefsService().setUserToken(token);
+        await SharedPrefsService().setUserId(userId);
         
         return response.data['data'];
       } else {
@@ -82,8 +82,8 @@ class AuthApiService {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
         
-        await TokenStorageService.saveToken(token);
-        await TokenStorageService.saveUserId(userId);
+        await SharedPrefsService().setUserToken(token);
+        await SharedPrefsService().setUserId(userId);
         
         return response.data['data'];
       } else {
@@ -96,7 +96,7 @@ class AuthApiService {
 
   /// Logout user
   Future<void> logout() async {
-    await TokenStorageService.clearAll();
+    await SharedPrefsService().clearAll();
   }
 
   /// Get current user profile

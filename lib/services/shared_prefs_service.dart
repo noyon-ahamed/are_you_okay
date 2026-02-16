@@ -11,6 +11,11 @@ class SharedPrefsService {
   factory SharedPrefsService() => _instance;
   SharedPrefsService._internal();
 
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_token');
+  }
+
   SharedPreferences? _prefs;
 
   Future<void> init() async {
