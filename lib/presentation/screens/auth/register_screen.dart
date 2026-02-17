@@ -202,7 +202,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Register button
                 CustomButton(
                   text: 'নিবন্ধন করুন',
-                  onPressed: _isLoading ? null : _handleRegister,
+                  onPressed: _isLoading ? null : () { _handleRegister(); },
                   isLoading: _isLoading,
                 ),
                 

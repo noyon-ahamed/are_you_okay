@@ -364,47 +364,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildQuickActions() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
+      child: Column(
         children: [
-          _buildActionCard(
-            icon: Icons.history,
-            label: 'ইতিহাস',
-            onTap: () => context.push(Routes.history),
+          Row(
+            children: [
+              _buildActionCard(
+                icon: Icons.history,
+                label: 'ইতিহাস',
+                onTap: () => context.push(Routes.history),
+              ),
+              const SizedBox(width: 12),
+              _buildActionCard(
+                icon: Icons.people,
+                label: 'যোগাযোগ',
+                onTap: () => context.push(Routes.contacts),
+              ),
+              const SizedBox(width: 12),
+              _buildActionCard(
+                icon: Icons.warning,
+                label: 'SOS',
+                onTap: () => context.push(Routes.sos),
+                isEmergency: true,
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          _buildActionCard(
-            icon: Icons.people,
-            label: 'যোগাযোগ',
-            onTap: () => context.push(Routes.contacts),
-          ),
-          const SizedBox(width: 12),
-          _buildActionCard(
-            icon: Icons.warning,
-            label: 'SOS',
-            onTap: () => context.push(Routes.sos),
-            isEmergency: true,
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          _buildActionCard(
-            icon: Icons.chat_bubble_outline,
-            label: 'AI সাথী',
-            onTap: () => context.push(Routes.aiChat),
-          ),
-          const SizedBox(width: 12),
-          _buildActionCard(
-            icon: Icons.public,
-            label: 'ভূমিকম্প',
-            onTap: () => context.push(Routes.earthquake),
-          ),
-          const SizedBox(width: 12),
-          _buildActionCard(
-            icon: Icons.call,
-            label: 'ফেইক কল',
-            onTap: () => context.push(Routes.fakeCall),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildActionCard(
+                icon: Icons.chat_bubble_outline,
+                label: 'AI সাথী',
+                onTap: () => context.push(Routes.aiChat),
+              ),
+              const SizedBox(width: 12),
+              _buildActionCard(
+                icon: Icons.public,
+                label: 'ভূমিকম্প',
+                onTap: () => context.push(Routes.earthquake),
+              ),
+              const SizedBox(width: 12),
+              _buildActionCard(
+                icon: Icons.call,
+                label: 'ফেইক কল',
+                onTap: () => context.push(Routes.fakeCall),
+              ),
+            ],
           ),
         ],
       ),

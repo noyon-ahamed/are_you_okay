@@ -180,7 +180,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Login button
                 CustomButton(
                   text: 'লগইন',
-                  onPressed: _isLoading ? null : _handleLogin,
+                  onPressed: _isLoading ? null : () { _handleLogin(); },
                   isLoading: _isLoading,
                 ),
                 

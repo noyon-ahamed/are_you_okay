@@ -5,7 +5,7 @@ import '../../core/theme/app_colors.dart';
 /// Reusable button with consistent styling
 class CustomButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isLoading;
   final bool isOutlined;
   final IconData? icon;
@@ -18,7 +18,7 @@ class CustomButton extends StatelessWidget {
   const CustomButton({
     super.key,
     required this.text,
-    required this.onPressed,
+    this.onPressed,
     this.isLoading = false,
     this.isOutlined = false,
     this.icon,

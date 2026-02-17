@@ -42,7 +42,7 @@ class ContactRepository {
 
       final contact = EmergencyContactModel(
         id: _uuid.v4(),
-        userId: user.uid,
+        userId: user.id,
         name: name,
         phoneNumber: phoneNumber,
         relationship: relationship,

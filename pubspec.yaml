@@ -70,7 +70,7 @@ dependencies:
   
   # Audio/Voice
   just_audio: ^0.9.36
-  record: ^5.0.4
+  # record: 5.1.0
   
   # Background tasks
   workmanager: ^0.5.2
@@ -100,12 +100,12 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
-    - assets/animations/
+
     - .env
   
-  fonts:
-    - family: CustomFont
-      fonts:
-        - asset: assets/fonts/CustomFont-Regular.ttf
-        - asset: assets/fonts/CustomFont-Bold.ttf
-          weight: 700
+  # fonts:
+  #   - family: CustomFont
+  #     fonts:
+  #       - asset: assets/fonts/CustomFont-Regular.ttf
+  #       - asset: assets/fonts/CustomFont-Bold.ttf
+  #         weight: 700

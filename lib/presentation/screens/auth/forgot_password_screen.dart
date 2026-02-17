@@ -132,7 +132,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 // Submit button
                 CustomButton(
                   text: 'রিসেট লিংক পাঠান',
-                  onPressed: _isLoading ? null : _handleSubmit,
+                  onPressed: _isLoading ? null : () { _handleSubmit(); },
                   isLoading: _isLoading,
                 ),
                 
