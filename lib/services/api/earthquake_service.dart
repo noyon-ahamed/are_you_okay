@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 
 final earthquakeServiceProvider = Provider<EarthquakeService>((ref) => EarthquakeService(Dio()));
@@ -7,8 +8,8 @@ final earthquakeServiceProvider = Provider<EarthquakeService>((ref) => Earthquak
 class EarthquakeService {
   final Dio _dio;
   
-  // TODO: Update with your actual backend URL
-  final String _baseUrl = 'http://10.0.2.2:3000/api'; 
+  // Use centralized API URL from AppConstants
+  final String _baseUrl = AppConstants.apiBaseUrl; 
 
   EarthquakeService(this._dio);
 

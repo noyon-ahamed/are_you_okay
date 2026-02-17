@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
+import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
 class AuthApiService {
-  static const String baseUrl = 'http://10.10.5.53:3000/api'; // Use Computer's Local IP for Physical Device
+  static const String baseUrl = AppConstants.apiBaseUrl;
   final Dio _dio = Dio();
 
   AuthApiService() {

@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
+import '../../core/constants/app_constants.dart';
 
 /// ConfigApiService
 /// Fetches app configuration from backend (including ad settings)
 class ConfigApiService {
-  static const String baseUrl = 'http://localhost:3000/api'; // Update for production
+  static const String baseUrl = AppConstants.apiBaseUrl;
   final Dio _dio = Dio();
 
   /// Get app configuration

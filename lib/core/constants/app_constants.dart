@@ -1,6 +1,13 @@
 class AppConstants {
   AppConstants._();
 
+  // API Configuration
+  // For Android emulator (localhost): 'http://10.0.2.2:3000/api'
+  // For physical device on LAN: 'http://<YOUR_IP>:3000/api'
+  // For production (Render): 'https://your-app.onrender.com/api'
+  static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
+
+
   // App Information
   static const String appName = 'Bhalo Achen Ki?';
   static const String appNameBangla = 'ভালো আছেন কি?';

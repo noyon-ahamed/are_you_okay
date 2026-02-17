@@ -8,8 +8,8 @@ final aiServiceProvider = Provider<AIService>((ref) => AIService(Dio()));
 class AIService {
   final Dio _dio;
   
-  // TODO: Update with your actual backend URL
-  final String _baseUrl = 'http://10.0.2.2:3000/api'; 
+  // Use centralized API URL from AppConstants
+  final String _baseUrl = AppConstants.apiBaseUrl; 
 
   AIService(this._dio);
 
