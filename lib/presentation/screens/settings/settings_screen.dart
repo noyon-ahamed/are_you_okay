@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../widgets/custom_button.dart';
+import 'package:go_router/go_router.dart';
 
-/// Settings Screen
-/// App settings and preferences
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_decorations.dart';
+import '../../../provider/auth_provider.dart';
+import '../../../provider/settings_provider.dart';
+import '../../../routes/app_router.dart';
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -13,130 +16,196 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _locationEnabled = true;
-  bool _darkModeEnabled = false;
-  String _selectedLanguage = 'বাংলা';
-
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('সেটিংস'),
       ),
       body: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
         children: [
-          _buildSectionHeader('সাধারণ'),
-          _buildSettingsTile(
-            icon: Icons.language,
-            title: 'ভাষা',
-            subtitle: _selectedLanguage,
-            onTap: () {
-              _showLanguageDialog();
-            },
-          ),
-          _buildSettingsTile(
-            icon: Icons.dark_mode,
-            title: 'ডার্ক মোড',
-            trailing: Switch(
-              value: _darkModeEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _darkModeEnabled = value;
-                });
+          // ==================== Appearance ====================
+          _buildSectionHeader('ডিজাইন'),
+          const SizedBox(height: 8),
+          _buildSettingsCard(isDark, [
+            _buildSwitchTile(
+              icon: Icons.dark_mode_rounded,
+              iconColor: const Color(0xFF6C63FF),
+              title: 'ডার্ক মোড',
+              subtitle: 'অন্ধকার থিম সক্রিয় করুন',
+              value: settings.themeIsDark,
+              onChanged: (val) {
+                ref.read(settingsProvider.notifier).setDarkMode(val);
               },
-              activeColor: AppColors.primary,
             ),
-          ),
-          const Divider(),
-
-          _buildSectionHeader('বিজ্ঞপ্তি'),
-          _buildSettingsTile(
-            icon: Icons.notifications_outlined,
-            title: 'বিজ্ঞপ্তি',
-            trailing: Switch(
-              value: _notificationsEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _notificationsEnabled = value;
-                });
-              },
-              activeColor: AppColors.primary,
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.language_rounded,
+              iconColor: const Color(0xFF00BCD4),
+              title: 'ভাষা',
+              subtitle: settings.language == 'bn' ? 'বাংলা' : 'English',
+              onTap: () => _showLanguageDialog(),
             ),
-          ),
-          _buildSettingsTile(
-            icon: Icons.notification_important_outlined,
-            title: 'বিজ্ঞপ্তি সেটিংস',
-            onTap: () {
-              Navigator.pushNamed(context, '/notification-settings');
-            },
-          ),
-          const Divider(),
+          ]),
 
-          _buildSectionHeader('গোপনীয়তা ও নিরাপত্তা'),
-          _buildSettingsTile(
-            icon: Icons.location_on_outlined,
-            title: 'লোকেশন ট্র্যাকিং',
-            trailing: Switch(
-              value: _locationEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _locationEnabled = value;
-                });
+          const SizedBox(height: 24),
+
+          // ==================== Safety ====================
+          _buildSectionHeader('নিরাপত্তা'),
+          const SizedBox(height: 8),
+          _buildSettingsCard(isDark, [
+            _buildSliderTile(
+              icon: Icons.timer_rounded,
+              iconColor: AppColors.primary,
+              title: 'চেক-ইন ইন্টারভাল',
+              subtitle: 'প্রতি ${settings.checkinIntervalHours} ঘণ্টা পর',
+              value: settings.checkinIntervalHours.toDouble(),
+              min: 1,
+              max: 48,
+              divisions: 47,
+              onChanged: (val) {
+                ref
+                    .read(settingsProvider.notifier)
+                    .setCheckinInterval(val.round());
               },
-              activeColor: AppColors.primary,
             ),
-          ),
-          _buildSettingsTile(
-            icon: Icons.lock_outlined,
-            title: 'পাসওয়ার্ড পরিবর্তন',
-            onTap: () {
-              // TODO: Navigate to change password
-            },
-          ),
-          const Divider(),
-
-          _buildSectionHeader('তথ্য'),
-          _buildSettingsTile(
-            icon: Icons.info_outlined,
-            title: 'অ্যাপ সম্পর্কে',
-            onTap: () {
-              _showAboutDialog();
-            },
-          ),
-          _buildSettingsTile(
-            icon: Icons.privacy_tip_outlined,
-            title: 'গোপনীয়তা নীতি',
-            onTap: () {
-              // TODO: Show privacy policy
-            },
-          ),
-          _buildSettingsTile(
-            icon: Icons.description_outlined,
-            title: 'শর্তাবলী',
-            onTap: () {
-              // TODO: Show terms of service
-            },
-          ),
-          _buildSettingsTile(
-            icon: Icons.help_outline,
-            title: 'সাহায্য ও সহায়তা',
-            onTap: () {
-              // TODO: Show help
-            },
-          ),
-          const Divider(),
-
-          _buildSectionHeader('বিপজ্জনক অঞ্চল'),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: CustomButton(
-              text: 'অ্যাকাউন্ট মুছুন',
-              onPressed: () {
-                _showDeleteAccountDialog();
+            _buildDivider(),
+            _buildSwitchTile(
+              icon: Icons.notifications_active_rounded,
+              iconColor: const Color(0xFFFF9800),
+              title: 'নোটিফিকেশন',
+              subtitle: 'চেক-ইন রিমাইন্ডার পাঠান',
+              value: settings.notificationsEnabled,
+              onChanged: (_) {
+                ref.read(settingsProvider.notifier).toggleNotifications();
               },
-              backgroundColor: AppColors.danger,
-              icon: Icons.delete_forever,
+            ),
+            _buildDivider(),
+            _buildSwitchTile(
+              icon: Icons.location_on_rounded,
+              iconColor: const Color(0xFF4CAF50),
+              title: 'লোকেশন',
+              subtitle: 'চেক-ইনে লোকেশন সংযুক্ত করুন',
+              value: settings.locationEnabled,
+              onChanged: (_) {
+                ref.read(settingsProvider.notifier).toggleLocation();
+              },
+            ),
+            _buildDivider(),
+            _buildSwitchTile(
+              icon: Icons.fingerprint_rounded,
+              iconColor: const Color(0xFF9C27B0),
+              title: 'বায়োমেট্রিক লক',
+              subtitle: 'অ্যাপ খুলতে ফিঙ্গারপ্রিন্ট ব্যবহার করুন',
+              value: settings.biometricEnabled,
+              onChanged: (_) {
+                ref.read(settingsProvider.notifier).toggleBiometric();
+              },
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ==================== Account ====================
+          _buildSectionHeader('অ্যাকাউন্ট'),
+          const SizedBox(height: 8),
+          _buildSettingsCard(isDark, [
+            _buildListTile(
+              icon: Icons.person_rounded,
+              iconColor: const Color(0xFF2196F3),
+              title: 'প্রোফাইল',
+              subtitle: 'প্রোফাইল তথ্য সম্পাদনা',
+              onTap: () => context.push(Routes.profile),
+            ),
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.contacts_rounded,
+              iconColor: const Color(0xFF009688),
+              title: 'জরুরি যোগাযোগ',
+              subtitle: 'যোগাযোগ পরিচালনা',
+              onTap: () => context.push(Routes.contacts),
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ==================== Data ====================
+          _buildSectionHeader('ডেটা'),
+          const SizedBox(height: 8),
+          _buildSettingsCard(isDark, [
+            _buildListTile(
+              icon: Icons.download_rounded,
+              iconColor: const Color(0xFF795548),
+              title: 'ডেটা এক্সপোর্ট',
+              subtitle: 'চেক-ইন ইতিহাস ডাউনলোড',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'ডেটা এক্সপোর্ট শীঘ্রই আসছে...',
+                      style: TextStyle(fontFamily: 'HindSiliguri'),
+                    ),
+                  ),
+                );
+              },
+            ),
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.delete_forever_rounded,
+              iconColor: AppColors.error,
+              title: 'ক্যাশ পরিষ্কার',
+              subtitle: 'স্থানীয় ডেটা পরিষ্কার করুন',
+              onTap: () => _showClearDataDialog(),
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ==================== About ====================
+          _buildSectionHeader('সম্পর্কে'),
+          const SizedBox(height: 8),
+          _buildSettingsCard(isDark, [
+            _buildListTile(
+              icon: Icons.info_outline_rounded,
+              iconColor: const Color(0xFF607D8B),
+              title: 'অ্যাপ সম্পর্কে',
+              subtitle: 'ভার্সন 2.0.0',
+              onTap: () {},
+            ),
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.privacy_tip_outlined,
+              iconColor: const Color(0xFF78909C),
+              title: 'গোপনীয়তা নীতি',
+              onTap: () {},
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ==================== Logout ====================
+          Container(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showLogoutDialog(),
+              icon: const Icon(Icons.logout, color: AppColors.error),
+              label: Text(
+                'লগআউট',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontFamily: 'HindSiliguri',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.error),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -145,91 +214,134 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  // ==================== Builders ====================
+
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.only(left: 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
+          fontFamily: 'HindSiliguri',
           fontSize: 14,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.primary,
-          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  Widget _buildSettingsTile({
+  Widget _buildSettingsCard(bool isDark, List<Widget> children) {
+    return Container(
+      decoration: AppDecorations.cardDecoration(context: context),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5);
+  }
+
+  Widget _buildSwitchTile({
     required IconData icon,
+    required Color iconColor,
     required String title,
     String? subtitle,
-    Widget? trailing,
-    VoidCallback? onTap,
+    required bool value,
+    required ValueChanged<bool> onChanged,
   }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 24),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    )),
+                if (subtitle != null)
+                  Text(subtitle,
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 12,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      )),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.primary,
+          ),
+        ],
       ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            )
-          : null,
-      trailing: trailing ??
-          (onTap != null
-              ? const Icon(Icons.chevron_right, color: AppColors.textSecondary)
-              : null),
-      onTap: onTap,
     );
   }
 
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ভাষা নির্বাচন করুন'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildListTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
           children: [
-            RadioListTile<String>(
-              title: const Text('বাংলা'),
-              value: 'বাংলা',
-              groupValue: _selectedLanguage,
-              onChanged: (value) {
-                setState(() {
-                  _selectedLanguage = value!;
-                });
-                Navigator.pop(context);
-              },
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'English',
-              groupValue: _selectedLanguage,
-              onChanged: (value) {
-                setState(() {
-                  _selectedLanguage = value!;
-                });
-                Navigator.pop(context);
-              },
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      )),
+                  if (subtitle != null)
+                    Text(subtitle,
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        )),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Theme.of(context).textTheme.bodySmall?.color,
             ),
           ],
         ),
@@ -237,46 +349,175 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showAboutDialog() {
-    showAboutDialog(
-      context: context,
-      applicationName: 'ভালো আছেন কি?',
-      applicationVersion: '1.0.0',
-      applicationIcon: const FlutterLogo(size: 48),
-      children: [
-        const Text('আপনার নিরাপত্তা, আমাদের দায়িত্ব'),
-        const SizedBox(height: 16),
-        const Text(
-          'এই অ্যাপটি বাংলাদেশের মানুষের নিরাপত্তার জন্য তৈরি করা হয়েছে। '
-          'নিয়মিত চেক-ইন করে আপনার প্রিয়জনদের জানান যে আপনি ভালো আছেন।',
-        ),
-      ],
+  Widget _buildSliderTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        )),
+                    Text(subtitle,
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Slider.adaptive(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            activeColor: AppColors.primary,
+            label: '${value.round()} ঘণ্টা',
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 
-  void _showDeleteAccountDialog() {
+  // ==================== Dialogs ====================
+
+  void _showLanguageDialog() {
+    final settings = ref.read(settingsProvider);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('ভাষা নির্বাচন',
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                )),
+            const SizedBox(height: 16),
+            _buildLanguageOption('বাংলা', 'bn', settings.language == 'bn'),
+            _buildLanguageOption('English', 'en', settings.language == 'en'),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageOption(String label, String code, bool isSelected) {
+    return ListTile(
+      title: Text(label, style: TextStyle(fontFamily: 'HindSiliguri')),
+      leading: Radio<String>(
+        value: code,
+        groupValue: isSelected ? code : null,
+        onChanged: (val) {
+          ref.read(settingsProvider.notifier).setLanguage(code);
+          Navigator.pop(context);
+        },
+        activeColor: AppColors.primary,
+      ),
+      onTap: () {
+        ref.read(settingsProvider.notifier).setLanguage(code);
+        Navigator.pop(context);
+      },
+    );
+  }
+
+  void _showClearDataDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('অ্যাকাউন্ট মুছুন?'),
-        content: const Text(
-          'আপনি কি নিশ্চিত যে আপনি আপনার অ্যাকাউন্ট মুছতে চান? '
-          'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।',
+        title: Text('ক্যাশ পরিষ্কার',
+            style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text(
+          'আপনি কি নিশ্চিত? স্থানীয় ডেটা মুছে যাবে।',
+          style: TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('বাতিল'),
+            child: Text('বাতিল',
+                style: TextStyle(fontFamily: 'HindSiliguri')),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () {
-              // TODO: Delete account
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text('ক্যাশ পরিষ্কার হয়েছে',
+                        style: TextStyle(fontFamily: 'HindSiliguri'))),
+              );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-            ),
-            child: const Text('মুছুন'),
+            child: Text('পরিষ্কার করুন',
+                style: TextStyle(
+                    fontFamily: 'HindSiliguri', color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('লগআউট',
+            style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text(
+          'আপনি কি লগআউট করতে চান?',
+          style: TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('বাতিল',
+                style: TextStyle(fontFamily: 'HindSiliguri')),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(authProvider.notifier).logout();
+              context.go(Routes.login);
+            },
+            child: Text('লগআউট',
+                style: TextStyle(
+                    fontFamily: 'HindSiliguri', color: AppColors.error)),
           ),
         ],
       ),

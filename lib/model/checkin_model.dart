@@ -58,4 +58,18 @@ class CheckInModel {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'timestamp': timestamp.toIso8601String(),
+      'latitude': latitude,
+      'longitude': longitude,
+      'method': method,
+      'notes': notes,
+      'isSynced': isSynced,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
 }

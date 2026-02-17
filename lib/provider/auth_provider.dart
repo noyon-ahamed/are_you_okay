@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/user_model.dart';
 import '../repository/auth_repository.dart';
+import '../services/socket_service.dart';
 
 // Auth State
 abstract class AuthState {
@@ -32,8 +33,9 @@ class AuthError extends AuthState {
 // Auth State Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final SocketService _socketService;
 
-  AuthNotifier(this._authRepository) : super(const AuthInitial()) {
+  AuthNotifier(this._authRepository, this._socketService) : super(const AuthInitial()) {
     checkAuthStatus();
   }
 
@@ -43,6 +45,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
         state = AuthAuthenticated(user);
+        _socketService.init(); // Connect socket
       } else {
         state = const AuthUnauthenticated();
       }
@@ -56,11 +59,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _authRepository.login(email: email, password: password);
       state = AuthAuthenticated(user);
+      _socketService.init(); // Connect socket
     } catch (e) {
       state = AuthError(e.toString());
-      // Reset to unauthenticated after error so UI can show login form again if needed
-      // Or keep error state depending on UI requirement. 
-      // Usually better to keep error state so UI can show snackbar and then reset.
     }
   }
 
@@ -79,6 +80,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         phone: phone,
       );
       state = AuthAuthenticated(user);
+      _socketService.init(); // Connect socket
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -88,6 +90,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     try {
       await _authRepository.logout();
+      _socketService.disconnect(); // Disconnect socket
       state = const AuthUnauthenticated();
     } catch (e) {
       state = AuthError(e.toString());
@@ -97,7 +100,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 // Provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.watch(authRepositoryProvider));
+  return AuthNotifier(
+    ref.watch(authRepositoryProvider),
+    ref.watch(socketServiceProvider),
+  );
 });
 
 // Current User Provider

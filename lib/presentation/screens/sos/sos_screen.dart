@@ -1,380 +1,550 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../widgets/custom_button.dart';
-import '../../../services/location_service.dart';
-import '../../../services/sms_service.dart';
-import 'package:are_you_okay/routes/app_router.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 
-/// SOS Screen
-/// Emergency SOS feature
-class SOSScreen extends StatefulWidget {
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_decorations.dart';
+import '../../../provider/contact_provider.dart';
+import '../../../model/emergency_contact_model.dart';
+import '../../../services/location_service.dart';
+import '../../../services/socket_service.dart';
+
+class SOSScreen extends ConsumerStatefulWidget {
   const SOSScreen({super.key});
 
   @override
-  State<SOSScreen> createState() => _SOSScreenState();
+  ConsumerState<SOSScreen> createState() => _SOSScreenState();
 }
 
-class _SOSScreenState extends State<SOSScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+class _SOSScreenState extends ConsumerState<SOSScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late AnimationController _countdownController;
+  late Animation<double> _pulseAnim;
+  
   bool _isActivating = false;
+  bool _isActivated = false;
+  int _countdown = 5;
+  Timer? _countdownTimer;
+  Position? _currentPosition;
+  StreamSubscription<Position>? _locationSubscription;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+    _pulseController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _countdownController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
     );
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _pulseController.dispose();
+    _countdownController.dispose();
+    _countdownTimer?.cancel();
+    _locationSubscription?.cancel();
     super.dispose();
+  }
+
+  void _startSOS() {
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _isActivating = true;
+      _countdown = 5;
+    });
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _countdown--;
+      });
+      HapticFeedback.lightImpact();
+
+      if (_countdown <= 0) {
+        timer.cancel();
+        _triggerSOS();
+      }
+    });
+  }
+
+  void _cancelSOS() {
+    _countdownTimer?.cancel();
+    _locationSubscription?.cancel();
+    setState(() {
+      _isActivating = false;
+      _isActivated = false; // Also reset activated state if needed? 
+      // User might want to stop active SOS. 
+      // The button "I am Safe" does separate logic.
+      _countdown = 5;
+    });
+  }
+
+  Future<void> _triggerSOS() async {
+    setState(() {
+      _isActivated = true;
+      _isActivating = false;
+    });
+
+    HapticFeedback.heavyImpact();
+
+    // Get location
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+      _currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+    } catch (e) {
+      // Continue without location
+    }
+
+    // Get real contacts
+    final contacts = ref.read(contactListProvider);
+    
+    // Start sharing location via Socket
+    final locationService = ref.read(locationServiceProvider);
+    final socketService = ref.read(socketServiceProvider);
+    
+    // Initial location emission
+    if (_currentPosition != null) {
+      socketService.emitLocationUpdate(
+        _currentPosition!.latitude, 
+        _currentPosition!.longitude
+      );
+    }
+    
+    // Stream updates
+    _locationSubscription?.cancel();
+    _locationSubscription = locationService.getLocationStream().listen((position) {
+      if (mounted) {
+        setState(() => _currentPosition = position);
+      }
+      socketService.emitLocationUpdate(position.latitude, position.longitude);
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'জরুরি সতর্কতা এবং লাইভ লোকেশন শেয়ার করা হচ্ছে!',
+            style: TextStyle(fontFamily: 'HindSiliguri'),
+          ),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final contacts = ref.watch(contactListProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: _isActivated
+          ? const Color(0xFFD32F2F)
+          : (isDark ? AppColors.backgroundDark : AppColors.background),
       appBar: AppBar(
         title: const Text('জরুরি SOS'),
-        backgroundColor: AppColors.danger,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        foregroundColor: _isActivated ? Colors.white : null,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.danger.withOpacity(0.1),
-              AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: _isActivating
+                    ? _buildCountdownView()
+                    : _isActivated
+                        ? _buildActivatedView()
+                        : _buildSOSButton(),
+              ),
+            ),
+
+            // Emergency contacts
+            if (!_isActivating && !_isActivated) ...[
+              _buildContactsSection(contacts, isDark),
+              const SizedBox(height: 16),
+              // Emergency Numbers
+              _buildEmergencyNumbers(isDark),
+              const SizedBox(height: 20),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSOSButton() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'জরুরি সাহায্যের জন্য\nদীর্ঘক্ষণ চাপুন',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            color: AppColors.textSecondary,
+            fontFamily: 'HindSiliguri',
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
+        const SizedBox(height: 32),
+        AnimatedBuilder(
+          animation: _pulseAnim,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _pulseAnim.value,
+              child: child,
+            );
+          },
+          child: GestureDetector(
+            onLongPress: _startSOS,
+            child: Hero(
+              tag: 'sos_icon',
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFF44336), Color(0xFFD32F2F)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF44336).withOpacity(0.4),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFF44336).withOpacity(0.2),
+                      blurRadius: 60,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.sos, color: Colors.white, size: 56),
+                    const SizedBox(height: 8),
+                    Text(
+                      'SOS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'HindSiliguri',
+                        letterSpacing: 4,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCountdownView() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'SOS সক্রিয় হচ্ছে...',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'HindSiliguri',
+          ),
+        ),
+        const SizedBox(height: 40),
+        Container(
+          width: 160,
+          height: 160,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.error.withOpacity(0.1),
+            border: Border.all(color: AppColors.error, width: 4),
+          ),
+          child: Center(
+            child: Text(
+              '$_countdown',
+              style: TextStyle(
+                fontSize: 72,
+                fontWeight: FontWeight.bold,
+                color: AppColors.error,
+                fontFamily: 'HindSiliguri',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+        TextButton.icon(
+          onPressed: _cancelSOS,
+          icon: const Icon(Icons.close, color: AppColors.error),
+          label: const Text(
+            'বাতিল করুন',
+            style: TextStyle(
+              fontSize: 18,
+              fontFamily: 'HindSiliguri',
+              color: AppColors.error,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivatedView() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          color: Colors.white,
+          size: 80,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'SOS সক্রিয় হয়েছে!',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFamily: 'HindSiliguri',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'আপনার জরুরি যোগাযোগকারীদের\nসতর্কতা পাঠানো হয়েছে',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white.withOpacity(0.8),
+            fontFamily: 'HindSiliguri',
+          ),
+        ),
+        if (_currentPosition != null) ...[
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 32),
-
-                // Warning message
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.warning.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: AppColors.warning,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'SOS সক্রিয় করলে আপনার সব জরুরি যোগাযোগে SMS ও নোটিফিকেশন পাঠানো হবে।',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // SOS Button
-                GestureDetector(
-                  onLongPress: _showSOSConfirmation,
-                  child: AnimatedBuilder(
-                    animation: _scaleAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _scaleAnimation.value,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        color: AppColors.danger,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.danger.withOpacity(0.5),
-                            blurRadius: 30,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.warning_rounded,
-                            color: Colors.white,
-                            size: 80,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'SOS',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'ধরে রাখুন',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
+                const Icon(Icons.location_on, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
                 Text(
-                  'বোতামটি ৩ সেকেন্ড ধরে রাখুন',
+                  'লোকেশন শেয়ার করা হয়েছে',
                   style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    fontFamily: 'HindSiliguri',
                   ),
                 ),
-
-                const Spacer(),
-
-                // Emergency Numbers
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'জরুরি নম্বর',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildEmergencyNumber(
-                        'জাতীয় জরুরি সেবা',
-                        '999',
-                      ),
-                      _buildEmergencyNumber(
-                        'অ্যাম্বুলেন্স',
-                        '199',
-                      ),
-                      _buildEmergencyNumber(
-                        'ফায়ার সার্ভিস',
-                        '199',
-                      ),
-                      _buildEmergencyNumber(
-                        'পুলিশ',
-                        '100',
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
               ],
             ),
           ),
+        ],
+        const SizedBox(height: 40),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _isActivated = false;
+              _locationSubscription?.cancel();
+            });
+          },
+          icon: const Icon(Icons.check),
+          label: const Text(
+            'আমি নিরাপদ',
+            style: TextStyle(fontFamily: 'HindSiliguri'),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.error,
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildEmergencyNumber(String label, String number) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => _callNumber(number),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+  Widget _buildContactsSection(List<EmergencyContactModel> contacts, bool isDark) {
+    if (contacts.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: AppDecorations.cardDecoration(context: context),
           child: Row(
             children: [
-              Icon(
-                Icons.phone,
-                size: 20,
-                color: AppColors.primary,
-              ),
+              Icon(Icons.info_outline, color: AppColors.warning),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  label,
+                  'জরুরি যোগাযোগ যোগ করুন',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
+                    fontFamily: 'HindSiliguri',
+                    color: AppColors.warning,
                   ),
                 ),
-              ),
-              Text(
-                number,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.call,
-                size: 16,
-                color: AppColors.success,
               ),
             ],
           ),
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'জরুরি যোগাযোগ (${contacts.length})',
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...contacts.take(3).map((c) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: AppDecorations.cardDecoration(context: context),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'HindSiliguri',
+                            ),
+                          ),
+                          Text(
+                            c.phoneNumber,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.check_circle,
+                      color: AppColors.success,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              )),
+        ],
       ),
     );
   }
 
-  void _showSOSConfirmation() async {
-    HapticFeedback.heavyImpact();
+  Widget _buildEmergencyNumbers(bool isDark) {
+    final numbers = [
+      {'name': '৯৯৯ (জাতীয় জরুরি)', 'number': '999'},
+      {'name': 'ফায়ার সার্ভিস', 'number': '199'},
+      {'name': 'অ্যাম্বুলেন্স', 'number': '199'},
+    ];
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: AppColors.danger),
-            const SizedBox(width: 8),
-            Text('SOS সক্রিয় করবেন?'),
-          ],
-        ),
-        content: Text(
-          'আপনার সব জরুরি যোগাযোগে SMS ও নোটিফিকেশন পাঠানো হবে। '
-          'আপনার বর্তমান অবস্থান শেয়ার করা হবে।\n\nআপনি কি নিশ্চিত?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('না'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              foregroundColor: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'জরুরি নম্বর',
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
             ),
-            child: const Text('হ্যাঁ, সাহায্য দরকার'),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: numbers.map((n) => Expanded(
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: AppDecorations.cardDecoration(context: context),
+                child: Column(
+                  children: [
+                    Text(
+                      n['number']!,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.error,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      n['name']!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'HindSiliguri',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )).toList(),
           ),
         ],
       ),
     );
-
-    if (confirm == true && mounted) {
-      _activateSOS();
-    }
-  }
-
-  Future<void> _activateSOS() async {
-    setState(() {
-      _isActivating = true;
-    });
-
-    try {
-      // 1. Get current location
-      final locationService = LocationService();
-      final position = await locationService.getCurrentLocation();
-      String locationStr = '';
-      if (position != null) {
-        locationStr = locationService.getGoogleMapsUrl(position.latitude, position.longitude);
-      }
-
-      // 2. Get emergency contacts (Mock for now, should come from Hive/Provider)
-      // Displaying dummy contacts for demonstration as Hive implementation wasn't fully inspected for content
-      final contacts = ['01700000000', '01800000000']; 
-
-      // 3. Send SMS to emergency contacts
-      final smsService = SMSService();
-      // Placeholder user name - in real app, get from AuthProvider
-      const userName = 'ব্যবহারকারী'; 
-      
-      int successCount = 0;
-      for (final contact in contacts) {
-        final success = await smsService.sendEmergencyAlert(
-          phoneNumber: contact,
-          userName: userName,
-          location: locationStr,
-          isSOS: true,
-        );
-        if (success) successCount++;
-      }
-
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('SOS সক্রিয়! $successCount জন কন্টাক্টে বার্তা পাঠানো হয়েছে।'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('সমস্যা হয়েছে: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isActivating = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _callNumber(String number) async {
-    final uri = Uri.parse('tel:$number');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
   }
 }

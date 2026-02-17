@@ -5,7 +5,7 @@ class AppConstants {
   // For Android emulator (localhost): 'http://10.0.2.2:3000/api'
   // For physical device on LAN: 'http://<YOUR_IP>:3000/api'
   // For production (Render): 'https://your-app.onrender.com/api'
-  static const String apiBaseUrl = 'http://10.0.2.2:3000/api';
+  static const String apiBaseUrl = 'https://are-you-okay.onrender.com/api';
 
 
   // App Information
@@ -60,11 +60,17 @@ class AppConstants {
   static const String keyCheckinInterval = 'checkin_interval';
   static const String keyNotificationsEnabled = 'notifications_enabled';
   
-  // Firebase Collections
-  static const String usersCollection = 'users';
-  static const String checkinsCollection = 'checkins';
-  static const String alertsCollection = 'alerts';
-  static const String emergencyContactsCollection = 'emergency_contacts';
+  // Biometric & Security
+  static const bool biometricEnabledByDefault = false;
+  
+  // Shake Detection
+  static const double shakeThreshold = 15.0; // m/s²
+  static const int shakeCountToTrigger = 3;
+  static const int shakeResetMs = 1000;
+  
+  // Mood Options
+  static const List<String> moodEmojis = ['😊', '🙂', '😐', '😔', '😰'];
+  static const List<String> moodLabels = ['দারুণ', 'ভালো', 'ঠিকঠাক', 'খারাপ', 'চিন্তিত'];
   
   // Ad Configuration
   static const int bannerAdRefreshInterval = 60; // seconds

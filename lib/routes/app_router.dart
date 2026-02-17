@@ -10,7 +10,14 @@ import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/ai_chat/ai_chat_screen.dart';
 import '../../presentation/screens/earthquake/earthquake_screen.dart';
 import '../../presentation/screens/fake_call/fake_call_screen.dart';
-// import '../../presentation/screens/onboarding/onboarding_screen.dart';
+import '../../presentation/screens/onboarding/onboarding_screen.dart';
+import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/profile/edit_profile_screen.dart';
+import '../../presentation/screens/settings/settings_screen.dart';
+import '../../presentation/screens/contacts/emergency_contacts_screen.dart';
+import '../../presentation/screens/contacts/add_contact_screen.dart';
+import '../../presentation/screens/sos/sos_screen.dart';
+import '../../presentation/screens/history/checkin_history_screen.dart';
 
 import '../../provider/auth_provider.dart';
 
@@ -25,8 +32,10 @@ class Routes {
   static const String earthquake = '/earthquake';
   static const String fakeCall = '/fake-call';
   static const String profile = '/profile';
+  static const String editProfile = '/profile/edit';
   static const String settings = '/settings';
   static const String contacts = '/contacts';
+  static const String addContact = '/contacts/add';
   static const String sos = '/sos';
   static const String history = '/history';
 }
@@ -36,31 +45,86 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: Routes.splash,
-    refreshListenable: ValueNotifier(authState), 
+    refreshListenable: ValueNotifier(authState),
     routes: [
+      // ==================== Auth Flow ====================
       GoRoute(
         path: Routes.splash,
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
+        path: Routes.onboarding,
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
         path: Routes.login,
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
       GoRoute(
         path: Routes.register,
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const RegisterScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: Routes.forgotPassword,
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ForgotPasswordScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
+
+      // ==================== Main App ====================
       GoRoute(
         path: Routes.home,
-        builder: (context, state) => const HomeScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const HomeScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
       GoRoute(
         path: Routes.aiChat,
-        builder: (context, state) => const AIChatScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const AIChatScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: Routes.earthquake,
@@ -72,33 +136,85 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.profile,
-        // TODO: Implement ProfileScreen
-        builder: (context, state) => const Scaffold(body: Center(child: Text('Profile Screen'))),
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: Routes.editProfile,
+        builder: (context, state) => const EditProfileScreen(),
       ),
       GoRoute(
         path: Routes.settings,
-        // TODO: Implement SettingsScreen
-        builder: (context, state) => const Scaffold(body: Center(child: Text('Settings Screen'))),
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: Routes.contacts,
-        // TODO: Implement ContactsScreen
-        builder: (context, state) => const Scaffold(body: Center(child: Text('Contacts Screen'))),
+        builder: (context, state) => const EmergencyContactsScreen(),
+      ),
+      GoRoute(
+        path: Routes.addContact,
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const AddContactScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: Routes.sos,
-        // TODO: Implement SOSScreen - currently using placeholder or separate screen
-         builder: (context, state) => const Scaffold(body: Center(child: Text('SOS Screen'))),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SOSScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
       GoRoute(
         path: Routes.history,
-        // TODO: Implement HistoryScreen
-        builder: (context, state) => const Scaffold(body: Center(child: Text('History Screen'))),
+        builder: (context, state) => const CheckinHistoryScreen(),
       ),
     ],
+
+    // ==================== Auth Guard ====================
     redirect: (context, state) {
-      // Handle redirection based on auth state if needed
-      // For now, let individual screens handle navigation or use this for protection
+      final isAuthenticated = authState is AuthAuthenticated;
+      final isLoading = authState is AuthLoading || authState is AuthInitial;
+      final currentPath = state.uri.path;
+
+      // Allow splash to load
+      if (currentPath == Routes.splash) return null;
+
+      // Allow onboarding regardless of auth state
+      if (currentPath == Routes.onboarding) return null;
+
+      // While loading auth state, stay on current page
+      if (isLoading) return null;
+
+      // Auth pages list
+      final authPages = [
+        Routes.login,
+        Routes.register,
+        Routes.forgotPassword,
+      ];
+      final isAuthPage = authPages.contains(currentPath);
+
+      // If not authenticated and trying to access protected page
+      if (!isAuthenticated && !isAuthPage) {
+        return Routes.login;
+      }
+
+      // If authenticated and trying to access auth page
+      if (isAuthenticated && isAuthPage) {
+        return Routes.home;
+      }
+
       return null;
     },
   );
