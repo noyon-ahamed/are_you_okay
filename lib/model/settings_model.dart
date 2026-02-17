@@ -4,6 +4,7 @@ class SettingsModel {
   final int checkinIntervalHours;
   final String language;
   final bool themeIsDark;
+  final bool biometricEnabled;
   final DateTime? updatedAt;
 
   const SettingsModel({
@@ -12,6 +13,7 @@ class SettingsModel {
     this.checkinIntervalHours = 24,
     this.language = 'en',
     this.themeIsDark = false,
+    this.biometricEnabled = false,
     this.updatedAt,
   });
 
@@ -21,6 +23,7 @@ class SettingsModel {
     int? checkinIntervalHours,
     String? language,
     bool? themeIsDark,
+    bool? biometricEnabled,
     DateTime? updatedAt,
   }) {
     return SettingsModel(
@@ -29,6 +32,7 @@ class SettingsModel {
       checkinIntervalHours: checkinIntervalHours ?? this.checkinIntervalHours,
       language: language ?? this.language,
       themeIsDark: themeIsDark ?? this.themeIsDark,
+      biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

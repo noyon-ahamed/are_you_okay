@@ -32,10 +32,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = ref.read(authProvider).maybeWhen(
-      authenticated: (u) => u,
-      orElse: () => null,
-    );
+    final authState = ref.read(authProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _addressController = TextEditingController(text: user?.address ?? '');

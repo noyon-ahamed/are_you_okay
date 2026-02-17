@@ -1,324 +1,340 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_decorations.dart';
 import '../../../model/emergency_contact_model.dart';
 import '../../../provider/contact_provider.dart';
-import '../../widgets/loading_widget.dart';
-import '../../widgets/empty_state_widget.dart';
-import '../../widgets/custom_button.dart';
-import 'package:are_you_okay/routes/app_router.dart';
+import '../../../routes/app_router.dart';
+import '../../widgets/shimmer_loading.dart';
+import '../../widgets/empty_state.dart';
 
-/// Emergency Contacts Screen
-/// Manage emergency contacts
 class EmergencyContactsScreen extends ConsumerWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final contactsAsync = ref.watch(contactProvider);
+    final contactState = ref.watch(contactProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('জরুরি যোগাযোগ'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _showInfoDialog(context),
+          ),
+        ],
       ),
-      body: contactsAsync.when(
-        initial: () => const Center(child: CircularProgressIndicator()),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        loaded: (contacts) {
-          if (contacts.isEmpty) {
-            return EmptyStateWidget(
-              title: 'কোন জরুরি যোগাযোগ নেই',
-              description: 'আপনার প্রিয়জনদের যোগ করুন যারা জরুরি অবস্থায় অবহিত হবেন।',
-              icon: Icons.contact_phone_outlined,
-              actionLabel: 'যোগাযোগ যোগ করুন',
-              onAction: () {
-                Navigator.pushNamed(context, '/add-contact');
-              },
-            );
-          }
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddContactSheet(context, ref),
+        icon: const Icon(Icons.person_add),
+        label: Text('যোগ করুন',
+            style: TextStyle(fontFamily: 'HindSiliguri', fontWeight: FontWeight.w600)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: _buildBody(context, ref, contactState, isDark),
+    );
+  }
 
-          return Column(
+  Widget _buildBody(BuildContext context, WidgetRef ref, ContactState state, bool isDark) {
+    if (state is ContactLoading) {
+      return const ShimmerList(itemCount: 4);
+    }
+
+    if (state is ContactError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: AppColors.error),
+            const SizedBox(height: 12),
+            Text('ত্রুটি হয়েছে',
+                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () =>
+                  ref.read(contactProvider.notifier).loadContacts(),
+              child: Text('আবার চেষ্টা',
+                  style: TextStyle(fontFamily: 'HindSiliguri')),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (state is ContactLoaded && state.contacts.isEmpty) {
+      return EmptyState(
+        icon: Icons.contacts_outlined,
+        title: 'কোনো জরুরি যোগাযোগ নেই',
+        description: 'আপনার প্রিয়জনদের জরুরি যোগাযোগ\nহিসেবে যোগ করুন',
+        buttonText: 'যোগ করুন',
+        onButtonPressed: () => _showAddContactSheet(context, ref),
+      );
+    }
+
+    final contacts =
+        state is ContactLoaded ? state.contacts : <EmergencyContactModel>[];
+
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      itemCount: contacts.length,
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) newIndex--;
+        final ids =
+            contacts.map((c) => c.id).toList();
+        final movedId = ids.removeAt(oldIndex);
+        ids.insert(newIndex, movedId);
+        ref.read(contactProvider.notifier).reorderContacts(ids);
+      },
+      itemBuilder: (context, index) {
+        final contact = contacts[index];
+        return _buildContactCard(context, ref, contact, index, isDark);
+      },
+    );
+  }
+
+
+
+  Widget _buildContactCard(BuildContext context, WidgetRef ref,
+      EmergencyContactModel contact, int index, bool isDark) {
+    final colors = [
+      const Color(0xFF6C63FF),
+      const Color(0xFF00BCD4),
+      const Color(0xFFFF9800),
+      const Color(0xFF4CAF50),
+      AppColors.primary,
+    ];
+    final color = colors[index % colors.length];
+
+    return Dismissible(
+      key: Key(contact.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.centerRight,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      confirmDismiss: (_) => _showDeleteConfirm(context),
+      onDismissed: (_) {
+        ref.read(contactProvider.notifier).deleteContact(contact.id);
+      },
+      child: Container(
+        key: ValueKey(contact.id),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: AppDecorations.cardDecoration(context: context),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: contacts.length,
-                  itemBuilder: (context, index) {
-                    final contact = contacts[index];
-                    return _ContactCard(
-                      contact: contact,
-                      onEdit: () {
-                        // TODO: Navigate to edit contact
-                      },
-                      onDelete: () async {
-                        final confirm = await _showDeleteDialog(context);
-                        if (confirm && context.mounted) {
-                          ref
-                              .read(contactProvider.notifier)
-                              .deleteContact(contact.id!);
-                        }
-                      },
-                      onTest: () {
-                        _showTestContactDialog(context, contact);
-                      },
-                    );
-                  },
+              // Avatar
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, color.withOpacity(0.7)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    contact.name.isNotEmpty
+                        ? contact.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: CustomButton(
-                  text: 'নতুন যোগাযোগ যোগ করুন',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/add-contact');
-                  },
-                  icon: Icons.person_add,
+              const SizedBox(width: 14),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      contact.name,
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      contact.phoneNumber,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                    if (contact.relationship.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          contact.relationship,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: color,
+                            fontFamily: 'HindSiliguri',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+              // Priority badge
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '#${contact.priority}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Drag handle
+              Icon(
+                Icons.drag_handle,
+                color: isDark
+                    ? AppColors.textTertiaryDark
+                    : AppColors.textTertiary,
+                size: 20,
               ),
             ],
-          );
-        },
-        error: (message) => Center(
-          child: Text('ত্রুটি: $message'),
+          ),
         ),
       ),
     );
   }
 
-  Future<bool> _showDeleteDialog(BuildContext context) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('মুছে ফেলবেন?'),
-            content: const Text('আপনি কি এই যোগাযোগটি মুছে ফেলতে চান?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('না'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.danger,
-                ),
-                child: const Text('হ্যাঁ'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  void _showTestContactDialog(
-    BuildContext context,
-    EmergencyContactModel contact,
-  ) {
-    showDialog(
+  Future<bool?> _showDeleteConfirm(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('টেস্ট বার্তা'),
-        content: Text(
-          'একটি টেস্ট বার্তা ${contact.name} কে পাঠানো হবে।'
-          '\nফোন: ${contact.phoneNumber}',
-        ),
+        title:
+            Text('মুছে ফেলুন', style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text('এই যোগাযোগ মুছে ফেলতে চান?',
+            style: TextStyle(fontFamily: 'HindSiliguri')),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('বাতিল'),
+            onPressed: () => Navigator.pop(context, false),
+            child:
+                Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
           ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Send test message
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('টেস্ট বার্তা পাঠানো হয়েছে')),
-              );
-            },
-            child: const Text('পাঠান'),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('মুছুন',
+                style: TextStyle(
+                    fontFamily: 'HindSiliguri', color: AppColors.error)),
           ),
         ],
       ),
     );
   }
-}
 
-class _ContactCard extends StatelessWidget {
-  final EmergencyContactModel contact;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onTest;
+  void _showAddContactSheet(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final relationController = TextEditingController();
 
-  const _ContactCard({
-    required this.contact,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onTest,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  child: Text(
-                    contact.name[0].toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        contact.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        contact.relationship,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getPriorityColor(contact.priority).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'অগ্রাধিকার ${contact.priority}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _getPriorityColor(contact.priority),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(8),
+            Text(
+              'নতুন যোগাযোগ',
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.phone,
-                    size: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    contact.phoneNumber,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'নাম',
+                prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
             const SizedBox(height: 12),
-
-            // Notification methods
-            Wrap(
-              spacing: 8,
-              children: [
-                if (contact.notifyViaSMS)
-                  Chip(
-                    label: const Text('SMS'),
-                    avatar: const Icon(Icons.sms, size: 16),
-                    backgroundColor: AppColors.success.withOpacity(0.1),
-                    labelStyle: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.success,
-                    ),
-                  ),
-                if (contact.notifyViaApp)
-                  Chip(
-                    label: const Text('অ্যাপ'),
-                    avatar: const Icon(Icons.notifications, size: 16),
-                    backgroundColor: AppColors.info.withOpacity(0.1),
-                    labelStyle: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.info,
-                    ),
-                  ),
-              ],
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'ফোন নম্বর',
+                prefixIcon: const Icon(Icons.phone_outlined),
+              ),
             ),
             const SizedBox(height: 12),
-
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onTest,
-                    icon: const Icon(Icons.send, size: 16),
-                    label: const Text('টেস্ট'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('সম্পাদনা'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.info,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete, size: 16),
-                    label: const Text('মুছুন'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.danger,
-                    ),
-                  ),
-                ),
-              ],
+            TextField(
+              controller: relationController,
+              decoration: InputDecoration(
+                labelText: 'সম্পর্ক (যেমন: মা, বাবা, বন্ধু)',
+                prefixIcon: const Icon(Icons.family_restroom_outlined),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty &&
+                      phoneController.text.isNotEmpty) {
+                    ref.read(contactProvider.notifier).addContact(
+                          name: nameController.text.trim(),
+                          phoneNumber: phoneController.text.trim(),
+                          relationship: relationController.text.trim(),
+                        );
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text('যোগ করুন',
+                    style: TextStyle(fontFamily: 'HindSiliguri')),
+              ),
             ),
           ],
         ),
@@ -326,16 +342,26 @@ class _ContactCard extends StatelessWidget {
     );
   }
 
-  Color _getPriorityColor(int priority) {
-    switch (priority) {
-      case 1:
-        return AppColors.danger;
-      case 2:
-        return AppColors.warning;
-      case 3:
-        return AppColors.info;
-      default:
-        return AppColors.textSecondary;
-    }
+  void _showInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('জরুরি যোগাযোগ',
+            style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text(
+          'জরুরি সময়ে এই যোগাযোগকারীদের SMS ও নোটিফিকেশন পাঠানো হবে। '
+          'ড্র্যাগ করে অগ্রাধিকার পরিবর্তন করুন।\n\n'
+          'বামে সোয়াইপ করে মুছুন।',
+          style: TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                Text('বুঝেছি', style: TextStyle(fontFamily: 'HindSiliguri')),
+          ),
+        ],
+      ),
+    );
   }
 }

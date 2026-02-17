@@ -1,233 +1,372 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
-import 'package:are_you_okay/routes/app_router.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/loading_widget.dart';
-import '../../../provider/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 
-/// Profile Screen
-/// Displays user profile information
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_decorations.dart';
+import '../../../provider/auth_provider.dart';
+import '../../../routes/app_router.dart';
+
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    String name = 'ব্যবহারকারী';
+    String email = '';
+    String phone = '';
+
+    if (authState is AuthAuthenticated) {
+      name = authState.user.name;
+      email = authState.user.email;
+      phone = authState.user.phone ?? '';
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('প্রোফাইল'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/edit-profile');
-            },
-            icon: const Icon(Icons.edit),
-          ),
-        ],
-      ),
-      body: authState.maybeWhen(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        authenticated: (user) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // Profile Picture
-                Center(
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        backgroundImage: user.profilePicture != null
-                            ? NetworkImage(user.profilePicture!)
-                            : null,
-                        child: user.profilePicture == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: AppColors.primary,
-                              )
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                              // TODO: Change profile picture
-                            },
-                            icon: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
+      body: Container(
+        decoration: isDark
+            ? AppDecorations.subtleGradientDark()
+            : AppDecorations.subtleGradientLight(),
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ==================== App Bar ====================
+            SliverAppBar(
+              expandedHeight: 260,
+              pinned: true,
+              stretch: true,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: AppDecorations.primaryGradientBg(),
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 40),
+                        // Avatar
+                        Hero(
+                          tag: 'profile_avatar',
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.2),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 3,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'HindSiliguri',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // Name
-                Text(
-                  user.name,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Phone
-                Text(
-                  user.phoneNumber,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Info Cards
-                _buildInfoCard(
-                  icon: Icons.email_outlined,
-                  title: 'ইমেইল',
-                  value: user.email ?? 'যোগ হয়নি',
-                ),
-                const SizedBox(height: 16),
-                _buildInfoCard(
-                  icon: Icons.calendar_today,
-                  title: 'জন্ম তারিখ',
-                  value: user.dateOfBirth != null
-                      ? '${user.dateOfBirth!.day}/${user.dateOfBirth!.month}/${user.dateOfBirth!.year}'
-                      : 'যোগ হয়নি',
-                ),
-                const SizedBox(height: 16),
-                _buildInfoCard(
-                  icon: Icons.location_on_outlined,
-                  title: 'ঠিকানা',
-                  value: user.address ?? 'যোগ হয়নি',
-                ),
-                const SizedBox(height: 16),
-                _buildInfoCard(
-                  icon: Icons.bloodtype,
-                  title: 'রক্তের গ্রুপ',
-                  value: user.bloodGroup ?? 'যোগ হয়নি',
-                ),
-                const SizedBox(height: 16),
-                _buildInfoCard(
-                  icon: Icons.timer_outlined,
-                  title: 'চেক-ইন ইন্টারভাল',
-                  value: '${user.checkinInterval} ঘণ্টা',
-                ),
-                const SizedBox(height: 32),
-
-                // Edit Profile Button
-                CustomButton(
-                  text: 'প্রোফাইল সম্পাদনা করুন',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/edit-profile');
-                  },
-                  icon: Icons.edit,
-                ),
-                const SizedBox(height: 16),
-
-                // Logout Button
-                CustomButton(
-                  text: 'লগ আউট',
-                  onPressed: () async {
-                    await ref.read(authProvider.notifier).logout();
-                    if (context.mounted) {
-                      Navigator.pushReplacementNamed(context, '/login');
-                    }
-                  },
-                  isOutlined: true,
-                  icon: Icons.logout,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => context.push(Routes.editProfile),
                 ),
               ],
             ),
-          );
-        },
-        error: (message) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: AppColors.danger),
-              const SizedBox(height: 16),
-              Text('ত্রুটি: $message'),
-            ],
-          ),
+
+            // ==================== Content ====================
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Stats Row
+                    _buildStatsRow(context, isDark),
+                    const SizedBox(height: 24),
+
+                    // Info Card
+                    _buildInfoCard(context, isDark, name, email, phone),
+                    const SizedBox(height: 16),
+
+                    // Quick Settings
+                    _buildQuickSettings(context, isDark),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        unauthenticated: () => const Center(
-          child: Text('অনুগ্রহ করে লগইন করুন'),
-        ),
-        orElse: () => const Center(child: CircularProgressIndicator()),
       ),
     );
   }
 
-  Widget _buildInfoCard({
+  Widget _buildStatsRow(BuildContext context, bool isDark) {
+    return Row(
+      children: [
+        _buildStatCard(
+          context: context,
+          icon: Icons.check_circle,
+          value: '0',
+          label: 'মোট চেক-ইন',
+          color: AppColors.success,
+          isDark: isDark,
+        ),
+        const SizedBox(width: 12),
+        _buildStatCard(
+          context: context,
+          icon: Icons.local_fire_department,
+          value: '0',
+          label: 'স্ট্রিক',
+          color: const Color(0xFFFF9800),
+          isDark: isDark,
+        ),
+        const SizedBox(width: 12),
+        _buildStatCard(
+          context: context,
+          icon: Icons.calendar_today,
+          value: '0',
+          label: 'সক্রিয় দিন',
+          color: AppColors.primary,
+          isDark: isDark,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required BuildContext context,
     required IconData icon,
-    required String title,
     required String value,
+    required String label,
+    required Color color,
+    required bool isDark,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: AppDecorations.cardDecoration(
+          context: context,
+          borderRadius: 16,
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'HindSiliguri',
+              ),
+            ),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'HindSiliguri',
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildInfoCard(
+    BuildContext context,
+    bool isDark,
+    String name,
+    String email,
+    String phone,
+  ) {
+    return Container(
+      decoration: AppDecorations.cardDecoration(context: context),
+      child: Column(
+        children: [
+          _buildInfoRow(
+            context,
+            Icons.person_outline,
+            'নাম',
+            name,
+          ),
+          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          _buildInfoRow(
+            context,
+            Icons.email_outlined,
+            'ইমেইল',
+            email,
+          ),
+          if (phone.isNotEmpty) ...[
+            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            _buildInfoRow(
+              context,
+              Icons.phone_outlined,
+              'ফোন',
+              phone,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+      BuildContext context, IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primary,
-              size: 24,
-            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
+                  label,
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    fontFamily: 'HindSiliguri',
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontFamily: 'HindSiliguri',
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickSettings(BuildContext context, bool isDark) {
+    return Container(
+      decoration: AppDecorations.cardDecoration(context: context),
+      child: Column(
+        children: [
+          _buildActionTile(
+            context: context,
+            icon: Icons.settings,
+            color: const Color(0xFF607D8B),
+            title: 'সেটিংস',
+            onTap: () => context.push(Routes.settings),
+          ),
+          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          _buildActionTile(
+            context: context,
+            icon: Icons.contacts,
+            color: const Color(0xFF009688),
+            title: 'জরুরি যোগাযোগ',
+            onTap: () => context.push(Routes.contacts),
+          ),
+          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          _buildActionTile(
+            context: context,
+            icon: Icons.history,
+            color: const Color(0xFFFF9800),
+            title: 'চেক-ইন ইতিহাস',
+            onTap: () => context.push(Routes.history),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color color,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -9,6 +9,9 @@ class UserModel {
   final DateTime? createdAt;
   final DateTime? lastCheckIn;
   final DateTime? updatedAt;
+  final String? address;
+  final String? bloodGroup;
+  final int checkinInterval;
 
   UserModel({
     required this.id,
@@ -21,6 +24,9 @@ class UserModel {
     this.createdAt,
     this.lastCheckIn,
     this.updatedAt,
+    this.address,
+    this.bloodGroup,
+    this.checkinInterval = 24,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +41,9 @@ class UserModel {
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
       lastCheckIn: json['lastCheckIn'] != null ? DateTime.parse(json['lastCheckIn']) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      address: json['address'],
+      bloodGroup: json['bloodGroup'],
+      checkinInterval: json['checkinInterval'] ?? 24,
     );
   }
 
@@ -50,6 +59,9 @@ class UserModel {
       'createdAt': createdAt?.toIso8601String(),
       'lastCheckIn': lastCheckIn?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'address': address,
+      'bloodGroup': bloodGroup,
+      'checkinInterval': checkinInterval,
     };
   }
 
@@ -64,6 +76,9 @@ class UserModel {
     DateTime? createdAt,
     DateTime? lastCheckIn,
     DateTime? updatedAt,
+    String? address,
+    String? bloodGroup,
+    int? checkinInterval,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -76,6 +91,9 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastCheckIn: lastCheckIn ?? this.lastCheckIn,
       updatedAt: updatedAt ?? this.updatedAt,
+      address: address ?? this.address,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      checkinInterval: checkinInterval ?? this.checkinInterval,
     );
   }
 }

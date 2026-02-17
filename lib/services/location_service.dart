@@ -1,6 +1,9 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter/foundation.dart';
+
+final locationServiceProvider = Provider<LocationService>((ref) => LocationService());
 
 /// Location Service
 /// Handles GPS location tracking and geocoding

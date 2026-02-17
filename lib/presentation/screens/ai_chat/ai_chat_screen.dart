@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/ai_service.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
@@ -11,54 +15,32 @@ class AIChatScreen extends ConsumerStatefulWidget {
 }
 
 class _AIChatScreenState extends ConsumerState<AIChatScreen> {
-  final TextEditingController _controller = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<Map<String, String>> _messages = [];
-  bool _isLoading = false;
+  final List<_ChatMessage> _messages = [];
+  bool _isTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Welcome message
+    _messages.add(_ChatMessage(
+      text: 'আস্সালামু আলাইকুম! আমি আপনার AI স্বাস্থ্য সহকারী। 🩺\n\n'
+          'আপনার শারীরিক বা মানসিক স্বাস্থ্য সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।',
+      isUser: false,
+      timestamp: DateTime.now(),
+    ));
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() {
-      _messages.add({'role': 'user', 'content': text});
-      _isLoading = true;
-      _controller.clear();
-    });
-    
-    _scrollToBottom();
-
-    try {
-      final aiService = ref.read(aiServiceProvider); // Assuming provider exists
-      final reply = await aiService.sendMessage(text);
-
-      if (mounted) {
-        setState(() {
-          _messages.add({'role': 'ai', 'content': reply});
-          _isLoading = false;
-        });
-        _scrollToBottom();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _messages.add({'role': 'ai', 'content': 'দুঃখিত, আমি এখন উত্তর দিতে পারছি না।'});
-          _isLoading = false;
-        });
-        _scrollToBottom();
-      }
-    }
-  }
-
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -69,104 +51,351 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     });
   }
 
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: text,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ));
+      _messageController.clear();
+      _isTyping = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final aiService = AIService(Dio());
+      final response = await aiService.sendMessage(text);
+
+      setState(() {
+        _isTyping = false;
+        _messages.add(_ChatMessage(
+          text: response,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      });
+    } catch (e) {
+      setState(() {
+        _isTyping = false;
+        _messages.add(_ChatMessage(
+          text: 'দুঃখিত, একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+          isUser: false,
+          timestamp: DateTime.now(),
+          isError: true,
+        ));
+      });
+    }
+    _scrollToBottom();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI সাথী'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AI সহকারী',
+                    style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
+                if (_isTyping)
+                  Text('টাইপ করছে...',
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 11,
+                        color: AppColors.success,
+                      )),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            onPressed: _messages.length > 1
+                ? () {
+                    setState(() {
+                      _messages.removeRange(1, _messages.length);
+                    });
+                  }
+                : null,
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // Suggestion chips
+          if (_messages.length <= 1) _buildSuggestions(),
+
+          // Messages
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
               itemBuilder: (context, index) {
-                final message = _messages[index];
-                final isUser = message['role'] == 'user';
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isUser ? AppColors.primary : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20).copyWith(
-                        bottomRight: isUser ? const Radius.circular(0) : null,
-                        bottomLeft: !isUser ? const Radius.circular(0) : null,
-                      ),
-                    ),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    child: Text(
-                      message['content']!,
-                      style: TextStyle(
-                        color: isUser ? Colors.white : Colors.black87,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                );
+                if (index == _messages.length && _isTyping) {
+                  return _buildTypingIndicator(isDark);
+                }
+                return _buildMessageBubble(_messages[index], isDark);
               },
             ),
           ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: LinearProgressIndicator(),
-            ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
+
+          // Input
+          _buildInputBar(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestions() {
+    final suggestions = [
+      'মাথাব্যথা হচ্ছে',
+      'ঘুম হচ্ছে না',
+      'মন খারাপ লাগছে',
+      'জ্বর হলে কী করব?',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: suggestions.map((s) {
+          return ActionChip(
+            label: Text(s, style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 13)),
+            onPressed: () {
+              _messageController.text = s;
+              _sendMessage();
+            },
+            backgroundColor: AppColors.primary.withOpacity(0.08),
+            side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(_ChatMessage message, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment:
+            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!message.isUser) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: message.isError
+                      ? [AppColors.error, AppColors.error.withOpacity(0.7)]
+                      : [const Color(0xFF6C63FF), const Color(0xFF5A52D5)],
                 ),
-              ],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                message.isError ? Icons.error_outline : Icons.smart_toy,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: message.isUser
+                    ? AppColors.primary
+                    : message.isError
+                        ? AppColors.error.withOpacity(0.1)
+                        : (isDark
+                            ? Colors.white.withOpacity(0.08)
+                            : const Color(0xFFF0F0F0)),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(message.isUser ? 18 : 4),
+                  bottomRight: Radius.circular(message.isUser ? 4 : 18),
+                ),
+              ),
+              child: Text(
+                message.text,
+                style: TextStyle(
+                  color: message.isUser
+                      ? Colors.white
+                      : message.isError
+                          ? AppColors.error
+                          : null,
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+          if (message.isUser) const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.smart_toy, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : const Color(0xFFF0F0F0),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+                bottomLeft: Radius.circular(4),
+              ),
             ),
             child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'আপনার প্রশ্ন লিখুন...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                return TweenAnimationBuilder<double>(
+                  key: ValueKey('dot_$i'),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 600 + (i * 200)),
+                  builder: (context, value, child) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.4 + value * 0.4),
+                        shape: BoxShape.circle,
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                    ),
-                    minLines: 1,
-                    maxLines: 3,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton(
-                  onPressed: _isLoading ? null : _sendMessage,
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  mini: true,
-                  child: const Icon(Icons.send, color: Colors.white),
-                ),
-              ],
+                    );
+                  },
+                );
+              }),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildInputBar(bool isDark) {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 8,
+        top: 8,
+        bottom: MediaQuery.of(context).padding.bottom + 8,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              maxLines: 4,
+              minLines: 1,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
+              decoration: InputDecoration(
+                hintText: 'আপনার প্রশ্ন লিখুন...',
+                hintStyle: TextStyle(fontFamily: 'HindSiliguri'),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withOpacity(0.06)
+                    : const Color(0xFFF5F5F5),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _isTyping ? null : _sendMessage,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _isTyping
+                      ? [Colors.grey, Colors.grey.shade400]
+                      : [AppColors.primary, AppColors.primaryLight],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.send, color: Colors.white, size: 22),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatMessage {
+  final String text;
+  final bool isUser;
+  final DateTime timestamp;
+  final bool isError;
+
+  _ChatMessage({
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
+    this.isError = false,
+  });
 }
