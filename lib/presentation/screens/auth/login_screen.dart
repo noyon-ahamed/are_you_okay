@@ -47,10 +47,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String message = e.toString().replaceAll('Exception: ', '');
+        if (message.contains('SocketException') || message.contains('Failed host lookup')) {
+          message = 'ইন্টারনেট সংযোগ নেই। অনুগ্রহ করে আপনার ইন্টারনেট চেক করুন।';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(message),
             backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
           ),
         );
       }

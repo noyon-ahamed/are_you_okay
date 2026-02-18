@@ -12,7 +12,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/auth');
 const checkinRoutes = require('./routes/checkin');
 const emergencyRoutes = require('./routes/emergency');
-const paymentRoutes = require('./routes/payment');
+// const paymentRoutes = require('./routes/payment'); // Disabled for now
 const aiRoutes = require('./routes/ai');
 const earthquakeRoutes = require('./routes/earthquake');
 const notificationRoutes = require('./routes/notification');
@@ -72,7 +72,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/emergency', emergencyRoutes);
-app.use('/api/payment', paymentRoutes);
+// app.use('/api/payment', paymentRoutes); // Disabled for now
 app.use('/api/ai', aiRoutes);
 app.use('/api/earthquake', earthquakeRoutes);
 app.use('/api/notification', notificationRoutes);

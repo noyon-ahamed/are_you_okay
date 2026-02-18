@@ -91,6 +91,11 @@ class AuthApiService {
         throw Exception(response.data['error'] ?? 'Login failed');
       }
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError || 
+          e.type == DioExceptionType.connectionTimeout ||
+          e.error.toString().contains('SocketException')) {
+         throw Exception('No Internet Connection');
+      }
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
   }

@@ -55,7 +55,7 @@ class ContactRepository {
 
       await hive.saveContact(contact);
       
-      // TODO: Sync with Firebase
+      // TODO: Sync with backend
 
       return contact;
     } catch (e) {
@@ -81,7 +81,7 @@ class ContactRepository {
       final updated = contact.copyWith(updatedAt: DateTime.now());
       await hive.updateContact(updated);
       
-      // TODO: Sync with Firebase
+      // TODO: Sync with backend
 
       return updated;
     } catch (e) {
@@ -94,7 +94,7 @@ class ContactRepository {
     try {
       await hive.deleteContact(id);
       
-      // TODO: Sync with Firebase
+      // TODO: Sync with backend
     } catch (e) {
       throw Exception('Failed to delete contact: $e');
     }
