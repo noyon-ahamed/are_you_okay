@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
+import '../auth/token_storage_service.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -55,6 +56,8 @@ class AuthApiService {
         
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
+        await TokenStorageService.saveToken(token);
+        await TokenStorageService.saveUserId(userId);
         
         return response.data['data'];
       } else {
@@ -85,6 +88,8 @@ class AuthApiService {
         
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
+        await TokenStorageService.saveToken(token);
+        await TokenStorageService.saveUserId(userId);
         
         return response.data['data'];
       } else {
@@ -103,6 +108,7 @@ class AuthApiService {
   /// Logout user
   Future<void> logout() async {
     await SharedPrefsService().clearAll();
+    await TokenStorageService.clearAll();
   }
 
   /// Get current user profile

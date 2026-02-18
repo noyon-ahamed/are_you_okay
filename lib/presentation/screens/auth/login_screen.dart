@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../services/api/auth_api_service.dart';
+import '../../../provider/auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
@@ -18,7 +18,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthApiService();
   
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -36,40 +35,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.login(
+      await ref.read(authProvider.notifier).login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (mounted) {
-        // Navigate to home screen
-        context.go('/home');
+        final authState = ref.read(authProvider);
+        if (authState is AuthAuthenticated) {
+          context.go('/home');
+        } else if (authState is AuthError) {
+          _showError(authState.message.replaceAll('Exception: ', ''));
+        }
       }
     } catch (e) {
       if (mounted) {
         String message = e.toString().replaceAll('Exception: ', '');
-        if (message.contains('SocketException') || message.contains('Failed host lookup')) {
-          message = 'ইন্টারনেট সংযোগ নেই। অনুগ্রহ করে আপনার ইন্টারনেট চেক করুন।';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
+        _showError(message);
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showError(String message) {
+    if (message.contains('SocketException') || 
+        message.contains('Failed host lookup') ||
+        message.contains('No Internet')) {
+      message = 'ইন্টারনেট সংযোগ নেই। অনুগ্রহ করে আপনার ইন্টারনেট চেক করুন।';
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
   }
 
   @override
