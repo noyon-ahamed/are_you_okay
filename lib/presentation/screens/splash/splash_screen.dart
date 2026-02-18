@@ -27,7 +27,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _navigateToNextScreen();
   }
 
   void _initializeAnimations() {
@@ -69,24 +68,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _controller.forward();
   }
 
-  Future<void> _navigateToNextScreen() async {
-    await Future.delayed(const Duration(seconds: 3));
 
-    if (mounted) {
-      final authState = ref.read(authProvider);
-
-      final state = authState;
-      if (state is AuthAuthenticated) {
-        context.go(Routes.home);
-      } else if (state is AuthUnauthenticated || state is AuthError) {
-        context.go(Routes.login); // Or onboarding
-      } else {
-        // Initial or Loading, do nothing or wait
-        // Maybe force login if stuck? Or onboarding?
-        context.go(Routes.login);
-      }
-    }
-  }
 
   @override
   void dispose() {
@@ -96,6 +78,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Listen to Auth State changes
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next is AuthAuthenticated) {
+        context.go(Routes.home);
+      } else if (next is AuthUnauthenticated || next is AuthError) {
+        context.go(Routes.login);
+      }
+    });
+
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
