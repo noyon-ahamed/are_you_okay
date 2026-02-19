@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../model/emergency_contact_model.dart';
 import '../services/hive_service.dart';
-import '../../core/constants/app_constants.dart';
+import '../core/constants/app_constants.dart';
 import 'auth_repository.dart';
 
 final contactRepositoryProvider = Provider<ContactRepository>((ref) {
@@ -51,10 +51,11 @@ class ContactRepository {
         notifyViaCall: notifyViaCall,
         notifyViaApp: notifyViaApp,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       await hive.saveContact(contact);
-      
+
       // TODO: Sync with backend
 
       return contact;
@@ -80,7 +81,7 @@ class ContactRepository {
     try {
       final updated = contact.copyWith(updatedAt: DateTime.now());
       await hive.updateContact(updated);
-      
+
       // TODO: Sync with backend
 
       return updated;
@@ -93,7 +94,7 @@ class ContactRepository {
   Future<void> deleteContact(String id) async {
     try {
       await hive.deleteContact(id);
-      
+
       // TODO: Sync with backend
     } catch (e) {
       throw Exception('Failed to delete contact: $e');

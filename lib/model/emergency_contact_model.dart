@@ -2,7 +2,7 @@ class EmergencyContactModel {
   final String id;
   final String name;
   final String phoneNumber;
-  final String relationship; // Renamed from relation to match usage
+  final String relationship;
   final String userId;
   final int priority;
   final bool isActive;
@@ -10,6 +10,7 @@ class EmergencyContactModel {
   final bool notifyViaCall;
   final bool notifyViaApp;
   final DateTime? createdAt;
+  final DateTime? updatedAt; // ← this was missing in your file
 
   EmergencyContactModel({
     required this.id,
@@ -23,6 +24,7 @@ class EmergencyContactModel {
     this.notifyViaCall = true,
     this.notifyViaApp = true,
     this.createdAt,
+    this.updatedAt, // ← this was missing in your file
   });
 
   factory EmergencyContactModel.fromJson(Map<String, dynamic> json) {
@@ -38,7 +40,25 @@ class EmergencyContactModel {
       notifyViaCall: json['notifyViaCall'] ?? true,
       notifyViaApp: json['notifyViaApp'] ?? true,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null, // ← this was missing
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'name': name,
+      'phoneNumber': phoneNumber,
+      'relationship': relationship,
+      'priority': priority,
+      'isActive': isActive,
+      'notifyViaSMS': notifyViaSMS,
+      'notifyViaCall': notifyViaCall,
+      'notifyViaApp': notifyViaApp,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(), // ← this was missing
+    };
   }
 
   EmergencyContactModel copyWith({
@@ -53,7 +73,7 @@ class EmergencyContactModel {
     bool? notifyViaCall,
     bool? notifyViaApp,
     DateTime? createdAt,
-    DateTime? updatedAt,
+    DateTime? updatedAt, // ← this was missing
   }) {
     return EmergencyContactModel(
       id: id ?? this.id,
@@ -67,9 +87,9 @@ class EmergencyContactModel {
       notifyViaCall: notifyViaCall ?? this.notifyViaCall,
       notifyViaApp: notifyViaApp ?? this.notifyViaApp,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt, // ← this was missing
     );
   }
 
-  // Getter for backward compatibility if needed, though strictly we changed the field
   String get relation => relationship;
 }

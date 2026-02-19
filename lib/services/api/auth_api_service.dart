@@ -10,11 +10,15 @@ class AuthApiService {
   final Dio _dio = Dio();
 
   AuthApiService() {
+    // Set timeouts
+    _dio.options.connectTimeout = const Duration(seconds: 10);
+    _dio.options.receiveTimeout = const Duration(seconds: 10);
+
     // Add token interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await SharedPrefsService.getToken();
+          final token = await TokenStorageService.getToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -23,7 +27,7 @@ class AuthApiService {
         onError: (error, handler) async {
           // Handle 401 Unauthorized - token expired
           if (error.response?.statusCode == 401) {
-            await SharedPrefsService().clearAll();
+            await SharedPrefsService().logout();
             // Optionally navigate to login screen here
           }
           return handler.next(error);
@@ -54,8 +58,6 @@ class AuthApiService {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
         
-        await SharedPrefsService().setUserToken(token);
-        await SharedPrefsService().setUserId(userId);
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
         
@@ -86,8 +88,6 @@ class AuthApiService {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
         
-        await SharedPrefsService().setUserToken(token);
-        await SharedPrefsService().setUserId(userId);
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
         
@@ -107,7 +107,7 @@ class AuthApiService {
 
   /// Logout user
   Future<void> logout() async {
-    await SharedPrefsService().clearAll();
+    await SharedPrefsService().logout();
     await TokenStorageService.clearAll();
   }
 
