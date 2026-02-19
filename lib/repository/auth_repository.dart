@@ -53,7 +53,10 @@ class AuthRepository {
       if (user != null) return user;
 
       // If not in memory but we have token, fetch from API
-      if (await TokenStorageService.isLoggedIn()) {
+      final hasToken = await TokenStorageService.isLoggedIn()
+          .timeout(const Duration(seconds: 2), onTimeout: () => false);
+
+      if (hasToken) {
         final response = await _apiService.getProfile();
         user = UserModel.fromJson(response);
         await _hiveService.saveUser(user); // Cache it

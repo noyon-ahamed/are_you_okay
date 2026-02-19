@@ -23,10 +23,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late Animation<double> _scaleAnimation;
   late Animation<Offset> _slideAnimation;
 
+  String? _targetRoute;
+  bool _isAnimationDone = false;
+
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    
+    // Ensure splash screen stays for at least 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isAnimationDone = true;
+        });
+        if (_targetRoute != null) {
+          context.go(_targetRoute!);
+        }
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -79,12 +94,35 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     // Listen to Auth State changes
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next is AuthAuthenticated) {
-        context.go(Routes.home);
-      } else if (next is AuthUnauthenticated || next is AuthError) {
-        context.go(Routes.login);
+    void handleAuth(AuthState state) {
+      String? route;
+      if (state is AuthAuthenticated) {
+        route = Routes.home;
+      } else if (state is AuthUnauthenticated || state is AuthError) {
+        route = Routes.login;
       }
+
+      if (route != null) {
+        if (_isAnimationDone) {
+          context.go(route);
+        } else {
+          _targetRoute = route;
+        }
+      }
+    }
+
+    // Check current state immediately
+    final authState = ref.watch(authProvider);
+    // Use addPostFrameCallback to avoid navigation during build
+    if (authState is! AuthLoading && authState is! AuthInitial) {
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+         handleAuth(authState);
+       });
+    }
+
+    // Listen to future changes
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      handleAuth(next);
     });
 
     final size = MediaQuery.of(context).size;
