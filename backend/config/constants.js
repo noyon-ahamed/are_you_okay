@@ -21,7 +21,7 @@ module.exports = {
         AI_VOICE_CALLS: 0,
         SMS_ALERTS: 5,
         VOICE_CALL_MINUTES: 0,
-        EMERGENCY_CONTACTS: 3,
+        EMERGENCY_CONTACTS: 5,
         CHECK_INS: -1 // unlimited
     },
 
@@ -37,8 +37,8 @@ module.exports = {
 
     // Check-in settings
     CHECK_IN: {
-        GRACE_PERIOD_HOURS: 72, // 3 days
-        REMINDER_HOURS: [9, 18], // 9 AM and 6 PM
+        GRACE_PERIOD_HOURS: 48, // 2 days (48h inactivity triggers emergency alert)
+        REMINDER_HOURS: [8, 14, 21], // 8 AM, 2 PM, 9 PM
         STREAK_RESET_HOURS: 48
     },
 
@@ -106,8 +106,8 @@ Keep responses concise and actionable.`
     // Alert messages (Bengali + English)
     ALERT_MESSAGES: {
         MISSED_CHECKIN: {
-            EN: 'Alert: {userName} has not checked in for 3 days. Last seen at {location} on {date}. Please contact them immediately.',
-            BN: 'সতর্কতা: {userName} গত ৩ দিন চেক-ইন করেননি। সর্বশেষ {date} তারিখে {location} এ দেখা গেছে। অনুগ্রহ করে তাৎক্ষণিক যোগাযোগ করুন।'
+            EN: 'Emergency Alert: Your relative \'{userName}\' has not checked in for the last 2 days. Please check on them. Phone: {userPhone}.',
+            BN: 'জরুরি সতর্কতা: আপনার নিকটজন \'{userName}\' গত ২ দিন চেক-ইন করেননি। অনুগ্রহ করে তাকে দেখুন। ফোন: {userPhone}।'
         },
         SOS: {
             EN: 'EMERGENCY: {userName} has sent an SOS alert! Current location: {location}. Message: {message}',

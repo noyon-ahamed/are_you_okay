@@ -17,6 +17,7 @@ const aiRoutes = require('./routes/ai');
 const earthquakeRoutes = require('./routes/earthquake');
 const notificationRoutes = require('./routes/notification');
 const configRoutes = require('./routes/config');
+const moodRoutes = require('./routes/mood');
 
 
 
@@ -77,6 +78,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/earthquake', earthquakeRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/mood', moodRoutes);
 
 // Socket.io connection handling
 const initSockets = require('./sockets/index');

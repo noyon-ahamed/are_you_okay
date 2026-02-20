@@ -5,10 +5,11 @@ const EmergencyContact = require('../model/EmergencyContact');
 const EmergencyAlert = require('../model/EmergencyAlert');
 const { sendNotification } = require('../config/firebase');
 const twilioClient = require('../config/twilio');
+const { sendEmail } = require('../services/emailService');
 const { ALERT_MESSAGES, CHECK_IN } = require('../config/constants');
 const { logger } = require('../middleware/logger');
 
-// Monitor users who haven't checked in for 3 days
+// Monitor users who haven't checked in for 2 days (48 hours)
 const checkMissedCheckIns = async (io) => {
     try {
         logger.info('🔍 Running check-in monitor...');
@@ -16,7 +17,7 @@ const checkMissedCheckIns = async (io) => {
         const gracePeriod = CHECK_IN.GRACE_PERIOD_HOURS * 60 * 60 * 1000; // Convert to ms
         const thresholdTime = new Date(Date.now() - gracePeriod);
 
-        // Find users who haven't checked in for 3+ days
+        // Find users who haven't checked in for 2+ days (48h)
         const missedUsers = await User.find({
             isActive: true,
             $or: [
@@ -67,8 +68,7 @@ const checkMissedCheckIns = async (io) => {
 
                 const alertMessage = ALERT_MESSAGES.MISSED_CHECKIN.EN
                     .replace('{userName}', user.name)
-                    .replace('{location}', 'their last known location')
-                    .replace('{date}', lastSeenDate);
+                    .replace('{userPhone}', user.phone || 'N/A');
 
                 // Send alerts to emergency contacts
                 const contactResults = [];
@@ -107,6 +107,29 @@ const checkMissedCheckIns = async (io) => {
                 alert.contactsNotified = contactResults;
                 await alert.save();
 
+                // Send email alerts to contacts who have email
+                for (const contact of contacts) {
+                    if (contact.email) {
+                        try {
+                            const emailSubject = `Emergency Alert: ${user.name} has not checked in`;
+                            const emailBody = `
+                                <h2>⚠️ Emergency Alert</h2>
+                                <p>${alertMessage}</p>
+                                <p><strong>User:</strong> ${user.name}</p>
+                                <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
+                                <p><strong>Last Check-in:</strong> ${lastSeenDate}</p>
+                                <p>Please contact them immediately.</p>
+                                <hr>
+                                <p><small>This alert was sent automatically by Are You Okay app.</small></p>
+                            `;
+                            await sendEmail(contact.email, emailSubject, emailBody);
+                            logger.info(`Email sent to ${contact.name} (${contact.email})`);
+                        } catch (error) {
+                            logger.error(`Failed to send email to ${contact.name}:`, error);
+                        }
+                    }
+                }
+
                 // Update user's missed count
                 await User.findByIdAndUpdate(user._id, {
                     $inc: { missedCheckInCount: 1 },
@@ -124,7 +147,7 @@ const checkMissedCheckIns = async (io) => {
                 if (user.fcmToken) {
                     await sendNotification(user.fcmToken, {
                         title: '⚠️ Check-in Reminder',
-                        body: 'You haven\'t checked in for 3 days. Your emergency contacts have been notified.',
+                        body: 'You haven\'t checked in for 2 days. Your emergency contacts have been notified.',
                     });
                 }
 

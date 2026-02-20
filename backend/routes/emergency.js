@@ -4,9 +4,9 @@ const authenticate = require('../middleware/authMiddleware');
 const EmergencyContact = require('../model/EmergencyContact');
 const EmergencyAlert = require('../model/EmergencyAlert');
 const User = require('../model/User');
-const Subscription = require('../model/Subscription');
 const twilioClient = require('../config/twilio');
-const { PRICING, ALERT_MESSAGES } = require('../config/constants');
+const { sendEmail } = require('../services/emailService');
+const { ALERT_MESSAGES } = require('../config/constants');
 
 // Get all emergency contacts
 router.get('/contacts', authenticate, async (req, res) => {
@@ -37,18 +37,16 @@ router.post('/contacts', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Name and phone required' });
         }
 
-        // Check subscription limits
-        const subscription = await Subscription.findOne({ userId: req.user._id });
+        // Check contact limits (max 5 for all users)
         const contactCount = await EmergencyContact.countDocuments({
             userId: req.user._id
         });
 
-        const maxContacts = subscription?.plan === 'premium' ? 10 : 3;
+        const maxContacts = 5;
 
         if (contactCount >= maxContacts) {
             return res.status(403).json({
-                error: `Maximum ${maxContacts} contacts allowed on ${subscription?.plan} plan`,
-                upgradeRequired: subscription?.plan === 'free',
+                error: `Maximum ${maxContacts} contacts allowed`,
             });
         }
 
@@ -187,7 +185,6 @@ router.post('/sos', authenticate, async (req, res) => {
         }
 
         const user = await User.findById(req.user._id);
-        const subscription = await Subscription.findOne({ userId: req.user._id });
 
         // Get all emergency contacts
         const contacts = await EmergencyContact.find({ userId: req.user._id })
@@ -246,6 +243,29 @@ router.post('/sos', authenticate, async (req, res) => {
         });
 
         const results = await Promise.all(alertPromises);
+
+        // Send email alerts to contacts who have email
+        for (const contact of contacts) {
+            if (contact.email) {
+                try {
+                    const locationLink = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
+                    const emailSubject = `⚠️ EMERGENCY: ${user.name} has sent an SOS Alert!`;
+                    const emailBody = `
+                        <h2>🚨 SOS Emergency Alert</h2>
+                        <p><strong>${user.name}</strong> has triggered an emergency SOS alert!</p>
+                        <p><strong>Location:</strong> <a href="${locationLink}">View on Google Maps</a></p>
+                        ${customMessage ? `<p><strong>Message:</strong> ${customMessage}</p>` : ''}
+                        <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
+                        <p>Please contact them immediately or call emergency services.</p>
+                        <hr>
+                        <p><small>This alert was sent automatically by Are You Okay app.</small></p>
+                    `;
+                    await sendEmail(contact.email, emailSubject, emailBody);
+                } catch (error) {
+                    console.error(`Failed to send email to ${contact.name}:`, error);
+                }
+            }
+        }
 
         // Update alert with notification results
         alert.contactsNotified = results;
