@@ -812,37 +812,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return 'শুভ রাত্রি 🌙';
   }
 
-  void _performCheckin() {
+  void _performCheckin() async {
     String? notes;
     if (_selectedMood != -1 && _selectedMood < AppConstants.moodLabels.length) {
       final moodLabel = AppConstants.moodLabels[_selectedMood];
       notes = 'Mood: $moodLabel';
     }
 
-    ref.read(checkinProvider.notifier).performCheckIn(
-      method: 'button',
-      notes: notes,
-    );
+    try {
+      await ref.read(checkinProvider.notifier).performCheckIn(
+        method: 'button',
+        notes: notes,
+      );
 
-    // Update status after check-in
-    ref.read(checkinStatusProvider.notifier).onCheckInComplete();
+      // Update status after check-in ONLY if successful
+      if (mounted) {
+        ref.read(checkinStatusProvider.notifier).onCheckInComplete();
 
-    // Cancel remaining check-in reminder notifications
-    LocalNotificationService().cancelNotification(1);
+        // Cancel remaining check-in reminder notifications
+        LocalNotificationService().cancelNotification(1);
 
-    setState(() {
-      _selectedMood = -1;
-    });
+        setState(() {
+          _selectedMood = -1;
+        });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'চেক-ইন সফল হয়েছে! ✓',
-          style: TextStyle(fontFamily: 'HindSiliguri'),
-        ),
-        backgroundColor: AppColors.success,
-      ),
-    );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'চেক-ইন সফল হয়েছে! ✓',
+              style: TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'চেক-ইন ব্যর্থ হয়েছে: $e',
+              style: TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   /// Save mood to backend
