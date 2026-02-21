@@ -828,6 +828,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // Update status after check-in ONLY if successful
       if (mounted) {
         ref.read(checkinStatusProvider.notifier).onCheckInComplete();
+        ref.invalidate(checkinHistoryProvider); // Refresh local history UI
 
         // Cancel remaining check-in reminder notifications
         LocalNotificationService().cancelNotification(1);

@@ -83,6 +83,15 @@ const userSchema = new mongoose.Schema({
             type: [Number], // [longitude, latitude]
             default: [0, 0] // Default (can be 0,0 but better to be updated on login/check-in)
         }
+    },
+    lastCheckIn: Date,
+    checkInStreak: {
+        type: Number,
+        default: 0
+    },
+    missedCheckInCount: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
