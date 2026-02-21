@@ -67,7 +67,7 @@ class CheckInRepository {
 
       final checkIn = CheckInModel(
         id: response['checkIn']?['_id'] ?? _uuid.v4(),
-        userId: response['checkIn']?['userId'] ?? '',
+        userId: response['checkIn']?['user'] ?? response['checkIn']?['userId'] ?? '',
         timestamp: DateTime.now(),
         latitude: lat,
         longitude: lng,

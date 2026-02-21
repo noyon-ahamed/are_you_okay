@@ -20,8 +20,8 @@ router.post('/', authenticate, async (req, res) => {
         today.setHours(0, 0, 0, 0);
 
         const existingCheckIn = await CheckIn.findOne({
-            userId: req.user._id,
-            timestamp: { $gte: today },
+            user: req.user._id,
+            checkInTime: { $gte: today },
         });
 
         if (existingCheckIn) {
@@ -33,13 +33,13 @@ router.post('/', authenticate, async (req, res) => {
 
         // Create check-in
         const checkIn = await CheckIn.create({
-            userId: req.user._id,
+            user: req.user._id,
             location: {
-                type: 'Point',
-                coordinates: [location.longitude, location.latitude],
+                latitude: location.latitude,
+                longitude: location.longitude,
             },
             status: status || 'safe',
-            note: note || '',
+            notes: note || '',
         });
 
         // Update user's last check-in and streak
@@ -81,7 +81,7 @@ router.post('/', authenticate, async (req, res) => {
         const io = req.app.get('io');
         if (io) {
             io.to(`user_${req.user._id}`).emit('checkin_success', {
-                timestamp: checkIn.timestamp,
+                timestamp: checkIn.checkInTime,
                 streak: newStreak,
                 status: checkIn.status,
             });
@@ -113,13 +113,13 @@ router.get('/history', authenticate, async (req, res) => {
     try {
         const { limit = 30, skip = 0 } = req.query;
 
-        const checkIns = await CheckIn.find({ userId: req.user._id })
-            .sort({ timestamp: -1 })
+        const checkIns = await CheckIn.find({ user: req.user._id })
+            .sort({ checkInTime: -1 })
             .limit(parseInt(limit))
             .skip(parseInt(skip))
             .select('-__v');
 
-        const total = await CheckIn.countDocuments({ userId: req.user._id });
+        const total = await CheckIn.countDocuments({ user: req.user._id });
 
         res.json({
             success: true,
@@ -161,8 +161,8 @@ router.get('/status', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
 
-        const lastCheckIn = await CheckIn.findOne({ userId: req.user._id })
-            .sort({ timestamp: -1 });
+        const lastCheckIn = await CheckIn.findOne({ user: req.user._id })
+            .sort({ checkInTime: -1 });
 
         const hoursSinceLastCheckIn = user.lastCheckIn
             ? Math.floor((Date.now() - user.lastCheckIn.getTime()) / (1000 * 60 * 60))
@@ -233,20 +233,20 @@ router.get('/calendar/:year/:month', authenticate, async (req, res) => {
         const endDate = new Date(year, month, 0, 23, 59, 59);
 
         const checkIns = await CheckIn.find({
-            userId: req.user._id,
-            timestamp: {
+            user: req.user._id,
+            checkInTime: {
                 $gte: startDate,
                 $lte: endDate,
             },
-        }).select('timestamp status');
+        }).select('checkInTime status');
 
         // Group by date
         const calendar = {};
         checkIns.forEach(checkIn => {
-            const date = checkIn.timestamp.toISOString().split('T')[0];
+            const date = checkIn.checkInTime.toISOString().split('T')[0];
             calendar[date] = {
                 status: checkIn.status,
-                timestamp: checkIn.timestamp,
+                timestamp: checkIn.checkInTime,
             };
         });
 
