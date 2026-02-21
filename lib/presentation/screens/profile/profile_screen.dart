@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
+import '../../../provider/checkin_provider.dart';
 import '../../../routes/app_router.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -113,7 +114,7 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     // Stats Row
-                    _buildStatsRow(context, isDark),
+                    _buildStatsRow(context, isDark, ref),
                     const SizedBox(height: 24),
 
                     // Info Card
@@ -133,13 +134,18 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, bool isDark) {
+  Widget _buildStatsRow(BuildContext context, bool isDark, WidgetRef ref) {
+    final checkins = ref.watch(checkinHistoryProvider);
+    final status = ref.watch(checkinStatusProvider);
+
+    final activeDays = checkins.map((c) => "${c.timestamp.year}-${c.timestamp.month}-${c.timestamp.day}").toSet().length;
+
     return Row(
       children: [
         _buildStatCard(
           context: context,
           icon: Icons.check_circle,
-          value: '0',
+          value: checkins.length.toString(),
           label: 'মোট চেক-ইন',
           color: AppColors.success,
           isDark: isDark,
@@ -148,7 +154,7 @@ class ProfileScreen extends ConsumerWidget {
         _buildStatCard(
           context: context,
           icon: Icons.local_fire_department,
-          value: '0',
+          value: status.streak.toString(),
           label: 'স্ট্রিক',
           color: const Color(0xFFFF9800),
           isDark: isDark,
@@ -157,7 +163,7 @@ class ProfileScreen extends ConsumerWidget {
         _buildStatCard(
           context: context,
           icon: Icons.calendar_today,
-          value: '0',
+          value: activeDays.toString(),
           label: 'সক্রিয় দিন',
           color: AppColors.primary,
           isDark: isDark,

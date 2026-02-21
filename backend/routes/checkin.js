@@ -164,22 +164,22 @@ router.get('/status', authenticate, async (req, res) => {
         const lastCheckIn = await CheckIn.findOne({ user: req.user._id })
             .sort({ checkInTime: -1 });
 
-        const hoursSinceLastCheckIn = user.lastCheckIn
-            ? Math.floor((Date.now() - user.lastCheckIn.getTime()) / (1000 * 60 * 60))
+        const hoursSinceLastCheckIn = lastCheckIn
+            ? Math.floor((Date.now() - lastCheckIn.checkInTime.getTime()) / (1000 * 60 * 60))
             : null;
 
         // Check if user has already checked in TODAY
         let needsCheckIn = true;
-        if (user.lastCheckIn) {
+        if (lastCheckIn) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            needsCheckIn = user.lastCheckIn < today;
+            needsCheckIn = lastCheckIn.checkInTime < today;
         }
 
         res.json({
             success: true,
             status: {
-                lastCheckIn: lastCheckIn,
+                lastCheckIn: lastCheckIn ? { timestamp: lastCheckIn.checkInTime } : null,
                 hoursSinceLastCheckIn,
                 needsCheckIn,
                 streak: user.checkInStreak || 0,
