@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/earthquake_service.dart';
@@ -33,8 +34,28 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     });
 
     try {
+      double? lat;
+      double? lng;
+
+      // Try to get current location to filter earthquake data
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.low,
+            );
+            lat = position.latitude;
+            lng = position.longitude;
+          }
+        }
+      } catch (e) {
+        debugPrint('Could not fetch location directly: $e');
+      }
+
       final earthquakeService = ref.read(earthquakeServiceProvider);
-      final data = await earthquakeService.getLatestEarthquakes();
+      final data = await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
 
       if (mounted) {
         setState(() {

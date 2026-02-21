@@ -72,10 +72,24 @@ const userSchema = new mongoose.Schema({
         }
     },
     fcmToken: String, // For push notifications
-    lastActive: Date
+    lastActive: Date,
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            default: [0, 0] // Default (can be 0,0 but better to be updated on login/check-in)
+        }
+    }
 }, {
     timestamps: true
 });
+
+// Create geospatial index for the user's location
+userSchema.index({ location: '2dsphere' });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

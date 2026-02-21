@@ -27,9 +27,18 @@ class EarthquakeService {
   }
 
   /// Get latest earthquake alerts from backend
-  Future<List<Map<String, dynamic>>> getLatestEarthquakes() async {
+  Future<List<Map<String, dynamic>>> getLatestEarthquakes({double? lat, double? lng}) async {
     try {
-      final response = await _dio.get('$_baseUrl/earthquake/latest');
+      final queryParams = <String, dynamic>{};
+      if (lat != null && lng != null) {
+        queryParams['lat'] = lat;
+        queryParams['lng'] = lng;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrl/earthquake/latest',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
 
       if (response.data['success'] == true) {
         return List<Map<String, dynamic>>.from(response.data['data'] ?? []);
