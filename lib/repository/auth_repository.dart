@@ -57,13 +57,22 @@ class AuthRepository {
           .timeout(const Duration(seconds: 2), onTimeout: () => false);
 
       if (hasToken) {
-        final response = await _apiService.getProfile();
-        user = UserModel.fromJson(response);
+        // Fetch profile with a 5-second timeout to prevent splash screen hang
+        final response = await _apiService.getProfile().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw Exception('Timeout fetching profile'),
+        );
+        
+        user = UserModel.fromJson(response['user']);
         await _hiveService.saveUser(user); // Cache it
         return user;
       }
       return null;
     } catch (e) {
+      // If we couldn't fetch the user but we have a token and userId, we could construct a basic user
+      // or we can force them to login again. For security, if token exists but offline, 
+      // they should theoretically just use the cached user. But if cached user is null and offline?
+      // They must log in.
       return null;
     }
   }

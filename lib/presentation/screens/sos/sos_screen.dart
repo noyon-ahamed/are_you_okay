@@ -10,6 +10,7 @@ import '../../../provider/contact_provider.dart';
 import '../../../model/emergency_contact_model.dart';
 import '../../../services/location_service.dart';
 import '../../../services/socket_service.dart';
+import '../../../services/api/emergency_api_service.dart';
 
 class SOSScreen extends ConsumerStatefulWidget {
   const SOSScreen({super.key});
@@ -30,6 +31,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   Timer? _countdownTimer;
   Position? _currentPosition;
   StreamSubscription<Position>? _locationSubscription;
+  String? _activeAlertId;
+  final _emergencyApi = EmergencyApiService();
 
   @override
   void initState() {
@@ -135,17 +138,41 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
       socketService.emitLocationUpdate(position.latitude, position.longitude);
     });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'জরুরি সতর্কতা এবং লাইভ লোকেশন শেয়ার করা হচ্ছে!',
-            style: TextStyle(fontFamily: 'HindSiliguri'),
-          ),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
-        ),
+    // === Call backend SOS endpoint to send SMS+Email alerts ===
+    try {
+      final result = await _emergencyApi.triggerSOS(
+        latitude: _currentPosition?.latitude ?? 23.8103,
+        longitude: _currentPosition?.longitude ?? 90.4125,
       );
+      _activeAlertId = result['alert']?['_id']?.toString();
+      
+      if (mounted) {
+        final notifiedCount = result['contactsNotified'] ?? 0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'SOS সক্রিয়! $notifiedCount জন যোগাযোগকারীকে সতর্ক করা হয়েছে',
+              style: TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Backend SOS error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'জরুরি সতর্কতা পাঠানো হচ্ছে (অফলাইন মোড)',
+              style: TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -370,10 +397,19 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         ],
         const SizedBox(height: 40),
         ElevatedButton.icon(
-          onPressed: () {
+          onPressed: () async {
+            // Resolve alert on backend
+            if (_activeAlertId != null) {
+              try {
+                await _emergencyApi.resolveAlert(_activeAlertId!);
+              } catch (e) {
+                debugPrint('Failed to resolve alert: $e');
+              }
+            }
             setState(() {
               _isActivated = false;
               _locationSubscription?.cancel();
+              _activeAlertId = null;
             });
           },
           icon: const Icon(Icons.check),

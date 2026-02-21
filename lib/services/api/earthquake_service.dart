@@ -1,39 +1,52 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
-import '../shared_prefs_service.dart';
+import '../auth/token_storage_service.dart';
 
-final earthquakeServiceProvider = Provider<EarthquakeService>((ref) => EarthquakeService(Dio()));
+final earthquakeServiceProvider = Provider<EarthquakeService>((ref) => EarthquakeService());
 
 class EarthquakeService {
   final Dio _dio;
-  
-  // Use centralized API URL from AppConstants
-  final String _baseUrl = AppConstants.apiBaseUrl; 
+  final String _baseUrl = AppConstants.apiBaseUrl;
 
-  EarthquakeService(this._dio);
+  EarthquakeService() : _dio = Dio() {
+    _dio.options.connectTimeout = const Duration(seconds: 60);
+    _dio.options.receiveTimeout = const Duration(seconds: 60);
 
-  Future<List<dynamic>> getRecentEarthquakes() async {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await TokenStorageService.getToken();
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
+      ),
+    );
+  }
+
+  /// Get latest earthquake alerts from backend
+  Future<List<Map<String, dynamic>>> getLatestEarthquakes() async {
     try {
-      final token = await SharedPrefsService.getToken();
-      
-      final response = await _dio.get(
-        '$_baseUrl/earthquake/recent',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
+      final response = await _dio.get('$_baseUrl/earthquake/latest');
 
-      if (response.statusCode == 200) {
-        return response.data['earthquakes'] ?? [];
+      if (response.data['success'] == true) {
+        return List<Map<String, dynamic>>.from(response.data['data'] ?? []);
       } else {
         throw Exception('Failed to fetch earthquakes');
       }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
+  /// Trigger manual earthquake data fetch
+  Future<void> fetchNow() async {
+    try {
+      await _dio.post('$_baseUrl/earthquake/fetch-now');
     } catch (e) {
-      throw Exception('Error fetching earthquakes: $e');
+      throw Exception('Failed to trigger earthquake fetch: $e');
     }
   }
 }

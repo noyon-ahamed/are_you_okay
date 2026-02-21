@@ -21,10 +21,12 @@ class ContactRepository {
   Future<EmergencyContactModel> addContact({
     required String name,
     required String phoneNumber,
+    String? email,
     required String relationship,
     int priority = 1,
     bool notifyViaSMS = true,
     bool notifyViaCall = false,
+    bool notifyViaEmail = true,
     bool notifyViaApp = true,
   }) async {
     try {
@@ -45,10 +47,12 @@ class ContactRepository {
         userId: user.id,
         name: name,
         phoneNumber: phoneNumber,
+        email: email,
         relationship: relationship,
         priority: priority,
         notifyViaSMS: notifyViaSMS,
         notifyViaCall: notifyViaCall,
+        notifyViaEmail: notifyViaEmail,
         notifyViaApp: notifyViaApp,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -133,7 +137,7 @@ class ContactRepository {
   /// Get contacts for notifications (sorted by priority)
   List<EmergencyContactModel> getNotificationContacts() {
     return getAllContacts()
-        .where((c) => c.notifyViaSMS || c.notifyViaCall || c.notifyViaApp)
+        .where((c) => c.notifyViaSMS || c.notifyViaCall || c.notifyViaEmail || c.notifyViaApp)
         .toList();
   }
 }

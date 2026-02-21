@@ -4,7 +4,7 @@ import '../../core/constants/app_constants.dart';
 /// ConfigApiService
 /// Fetches app configuration from backend (including ad settings)
 class ConfigApiService {
-  static const String baseUrl = AppConstants.apiBaseUrl;
+  static String get baseUrl => AppConstants.apiBaseUrl;
   final Dio _dio = Dio();
 
   /// Get app configuration

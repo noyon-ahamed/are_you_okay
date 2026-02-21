@@ -1,22 +1,28 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
+import '../../../services/api/earthquake_service.dart';
 
-class EarthquakeScreen extends StatefulWidget {
+class EarthquakeScreen extends ConsumerStatefulWidget {
   const EarthquakeScreen({super.key});
 
   @override
-  State<EarthquakeScreen> createState() => _EarthquakeScreenState();
+  ConsumerState<EarthquakeScreen> createState() => _EarthquakeScreenState();
 }
 
-class _EarthquakeScreenState extends State<EarthquakeScreen> {
+class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   bool _isLoading = true;
+  String? _error;
   List<_EarthquakeData> _recentQuakes = [];
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Bangladesh bounds
   static const CameraPosition _initialPosition = CameraPosition(
@@ -30,36 +36,94 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
     _fetchEarthquakeData();
   }
 
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchEarthquakeData() async {
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() {
-        _recentQuakes = [
-          _EarthquakeData(
-            magnitude: 4.2,
-            location: 'সিলেট, বাংলাদেশ',
-            time: '১০ মিনিট আগে',
-            latLng: const LatLng(24.8949, 91.8687),
-            depth: '১০ কিমি',
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final earthquakeService = ref.read(earthquakeServiceProvider);
+      final data = await earthquakeService.getLatestEarthquakes();
+
+      if (mounted) {
+        setState(() {
+          _recentQuakes = data.map((e) {
+            final coords = e['location']?['coordinates'] as List?;
+            final lng = coords != null && coords.isNotEmpty ? (coords[0] as num).toDouble() : 0.0;
+            final lat = coords != null && coords.length > 1 ? (coords[1] as num).toDouble() : 0.0;
+            final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
+            final timestamp = DateTime.tryParse(e['timestamp']?.toString() ?? '') ?? DateTime.now();
+
+            return _EarthquakeData(
+              eventId: e['eventId']?.toString() ?? '',
+              magnitude: magnitude,
+              location: e['place']?.toString() ?? 'Unknown',
+              time: timeago.format(timestamp),
+              latLng: LatLng(lat, lng),
+              depth: '${(e['depth'] as num?)?.toStringAsFixed(0) ?? '?'} km',
+              timestamp: timestamp,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+
+        // Check for dangerous earthquakes and play siren
+        final dangerous = _recentQuakes.where((q) => q.magnitude >= 6.0);
+        if (dangerous.isNotEmpty) {
+          _playSirenAlert();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _playSirenAlert() async {
+    try {
+      // Use a built-in alert sound or asset
+      // For now, just show a notification-style alert
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppColors.error,
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+                SizedBox(width: 8),
+                Text(
+                  '⚠️ বিপদ সংকেত!',
+                  style: TextStyle(color: Colors.white, fontFamily: 'HindSiliguri'),
+                ),
+              ],
+            ),
+            content: const Text(
+              'উচ্চ মাত্রার ভূমিকম্প শনাক্ত হয়েছে! নিরাপদ স্থানে যান!',
+              style: TextStyle(color: Colors.white, fontFamily: 'HindSiliguri'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('বুঝেছি', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-          _EarthquakeData(
-            magnitude: 3.8,
-            location: 'চট্টগ্রাম, বাংলাদেশ',
-            time: '২ ঘণ্টা আগে',
-            latLng: const LatLng(22.3569, 91.7832),
-            depth: '৫ কিমি',
-          ),
-          _EarthquakeData(
-            magnitude: 5.1,
-            location: 'মায়ানমার সীমান্ত',
-            time: '১ দিন আগে',
-            latLng: const LatLng(21.2, 92.5),
-            depth: '১৫ কিমি',
-          ),
-        ];
-        _isLoading = false;
-      });
+        );
+      }
+    } catch (e) {
+      debugPrint('Siren error: $e');
     }
   }
 
@@ -72,27 +136,28 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
         children: [
           // ==================== Map Background ====================
           GoogleMap(
-            mapType: isDark ? MapType.normal : MapType.normal, // TODO: Custom dark style
+            mapType: MapType.normal,
             initialCameraPosition: _initialPosition,
             markers: _recentQuakes.map((quake) {
               return Marker(
-                markerId: MarkerId(quake.location),
+                markerId: MarkerId(quake.eventId.isEmpty ? quake.location : quake.eventId),
                 position: quake.latLng,
                 infoWindow: InfoWindow(
                   title: '${quake.magnitude} মাত্রা',
                   snippet: quake.location,
                 ),
                 icon: BitmapDescriptor.defaultMarkerWithHue(
-                  quake.magnitude >= 5.0
+                  quake.magnitude >= 6.0
                       ? BitmapDescriptor.hueRed
-                      : BitmapDescriptor.hueOrange,
+                      : quake.magnitude >= 4.5
+                          ? BitmapDescriptor.hueOrange
+                          : BitmapDescriptor.hueYellow,
                 ),
               );
             }).toSet(),
             onMapCreated: (GoogleMapController controller) {
-              _controller.complete(controller);
-              if (isDark) {
-                // TODO: Set dark map style
+              if (!_controller.isCompleted) {
+                _controller.complete(controller);
               }
             },
             zoomControlsEnabled: false,
@@ -138,10 +203,7 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.refresh, color: Colors.white),
-                        onPressed: () {
-                          setState(() => _isLoading = true);
-                          _fetchEarthquakeData();
-                        },
+                        onPressed: _fetchEarthquakeData,
                       ),
                     ],
                   ),
@@ -180,7 +242,7 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                       ),
                     ),
                   ),
-                  
+
                   // Title
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -188,9 +250,9 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                       children: [
                         Icon(Icons.public, color: AppColors.primary, size: 20),
                         const SizedBox(width: 8),
-                        const Text(
-                          'সাম্প্রতিক ভূমিকম্প',
-                          style: TextStyle(
+                        Text(
+                          'সাম্প্রতিক ভূমিকম্প (${_recentQuakes.length})',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'HindSiliguri',
@@ -204,20 +266,71 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                   Expanded(
                     child: _isLoading
                         ? _buildLoadingList()
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _recentQuakes.length,
-                            itemBuilder: (context, index) {
-                              return _buildQuakeItem(
-                                  context, _recentQuakes[index], isDark);
-                            },
-                          ),
+                        : _error != null
+                            ? _buildErrorView()
+                            : _recentQuakes.isEmpty
+                                ? _buildEmptyView()
+                                : RefreshIndicator(
+                                    onRefresh: _fetchEarthquakeData,
+                                    child: ListView.builder(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      itemCount: _recentQuakes.length,
+                                      itemBuilder: (context, index) {
+                                        return _buildQuakeItem(
+                                            context, _recentQuakes[index], isDark);
+                                      },
+                                    ),
+                                  ),
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: AppColors.error),
+            const SizedBox(height: 12),
+            Text(
+              'ডেটা লোড করতে ব্যর্থ',
+              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _fetchEarthquakeData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('আবার চেষ্টা করুন', style: TextStyle(fontFamily: 'HindSiliguri')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, size: 48, color: AppColors.success),
+            const SizedBox(height: 12),
+            Text(
+              'কোনো সাম্প্রতিক ভূমিকম্প নেই',
+              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -251,7 +364,7 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
     if (quake.magnitude >= 6.0) {
       magColor = AppColors.error;
     } else if (quake.magnitude >= 4.5) {
-      magColor = const Color(0xFFFF9800); // Warning
+      magColor = const Color(0xFFFF9800);
     } else {
       magColor = AppColors.success;
     }
@@ -262,7 +375,7 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
       decoration: AppDecorations.cardDecoration(context: context),
       child: Row(
         children: [
-          // Look Circle
+          // Magnitude Circle
           Container(
             width: 50,
             height: 50,
@@ -273,9 +386,9 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
             ),
             child: Center(
               child: Text(
-                quake.magnitude.toString(),
+                quake.magnitude.toStringAsFixed(1),
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: magColor,
                 ),
@@ -292,9 +405,10 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                   quake.location,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    fontFamily: 'HindSiliguri',
+                    fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -310,7 +424,6 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).textTheme.bodySmall?.color,
-                        fontFamily: 'HindSiliguri',
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -325,7 +438,6 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).textTheme.bodySmall?.color,
-                        fontFamily: 'HindSiliguri',
                       ),
                     ),
                   ],
@@ -333,11 +445,13 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
               ],
             ),
           ),
-          // Arrow
-          Icon(
-            Icons.chevron_right,
-            color: Theme.of(context).dividerColor,
-          ),
+          if (quake.magnitude >= 6.0)
+            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24)
+          else
+            Icon(
+              Icons.chevron_right,
+              color: Theme.of(context).dividerColor,
+            ),
         ],
       ),
     );
@@ -345,17 +459,21 @@ class _EarthquakeScreenState extends State<EarthquakeScreen> {
 }
 
 class _EarthquakeData {
+  final String eventId;
   final double magnitude;
   final String location;
   final String time;
   final LatLng latLng;
   final String depth;
+  final DateTime timestamp;
 
   _EarthquakeData({
+    required this.eventId,
     required this.magnitude,
     required this.location,
     required this.time,
     required this.latLng,
     required this.depth,
+    required this.timestamp,
   });
 }

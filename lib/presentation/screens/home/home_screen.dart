@@ -13,6 +13,8 @@ import '../../../routes/app_router.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
+import '../../../services/notification_service.dart';
+import '../../../services/api/mood_api_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -30,8 +32,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Timer? _countdownTimer;
   int _selectedMood = -1;
   int _bottomNavIndex = 0;
+  bool _isSavingMood = false;
 
-  // Countdown
+  // Countdown — will be synced from server
   Duration _timeRemaining = const Duration(hours: 24);
 
   @override
@@ -60,11 +63,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(shakeDetectorProvider).startListening(() {
         if (mounted) {
-           // Show snackbar or visual feedback before navigating? 
-           // For now, direct navigation to SOS screen (which has countdown)
-           context.push(Routes.sos);
+          context.push(Routes.sos);
         }
       });
+
+      // Fetch check-in status from server
+      ref.read(checkinStatusProvider.notifier).fetchStatus();
     });
 
     // Start countdown timer
@@ -74,10 +78,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _startCountdown() {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_timeRemaining.inSeconds > 0) {
-        setState(() {
-          _timeRemaining -= const Duration(seconds: 1);
-        });
+      final statusData = ref.read(checkinStatusProvider);
+      if (!statusData.isLoading) {
+        final remaining = statusData.timeRemaining;
+        if (remaining != _timeRemaining) {
+          setState(() {
+            _timeRemaining = remaining;
+          });
+        }
       }
     });
   }
@@ -93,11 +101,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   double get _urgencyPercent {
     final total = const Duration(hours: 24).inSeconds;
-    final remaining = _timeRemaining.inSeconds;
+    final remaining = _timeRemaining.inSeconds.clamp(0, total);
     return 1.0 - (remaining / total);
   }
 
   Color get _urgencyColor {
+    final statusData = ref.read(checkinStatusProvider);
+    if (statusData.hasCheckedInToday) return AppColors.success;
     if (_urgencyPercent < 0.5) return AppColors.success;
     if (_urgencyPercent < 0.75) return AppColors.warning;
     return AppColors.error;
@@ -107,8 +117,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final checkinState = ref.watch(checkinProvider);
+    final statusData = ref.watch(checkinStatusProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final size = MediaQuery.of(context).size;
 
     String userName = 'ব্যবহারকারী';
     if (authState is AuthAuthenticated) {
@@ -135,11 +145,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 28),
 
                   // ==================== Check-in Button ====================
-                  _buildCheckinButton(checkinState, isDark),
+                  _buildCheckinButton(checkinState, statusData, isDark),
                   const SizedBox(height: 12),
 
                   // ==================== Countdown Timer ====================
-                  _buildCountdownTimer(isDark),
+                  _buildCountdownTimer(statusData, isDark),
                   const SizedBox(height: 24),
 
                   // ==================== Mood Selector ====================
@@ -158,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 24),
 
                   // ==================== Safety Stats ====================
-                  _buildSafetyStats(isDark),
+                  _buildSafetyStats(statusData, isDark),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -254,27 +264,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Check-in Button ====================
-  Widget _buildCheckinButton(CheckInState state, bool isDark) {
+  Widget _buildCheckinButton(CheckInState state, CheckInStatusData statusData, bool isDark) {
     final isLoading = state is CheckInLoading;
+    final hasCheckedIn = statusData.hasCheckedInToday;
 
     return Center(
       child: AnimatedBuilder(
         animation: _pulseAnimation,
         builder: (context, child) {
           return Transform.scale(
-            scale: isLoading ? 1.0 : _pulseAnimation.value,
+            scale: (isLoading || hasCheckedIn) ? 1.0 : _pulseAnimation.value,
             child: child,
           );
         },
         child: GestureDetector(
-          onTap: isLoading ? null : _performCheckin,
+          onTap: (isLoading || hasCheckedIn) ? null : _performCheckin,
           child: Container(
             width: 180,
             height: 180,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: AppDecorations.coloredShadow(
-                _urgencyColor,
+                hasCheckedIn ? AppColors.success : _urgencyColor,
                 opacity: 0.35,
               ),
             ),
@@ -288,8 +299,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     return CustomPaint(
                       size: const Size(180, 180),
                       painter: _SafetyRingPainter(
-                        progress: 1.0 - _urgencyPercent,
-                        color: _urgencyColor,
+                        progress: hasCheckedIn ? 1.0 : (1.0 - _urgencyPercent),
+                        color: hasCheckedIn ? AppColors.success : _urgencyColor,
                         rotation: _ringAnimation.value,
                       ),
                     );
@@ -304,10 +315,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        _urgencyColor,
-                        _urgencyColor.withOpacity(0.8),
-                      ],
+                      colors: hasCheckedIn
+                          ? [AppColors.success, AppColors.success.withOpacity(0.8)]
+                          : [_urgencyColor, _urgencyColor.withOpacity(0.8)],
                     ),
                   ),
                   child: isLoading
@@ -321,26 +331,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                           ),
                         )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.favorite,
-                              color: Colors.white,
-                              size: 36,
+                      : hasCheckedIn
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'চেক-ইন সম্পন্ন ✓',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'HindSiliguri',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.favorite,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'চেক-ইন',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'HindSiliguri',
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'চেক-ইন',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'HindSiliguri',
-                              ),
-                            ),
-                          ],
-                        ),
                 ),
               ],
             ),
@@ -351,7 +382,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Countdown Timer ====================
-  Widget _buildCountdownTimer(bool isDark) {
+  Widget _buildCountdownTimer(CheckInStatusData statusData, bool isDark) {
+    final hasCheckedIn = statusData.hasCheckedInToday;
     final hours = _timeRemaining.inHours;
     final minutes = _timeRemaining.inMinutes.remainder(60);
     final seconds = _timeRemaining.inSeconds.remainder(60);
@@ -360,33 +392,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Column(
         children: [
           StatusBadge(
-            type: _urgencyPercent < 0.5
+            type: hasCheckedIn
                 ? StatusType.safe
-                : _urgencyPercent < 0.75
-                    ? StatusType.warning
-                    : StatusType.danger,
-            label: _urgencyPercent < 0.5
-                ? 'নিরাপদ'
-                : _urgencyPercent < 0.75
-                    ? 'চেক-ইন প্রয়োজন'
-                    : 'জরুরি চেক-ইন',
+                : _urgencyPercent < 0.5
+                    ? StatusType.safe
+                    : _urgencyPercent < 0.75
+                        ? StatusType.warning
+                        : StatusType.danger,
+            label: hasCheckedIn
+                ? 'আজকের চেক-ইন সম্পন্ন ✓'
+                : _urgencyPercent < 0.5
+                    ? 'নিরাপদ'
+                    : _urgencyPercent < 0.75
+                        ? 'চেক-ইন প্রয়োজন'
+                        : 'জরুরি চেক-ইন',
           ),
           const SizedBox(height: 12),
-          Text(
-            '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 4,
-              color: _urgencyColor,
-              fontFamily: 'HindSiliguri',
+          if (!hasCheckedIn) ...[
+            Text(
+              '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 4,
+                color: _urgencyColor,
+                fontFamily: 'HindSiliguri',
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'পরবর্তী চেক-ইনের বাকি সময়',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+            const SizedBox(height: 4),
+            Text(
+              'পরবর্তী চেক-ইনের বাকি সময়',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ] else ...[
+            if (statusData.streak > 0)
+              Text(
+                '🔥 ${statusData.streak} দিনের স্ট্রিক!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                  fontFamily: 'HindSiliguri',
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -412,7 +461,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: List.generate(
               AppConstants.moodEmojis.length,
               (index) => GestureDetector(
-                onTap: () => setState(() => _selectedMood = index),
+                onTap: _isSavingMood ? null : () => _onMoodSelected(index),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(10),
@@ -458,6 +507,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
+          if (_isSavingMood)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -578,7 +638,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Safety Stats ====================
-  Widget _buildSafetyStats(bool isDark) {
+  Widget _buildSafetyStats(CheckInStatusData statusData, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.cardDecoration(context: context),
@@ -596,20 +656,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               _buildStatItem(
                 icon: Icons.check_circle,
-                value: '0',
-                label: 'চেক-ইন',
-                color: AppColors.success,
+                value: statusData.hasCheckedInToday ? '✓' : '✗',
+                label: 'আজকের চেক-ইন',
+                color: statusData.hasCheckedInToday
+                    ? AppColors.success
+                    : AppColors.error,
               ),
               _buildStatItem(
                 icon: Icons.local_fire_department,
-                value: '0',
+                value: '${statusData.streak}',
                 label: 'স্ট্রিক',
                 color: const Color(0xFFFF9800),
               ),
               _buildStatItem(
                 icon: Icons.shield,
-                value: '0',
-                label: 'নিরাপদ দিন',
+                value: '${statusData.hoursSinceLastCheckIn ?? 0}h',
+                label: 'শেষ চেক-ইন',
                 color: AppColors.primary,
               ),
             ],
@@ -761,21 +823,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       method: 'button',
       notes: notes,
     );
-    
+
+    // Update status after check-in
+    ref.read(checkinStatusProvider.notifier).onCheckInComplete();
+
+    // Cancel remaining check-in reminder notifications
+    LocalNotificationService().cancelNotification(1);
+
     setState(() {
-      _timeRemaining = const Duration(hours: 24);
-      _selectedMood = -1; // Reset mood
+      _selectedMood = -1;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'চেক-ইন সফল হয়েছে!',
+          'চেক-ইন সফল হয়েছে! ✓',
           style: TextStyle(fontFamily: 'HindSiliguri'),
         ),
         backgroundColor: AppColors.success,
       ),
     );
+  }
+
+  /// Save mood to backend
+  void _onMoodSelected(int index) async {
+    setState(() => _selectedMood = index);
+
+    // Map index to mood string for backend
+    final moodKeys = ['happy', 'good', 'neutral', 'sad', 'anxious'];
+    if (index >= 0 && index < moodKeys.length) {
+      setState(() => _isSavingMood = true);
+      try {
+        await MoodApiService().saveMood(
+          mood: moodKeys[index],
+          note: AppConstants.moodLabels[index],
+        );
+      } catch (e) {
+        debugPrint('Failed to save mood: $e');
+        // Silently fail — mood will be saved with check-in
+      } finally {
+        if (mounted) {
+          setState(() => _isSavingMood = false);
+        }
+      }
+    }
   }
 }
 
