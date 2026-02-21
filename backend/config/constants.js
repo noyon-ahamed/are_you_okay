@@ -37,9 +37,9 @@ module.exports = {
 
     // Check-in settings
     CHECK_IN: {
-        GRACE_PERIOD_HOURS: 48, // 2 days (48h inactivity triggers emergency alert)
+        GRACE_PERIOD_HOURS: 72, // 3 days (72h inactivity triggers emergency alert)
         REMINDER_HOURS: [8, 14, 21], // 8 AM, 2 PM, 9 PM
-        STREAK_RESET_HOURS: 48
+        STREAK_RESET_HOURS: 72
     },
 
     // Emergency settings

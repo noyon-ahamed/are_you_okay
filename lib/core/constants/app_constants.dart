@@ -1,12 +1,11 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConstants {
   AppConstants._();
 
   // API Configuration
-  // For Android emulator (localhost): 'http://10.0.2.2:3000/api'
-  // For physical device on LAN: 'http://<YOUR_IP>:3000/api'
   // For production (Render): 'https://your-app.onrender.com/api'
-  static const String apiBaseUrl = 'https://are-you-okay.onrender.com/api';
-
+  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'https://are-you-okay.onrender.com/api';
 
   // App Information
   static const String appName = 'Bhalo Achen Ki?';

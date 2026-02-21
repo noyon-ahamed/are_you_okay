@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import '../model/checkin_model.dart';
+import '../services/api/checkin_api_service.dart';
 import '../services/hive_service.dart';
 import '../services/shared_prefs_service.dart';
 import '../services/socket_service.dart';
@@ -10,6 +13,7 @@ final checkinRepositoryProvider = Provider<CheckInRepository>((ref) {
     hive: ref.watch(hiveServiceProvider),
     prefs: ref.watch(sharedPrefsServiceProvider),
     socketService: ref.watch(socketServiceProvider),
+    api: CheckinApiService(),
   );
 });
 
@@ -17,97 +21,160 @@ class CheckInRepository {
   final HiveService hive;
   final SharedPrefsService prefs;
   final SocketService socketService;
+  final CheckinApiService api;
   final _uuid = const Uuid();
 
   CheckInRepository({
     required this.hive,
     required this.prefs,
     required this.socketService,
+    required this.api,
   });
 
-  /// Perform check-in
+  /// Perform check-in — calls backend API, falls back to local storage
   Future<CheckInModel> performCheckIn({
     double? latitude,
     double? longitude,
     String method = 'button',
     String? notes,
   }) async {
+    // Get location if not provided
+    double lat = latitude ?? 23.8103;
+    double lng = longitude ?? 90.4125;
+    
     try {
-      final user = hive.getCurrentUser();
-      if (user == null) {
-        throw Exception('User not logged in');
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
       }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 5));
+      lat = position.latitude;
+      lng = position.longitude;
+    } catch (e) {
+      debugPrint('Location error (using default): $e');
+    }
+
+    try {
+      // Try backend API first
+      final response = await api.checkIn(
+        latitude: lat,
+        longitude: lng,
+        status: 'safe',
+        note: notes,
+      );
 
       final checkIn = CheckInModel(
-        id: _uuid.v4(),
-        userId: user.id,
+        id: response['checkIn']?['_id'] ?? _uuid.v4(),
+        userId: response['checkIn']?['userId'] ?? '',
         timestamp: DateTime.now(),
-        latitude: latitude,
-        longitude: longitude,
+        latitude: lat,
+        longitude: lng,
+        method: method,
+        notes: notes,
+        isSynced: true,
+        createdAt: DateTime.now(),
+      );
+
+      // Cache locally
+      await hive.saveCheckIn(checkIn);
+      await prefs.setLastCheckIn(checkIn.timestamp);
+
+      return checkIn;
+    } catch (e) {
+      debugPrint('Backend check-in failed, saving locally: $e');
+
+      // Fallback: save locally for later sync
+      final user = hive.getCurrentUser();
+      final checkIn = CheckInModel(
+        id: _uuid.v4(),
+        userId: user?.id ?? 'offline',
+        timestamp: DateTime.now(),
+        latitude: lat,
+        longitude: lng,
         method: method,
         notes: notes,
         isSynced: false,
         createdAt: DateTime.now(),
       );
 
-      // Save locally first (Optimistic UI)
       await hive.saveCheckIn(checkIn);
-      
-      // Update last check-in time
       await prefs.setLastCheckIn(checkIn.timestamp);
-      
-      // Update user's last check-in
-      await hive.updateUser(
-        user.copyWith(
-          lastCheckIn: checkIn.timestamp,
-          updatedAt: DateTime.now(),
-        ),
-      );
 
-      // Try to sync immediately
+      // Try socket sync
       if (socketService.isConnected) {
         socketService.emitCheckIn(checkIn.toJson());
-        
-        // Let's optimistically mark synced if connected.
         await hive.markCheckInAsSynced(checkIn.id);
-        
-        // Return synced version
         return checkIn.copyWith(isSynced: true);
       }
 
-      return checkIn; // Return un-synced version
-    } catch (e) {
-      throw Exception('Failed to perform check-in: $e');
+      return checkIn;
     }
   }
 
-  // ... (getters omitted for brevity, they remain same) ...
+  /// Get check-in status from backend
+  Future<Map<String, dynamic>> fetchStatus() async {
+    try {
+      final status = await api.getStatus();
+      return status;
+    } catch (e) {
+      debugPrint('Failed to fetch status from backend: $e');
+      // Fallback to local data
+      final lastCheckIn = prefs.lastCheckIn;
+      final hoursSince = lastCheckIn != null
+          ? DateTime.now().difference(lastCheckIn).inHours
+          : null;
+
+      return {
+        'lastCheckIn': lastCheckIn?.toIso8601String(),
+        'hoursSinceLastCheckIn': hoursSince,
+        'needsCheckIn': hoursSince == null || hoursSince >= 24,
+        'streak': 0,
+        'isAtRisk': hoursSince != null && hoursSince >= 72,
+      };
+    }
+  }
+
+  /// Get check-in history from backend
+  Future<List<Map<String, dynamic>>> fetchHistory({
+    int limit = 30,
+    int skip = 0,
+  }) async {
+    try {
+      final response = await api.getHistory(limit: limit, skip: skip);
+      return List<Map<String, dynamic>>.from(response['checkIns'] ?? []);
+    } catch (e) {
+      debugPrint('Failed to fetch history from backend: $e');
+      // Fallback to local
+      return getAllCheckIns().map((c) => c.toJson()).toList();
+    }
+  }
 
   /// Sync pending check-ins with server
   Future<void> syncPendingCheckIns() async {
     try {
       if (!socketService.isConnected) {
-        await socketService.init(); // Try to connect if not
+        await socketService.init();
       }
 
-      if (!socketService.isConnected) return; // Still offline
+      if (!socketService.isConnected) return;
 
       final pending = hive.getPendingSyncCheckIns();
       if (pending.isEmpty) return;
 
-      print('Syncing ${pending.length} pending check-ins...');
-      
+      debugPrint('Syncing ${pending.length} pending check-ins...');
+
       for (final checkIn in pending) {
         socketService.emitCheckIn(checkIn.toJson());
-        // Mark as synced
         await hive.markCheckInAsSynced(checkIn.id);
       }
     } catch (e) {
-      throw Exception('Failed to sync check-ins: $e');
+      debugPrint('Failed to sync check-ins: $e');
     }
   }
 
-  /// Get all check-ins
+  /// Get all local check-ins
   List<CheckInModel> getAllCheckIns() {
     return hive.getAllCheckIns();
   }
@@ -127,7 +194,7 @@ class CheckInRepository {
     final now = DateTime.now();
 
     if (now.isAfter(nextCheckIn)) {
-      return 0; // Overdue
+      return 0;
     }
 
     return nextCheckIn.difference(now).inHours;
@@ -136,7 +203,7 @@ class CheckInRepository {
   /// Get check-in statistics
   Map<String, dynamic> getCheckInStats() {
     final all = hive.getAllCheckIns();
-    
+
     return {
       'total': all.length,
       'thisWeek': all.where((c) {

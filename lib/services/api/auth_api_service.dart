@@ -6,13 +6,13 @@ import '../auth/token_storage_service.dart';
 /// AuthApiService
 /// Handles authentication API calls with JWT
 class AuthApiService {
-  static const String baseUrl = AppConstants.apiBaseUrl;
+  static String get baseUrl => AppConstants.apiBaseUrl;
   final Dio _dio = Dio();
 
   AuthApiService() {
     // Set timeouts
-    _dio.options.connectTimeout = const Duration(seconds: 10);
-    _dio.options.receiveTimeout = const Duration(seconds: 10);
+    _dio.options.connectTimeout = const Duration(seconds: 60);
+    _dio.options.receiveTimeout = const Duration(seconds: 60);
 
     // Add token interceptor
     _dio.interceptors.add(

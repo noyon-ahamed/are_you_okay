@@ -69,6 +69,15 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'Server is running',
+        timestamp: new Date(),
+    });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/checkin', checkinRoutes);

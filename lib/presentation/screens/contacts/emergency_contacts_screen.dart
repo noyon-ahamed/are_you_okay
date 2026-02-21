@@ -269,6 +269,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final relationController = TextEditingController();
+    final emailController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -317,6 +318,15 @@ class EmergencyContactsScreen extends ConsumerWidget {
                 prefixIcon: const Icon(Icons.family_restroom_outlined),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'ইমেইল অ্যাড্রেস (ঐচ্ছিক)',
+                prefixIcon: const Icon(Icons.email_outlined),
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -327,6 +337,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
                     ref.read(contactProvider.notifier).addContact(
                           name: nameController.text.trim(),
                           phoneNumber: phoneController.text.trim(),
+                          email: emailController.text.trim().isNotEmpty ? emailController.text.trim() : null,
                           relationship: relationController.text.trim(),
                         );
                     Navigator.pop(context);

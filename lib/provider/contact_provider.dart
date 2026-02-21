@@ -46,10 +46,12 @@ class ContactNotifier extends StateNotifier<ContactState> {
   Future<void> addContact({
     required String name,
     required String phoneNumber,
+    String? email,
     required String relationship,
     int priority = 1,
     bool notifyViaSMS = true,
     bool notifyViaCall = false,
+    bool notifyViaEmail = true,
     bool notifyViaApp = true,
   }) async {
     try {
@@ -58,10 +60,12 @@ class ContactNotifier extends StateNotifier<ContactState> {
       await _repository.addContact(
         name: name,
         phoneNumber: phoneNumber,
+        email: email,
         relationship: relationship,
         priority: priority,
         notifyViaSMS: notifyViaSMS,
         notifyViaCall: notifyViaCall,
+        notifyViaEmail: notifyViaEmail,
         notifyViaApp: notifyViaApp,
       );
       
