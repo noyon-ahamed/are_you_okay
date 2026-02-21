@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/theme/app_colors.dart';
@@ -18,28 +16,14 @@ class EarthquakeScreen extends ConsumerStatefulWidget {
 }
 
 class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
-  final Completer<GoogleMapController> _controller = Completer();
   bool _isLoading = true;
   String? _error;
   List<_EarthquakeData> _recentQuakes = [];
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  // Bangladesh bounds
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(23.6850, 90.3563),
-    zoom: 6.5,
-  );
 
   @override
   void initState() {
     super.initState();
     _fetchEarthquakeData();
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   Future<void> _fetchEarthquakeData() async {
@@ -66,7 +50,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
               magnitude: magnitude,
               location: e['place']?.toString() ?? 'Unknown',
               time: timeago.format(timestamp),
-              latLng: LatLng(lat, lng),
+              latitude: lat,
+              longitude: lng,
               depth: '${(e['depth'] as num?)?.toStringAsFixed(0) ?? '?'} km',
               timestamp: timestamp,
             );
@@ -92,8 +77,6 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
 
   Future<void> _playSirenAlert() async {
     try {
-      // Use a built-in alert sound or asset
-      // For now, just show a notification-style alert
       if (mounted) {
         showDialog(
           context: context,
@@ -132,234 +115,155 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // ==================== Map Background ====================
-          GoogleMap(
-            mapType: MapType.normal,
-            initialCameraPosition: _initialPosition,
-            markers: _recentQuakes.map((quake) {
-              return Marker(
-                markerId: MarkerId(quake.eventId.isEmpty ? quake.location : quake.eventId),
-                position: quake.latLng,
-                infoWindow: InfoWindow(
-                  title: '${quake.magnitude} মাত্রা',
-                  snippet: quake.location,
-                ),
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  quake.magnitude >= 6.0
-                      ? BitmapDescriptor.hueRed
-                      : quake.magnitude >= 4.5
-                          ? BitmapDescriptor.hueOrange
-                          : BitmapDescriptor.hueYellow,
-                ),
+      appBar: AppBar(
+        title: const Text(
+          'ভূমিকম্প সতর্কতা',
+          style: TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchEarthquakeData,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? _buildLoadingList()
+          : _error != null
+              ? _buildErrorView()
+              : _recentQuakes.isEmpty
+                  ? _buildEmptyView()
+                  : RefreshIndicator(
+                      onRefresh: _fetchEarthquakeData,
+                      child: _buildHistoryList(context, isDark),
+                    ),
+    );
+  }
+
+  Widget _buildHistoryList(BuildContext context, bool isDark) {
+    // Highest magnitude calculation
+    double highestMag = 0.0;
+    int highMagnitudeCount = 0;
+
+    for (var quake in _recentQuakes) {
+      if (quake.magnitude > highestMag) {
+        highestMag = quake.magnitude;
+      }
+      if (quake.magnitude >= 4.5) {
+        highMagnitudeCount++;
+      }
+    }
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      slivers: [
+        // Stats header
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: _buildStatsHeader(context, isDark, highestMag, highMagnitudeCount),
+          ),
+        ),
+
+        // Timeline list
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final quake = _recentQuakes[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildQuakeItem(context, quake, isDark),
               );
-            }).toSet(),
-            onMapCreated: (GoogleMapController controller) {
-              if (!_controller.isCompleted) {
-                _controller.complete(controller);
-              }
             },
-            zoomControlsEnabled: false,
-            myLocationButtonEnabled: false,
+            childCount: _recentQuakes.length,
           ),
+        ),
 
-          // ==================== Top Gradient Overlay ====================
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 120,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.7),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'ভূমিকম্প সতর্কতা',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'HindSiliguri',
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white),
-                        onPressed: _fetchEarthquakeData,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
+    );
+  }
+
+  Widget _buildStatsHeader(
+    BuildContext context,
+    bool isDark,
+    double highestMag,
+    int highMagnitudeCount,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Color(0xFF795548),
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStat(
+            icon: Icons.public,
+            value: '${_recentQuakes.length}',
+            label: 'মোট',
           ),
-
-          // ==================== Bottom Sheet List ====================
-          Positioned.fill(
-            top: MediaQuery.of(context).size.height * 0.55,
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 8),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-
-                  // Title
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.public, color: AppColors.primary, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'সাম্প্রতিক ভূমিকম্প (${_recentQuakes.length})',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'HindSiliguri',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // List
-                  Expanded(
-                    child: _isLoading
-                        ? _buildLoadingList()
-                        : _error != null
-                            ? _buildErrorView()
-                            : _recentQuakes.isEmpty
-                                ? _buildEmptyView()
-                                : RefreshIndicator(
-                                    onRefresh: _fetchEarthquakeData,
-                                    child: ListView.builder(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      itemCount: _recentQuakes.length,
-                                      itemBuilder: (context, index) {
-                                        return _buildQuakeItem(
-                                            context, _recentQuakes[index], isDark);
-                                      },
-                                    ),
-                                  ),
-                  ),
-                ],
-              ),
-            ),
+          Container(
+            width: 1,
+            height: 40,
+            color: Colors.white.withOpacity(0.3),
+          ),
+          _buildStat(
+            icon: Icons.warning_amber_rounded,
+            value: highestMag.toStringAsFixed(1),
+            label: 'সর্বোচ্চ মাত্রা',
+            color: highestMag >= 6.0 ? AppColors.error : Colors.white,
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: Colors.white.withOpacity(0.3),
+          ),
+          _buildStat(
+            icon: Icons.bolt,
+            value: '$highMagnitudeCount',
+            label: '৪.৫+ মাত্রা',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.error),
-            const SizedBox(height: 12),
-            Text(
-              'ডেটা লোড করতে ব্যর্থ',
-              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: _fetchEarthquakeData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('আবার চেষ্টা করুন', style: TextStyle(fontFamily: 'HindSiliguri')),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_outline, size: 48, color: AppColors.success),
-            const SizedBox(height: 12),
-            Text(
-              'কোনো সাম্প্রতিক ভূমিকম্প নেই',
-              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: 3,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
-            child: Container(
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+  Widget _buildStat({
+    required IconData icon,
+    required String value,
+    required String label,
+    Color color = Colors.white,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'HindSiliguri',
           ),
-        );
-      },
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 12,
+            fontFamily: 'HindSiliguri',
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildQuakeItem(
-      BuildContext context, _EarthquakeData quake, bool isDark) {
+  Widget _buildQuakeItem(BuildContext context, _EarthquakeData quake, bool isDark) {
     Color magColor;
     if (quake.magnitude >= 6.0) {
       magColor = AppColors.error;
@@ -371,7 +275,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: AppDecorations.cardDecoration(context: context),
       child: Row(
         children: [
@@ -410,7 +314,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Icon(
@@ -445,15 +349,75 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
               ],
             ),
           ),
-          if (quake.magnitude >= 6.0)
-            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24)
-          else
-            Icon(
-              Icons.chevron_right,
-              color: Theme.of(context).dividerColor,
-            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: AppColors.error),
+            const SizedBox(height: 12),
+            const Text(
+              'ডেটা লোড করতে ব্যর্থ',
+              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _fetchEarthquakeData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('আবার চেষ্টা করুন', style: TextStyle(fontFamily: 'HindSiliguri')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, size: 48, color: AppColors.success),
+            const SizedBox(height: 12),
+            const Text(
+              'কোনো সাম্প্রতিক ভূমিকম্প নেই',
+              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Shimmer.fromColors(
+            baseColor: Colors.grey[300]!,
+            highlightColor: Colors.grey[100]!,
+            child: Container(
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -463,7 +427,8 @@ class _EarthquakeData {
   final double magnitude;
   final String location;
   final String time;
-  final LatLng latLng;
+  final double latitude;
+  final double longitude;
   final String depth;
   final DateTime timestamp;
 
@@ -472,7 +437,8 @@ class _EarthquakeData {
     required this.magnitude,
     required this.location,
     required this.time,
-    required this.latLng,
+    required this.latitude,
+    required this.longitude,
     required this.depth,
     required this.timestamp,
   });
