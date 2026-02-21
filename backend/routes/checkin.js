@@ -168,9 +168,13 @@ router.get('/status', authenticate, async (req, res) => {
             ? Math.floor((Date.now() - user.lastCheckIn.getTime()) / (1000 * 60 * 60))
             : null;
 
-        const needsCheckIn = hoursSinceLastCheckIn
-            ? hoursSinceLastCheckIn >= 24
-            : true;
+        // Check if user has already checked in TODAY
+        let needsCheckIn = true;
+        if (user.lastCheckIn) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            needsCheckIn = user.lastCheckIn < today;
+        }
 
         res.json({
             success: true,
@@ -179,7 +183,7 @@ router.get('/status', authenticate, async (req, res) => {
                 hoursSinceLastCheckIn,
                 needsCheckIn,
                 streak: user.checkInStreak || 0,
-                isAtRisk: hoursSinceLastCheckIn >= 72, // 3 days
+                isAtRisk: hoursSinceLastCheckIn !== null && hoursSinceLastCheckIn >= 72, // 3 days
             },
         });
 
