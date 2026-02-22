@@ -165,6 +165,21 @@ class CheckinApiService {
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
   }
+  Future<Map<String, dynamic>> setCheckInInterval(int interval) async {
+    try {
+      final response = await _dio.post(
+        '$baseUrl/checkin/interval',
+        data: {'interval': interval},
+      );
+      if (response.data['success'] == true) {
+        return response.data;
+      } else {
+        throw Exception(response.data['error'] ?? 'Failed to set interval');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
 }
 
 /// Helper class for parsing HTTP date headers

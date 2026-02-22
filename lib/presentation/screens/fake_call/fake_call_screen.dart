@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -161,11 +162,9 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
     
-    // We update UI to setup, as CallKit is now handling the foreground overlay
+    // Pop the fake call setup screen, as CallKit is now handling the foreground overlay
     if (mounted) {
-      setState(() {
-        _callState = _CallState.setup;
-      });
+      context.pop();
     }
   }
 

@@ -34,6 +34,8 @@ class CheckInStatusData {
   final DateTime? lastCheckIn;
   final int? hoursSinceLastCheckIn;
   final bool needsCheckIn;
+  final bool canCheckIn;
+  final DateTime? nextCheckInTime;
   final int streak;
   final bool isAtRisk;
   final bool isLoading;
@@ -43,36 +45,38 @@ class CheckInStatusData {
     this.lastCheckIn,
     this.hoursSinceLastCheckIn,
     this.needsCheckIn = true,
+    this.canCheckIn = true,
+    this.nextCheckInTime,
     this.streak = 0,
     this.isAtRisk = false,
     this.isLoading = false,
     this.error,
   });
 
-  /// Time remaining until next check-in is needed (24h cycle)
+  /// Time remaining until next check-in is allowed (from server's nextCheckInTime)
   Duration get timeRemaining {
-    if (lastCheckIn == null) return Duration.zero;
-    
-    // Next check-in is 24 hours after last check-in
-    final nextCheckInTime = lastCheckIn!.add(const Duration(hours: 24));
+    if (nextCheckInTime == null) {
+      if (lastCheckIn == null) return Duration.zero;
+      // Fallback: use lastCheckIn + 24h
+      final fallbackNext = lastCheckIn!.add(const Duration(hours: 24));
+      final now = DateTime.now();
+      if (now.isAfter(fallbackNext)) return Duration.zero;
+      return fallbackNext.difference(now);
+    }
     final now = DateTime.now();
-    
-    if (now.isAfter(nextCheckInTime)) return Duration.zero;
-    return nextCheckInTime.difference(now);
+    if (now.isAfter(nextCheckInTime!)) return Duration.zero;
+    return nextCheckInTime!.difference(now);
   }
 
-  bool get hasCheckedInToday {
-    if (lastCheckIn == null) return false;
-    final now = DateTime.now();
-    return lastCheckIn!.year == now.year &&
-        lastCheckIn!.month == now.month &&
-        lastCheckIn!.day == now.day;
-  }
+  /// Whether user has already checked in (within 24h window)
+  bool get hasCheckedInToday => !canCheckIn;
 
   CheckInStatusData copyWith({
     DateTime? lastCheckIn,
     int? hoursSinceLastCheckIn,
     bool? needsCheckIn,
+    bool? canCheckIn,
+    DateTime? nextCheckInTime,
     int? streak,
     bool? isAtRisk,
     bool? isLoading,
@@ -82,6 +86,8 @@ class CheckInStatusData {
       lastCheckIn: lastCheckIn ?? this.lastCheckIn,
       hoursSinceLastCheckIn: hoursSinceLastCheckIn ?? this.hoursSinceLastCheckIn,
       needsCheckIn: needsCheckIn ?? this.needsCheckIn,
+      canCheckIn: canCheckIn ?? this.canCheckIn,
+      nextCheckInTime: nextCheckInTime ?? this.nextCheckInTime,
       streak: streak ?? this.streak,
       isAtRisk: isAtRisk ?? this.isAtRisk,
       isLoading: isLoading ?? this.isLoading,
@@ -152,10 +158,20 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
         }
       }
 
+      DateTime? nextCheckInTime;
+      if (status['nextCheckInTime'] != null) {
+        nextCheckInTime = DateTime.tryParse(status['nextCheckInTime'].toString());
+      }
+
+      final canCheckIn = status['canCheckIn'] as bool? ?? 
+                          status['needsCheckIn'] as bool? ?? true;
+
       state = CheckInStatusData(
         lastCheckIn: lastCheckIn,
         hoursSinceLastCheckIn: status['hoursSinceLastCheckIn'] as int?,
-        needsCheckIn: status['needsCheckIn'] as bool? ?? true,
+        needsCheckIn: canCheckIn,
+        canCheckIn: canCheckIn,
+        nextCheckInTime: nextCheckInTime,
         streak: status['streak'] as int? ?? 0,
         isAtRisk: status['isAtRisk'] as bool? ?? false,
         isLoading: false,
@@ -171,10 +187,13 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
 
   /// Called after a successful check-in to refresh status
   void onCheckInComplete() {
+    final now = DateTime.now();
     state = CheckInStatusData(
-      lastCheckIn: DateTime.now(),
+      lastCheckIn: now,
       hoursSinceLastCheckIn: 0,
       needsCheckIn: false,
+      canCheckIn: false,
+      nextCheckInTime: now.add(const Duration(hours: 24)),
       streak: state.streak + 1,
       isAtRisk: false,
       isLoading: false,
