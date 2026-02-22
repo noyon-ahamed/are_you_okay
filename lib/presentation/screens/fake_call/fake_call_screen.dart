@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -12,17 +14,17 @@ class FakeCallScreen extends StatefulWidget {
   State<FakeCallScreen> createState() => _FakeCallScreenState();
 }
 
-class _FakeCallScreenState extends State<FakeCallScreen>
-    with TickerProviderStateMixin {
+class _FakeCallScreenState extends State<FakeCallScreen> {
   // Call state
   _CallState _callState = _CallState.setup;
 
   // Caller presets
   int _selectedPreset = 0;
   final List<_CallerPreset> _presets = [
-    _CallerPreset(name: 'মা', number: '+880 1711-XXXXXX', icon: Icons.favorite, color: Color(0xFFE91E63)),
-    _CallerPreset(name: 'বাবা', number: '+880 1811-XXXXXX', icon: Icons.person, color: Color(0xFF2196F3)),
-    _CallerPreset(name: 'বস', number: '+880 1911-XXXXXX', icon: Icons.work, color: Color(0xFF795548)),
+    _CallerPreset(name: 'বন্ধু', number: '+880 1611-564875', icon: Icons.group, color: Color(0xFF4CAF50)),
+    _CallerPreset(name: 'মা', number: '+880 1711-564875', icon: Icons.favorite, color: Color(0xFFE91E63)),
+    _CallerPreset(name: 'বাবা', number: '+880 1811-564875', icon: Icons.person, color: Color(0xFF2196F3)),
+    _CallerPreset(name: 'বস', number: '+880 1911-564875', icon: Icons.work, color: Color(0xFF795548)),
     _CallerPreset(name: 'পুলিশ', number: '৯৯৯', icon: Icons.local_police, color: Color(0xFF607D8B)),
   ];
 
@@ -32,44 +34,69 @@ class _FakeCallScreenState extends State<FakeCallScreen>
 
   // Timer
   Timer? _delayTimer;
-  Timer? _callTimer;
   int _delaySeconds = 5;
-  int _callDuration = 0;
   int _remainingDelay = 0;
 
-  // Animation
-  late AnimationController _ringAnimController;
-  late Animation<double> _ringAnimation;
+  // CallKit details
+  final Uuid _uuid = const Uuid();
+  String? _currentCallId;
+  StreamSubscription<CallEvent?>? _callkitEventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _ringAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _ringAnimation = Tween<double>(begin: -0.05, end: 0.05).animate(
-      CurvedAnimation(parent: _ringAnimController, curve: Curves.easeInOut),
-    );
+    _nameController.text = _presets[_selectedPreset].name;
+    _numberController.text = _presets[_selectedPreset].number;
+    _listenToCallKitEvents();
+  }
+
+  void _listenToCallKitEvents() {
+    _callkitEventSubscription =
+        FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
+      if (event == null) return;
+
+      switch (event.event) {
+        case Event.actionCallAccept:
+          // Global listener in main.dart handles navigation
+          setState(() => _callState = _CallState.setup);
+          break;
+        case Event.actionCallDecline:
+        case Event.actionCallEnded:
+        case Event.actionCallTimeout:
+          debugPrint('Call ended or declined natively');
+          setState(() => _callState = _CallState.setup);
+          break;
+        default:
+          break;
+      }
+    });
   }
 
   @override
   void dispose() {
     _delayTimer?.cancel();
-    _callTimer?.cancel();
-    _ringAnimController.dispose();
     _nameController.dispose();
     _numberController.dispose();
+    _callkitEventSubscription?.cancel();
     super.dispose();
   }
 
-  void _startFakeCall() {
+  Future<void> _startFakeCall() async {
+    // Request notification permissions for CallKit (Required for Android 13+)
+    await FlutterCallkitIncoming.requestNotificationPermission({
+      "rationaleMessagePermission": "Notification permission is required to show the call screen.",
+      "postNotificationMessageRequired": "Please allow notification permission from settings to receive fake calls."
+    });
+
+    if (!mounted) return;
+
     setState(() {
       _callState = _CallState.waiting;
       _remainingDelay = _delaySeconds;
     });
 
     _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
       setState(() {
         _remainingDelay--;
       });
@@ -81,41 +108,71 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     });
   }
 
-  void _showIncomingCall() {
-    HapticFeedback.heavyImpact();
-    _ringAnimController.repeat(reverse: true);
+  Future<void> _showIncomingCall() async {
+    _currentCallId = _uuid.v4();
 
-    setState(() {
-      _callState = _CallState.incoming;
-    });
-  }
+    // Append the number to the name to force Android to display the number
+    // beneath the caller's name in the native notification view.
+    final String compoundName = "$_currentCallerName\n$_currentCallerNumber";
 
-  void _acceptCall() {
-    _ringAnimController.stop();
-    _ringAnimController.reset();
-    HapticFeedback.mediumImpact();
+    final params = CallKitParams(
+      id: _currentCallId,
+      nameCaller: compoundName,
+      appName: 'Are You Okay',
+      avatar: '', 
+      handle: _currentCallerNumber,
+      type: 0, 
+      duration: 30000, 
+      textAccept: 'গ্রহণ',
+      textDecline: 'হটান',
+      missedCallNotification: NotificationParams(
+        showNotification: true,
+        isShowCallback: false,
+        subtitle: 'মিসড কল',
+        callbackText: 'কল ব্যাক',
+      ),
+      extra: <String, dynamic>{'userId': '1a2b3c4d'},
+      android: AndroidParams(
+        isCustomNotification: true,
+        isShowLogo: false,
+        ringtonePath: 'system_ringtone_default',
+        backgroundColor: '#0955fa',
+        backgroundUrl: 'assets/test.png',
+        actionColor: '#4CAF50',
+        textColor: '#ffffff',
+      ),
+      ios: IOSParams(
+        iconName: 'AppIcon',
+        handleType: 'generic',
+        supportsVideo: false,
+        maximumCallGroups: 2,
+        maximumCallsPerCallGroup: 1,
+        audioSessionMode: 'default',
+        audioSessionActive: true,
+        audioSessionPreferredSampleRate: 44100.0,
+        audioSessionPreferredIOBufferDuration: 0.005,
+        supportsDTMF: true,
+        supportsHolding: true,
+        supportsGrouping: false,
+        supportsUngrouping: false,
+        ringtonePath: 'system_ringtone_default',
+      ),
+    );
 
-    setState(() {
-      _callState = _CallState.talking;
-      _callDuration = 0;
-    });
-
-    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    await FlutterCallkitIncoming.showCallkitIncoming(params);
+    
+    // We update UI to setup, as CallKit is now handling the foreground overlay
+    if (mounted) {
       setState(() {
-        _callDuration++;
+        _callState = _CallState.setup;
       });
-    });
+    }
   }
 
-  void _endCall() {
-    _callTimer?.cancel();
+  void _cancelTimer() {
     _delayTimer?.cancel();
-    _ringAnimController.stop();
-    _ringAnimController.reset();
-
     setState(() {
       _callState = _CallState.setup;
-      _callDuration = 0;
     });
   }
 
@@ -129,24 +186,12 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     return _presets[_selectedPreset].number;
   }
 
-  String _formatDuration(int seconds) {
-    final m = (seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (seconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
-    switch (_callState) {
-      case _CallState.setup:
-        return _buildSetupScreen();
-      case _CallState.waiting:
-        return _buildWaitingScreen();
-      case _CallState.incoming:
-        return _buildIncomingScreen();
-      case _CallState.talking:
-        return _buildTalkingScreen();
+    if (_callState == _CallState.waiting) {
+       return _buildWaitingScreen();
     }
+    return _buildSetupScreen();
   }
 
   // ==================== Setup Screen ====================
@@ -162,7 +207,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Preset selection
-            Text('কলার নির্বাচন',
+            const Text('কলার নির্বাচন',
                 style: TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
@@ -175,9 +220,11 @@ class _FakeCallScreenState extends State<FakeCallScreen>
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      setState(() => _selectedPreset = i);
-                      _nameController.clear();
-                      _numberController.clear();
+                      setState(() {
+                        _selectedPreset = i;
+                        _nameController.text = _presets[i].name;
+                        _numberController.text = _presets[i].number;
+                      });
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -223,7 +270,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
             const SizedBox(height: 24),
 
             // Custom fields
-            Text('অথবা কাস্টম',
+            const Text('অথবা কাস্টম',
                 style: TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
@@ -231,32 +278,32 @@ class _FakeCallScreenState extends State<FakeCallScreen>
             const SizedBox(height: 12),
             TextField(
               controller: _nameController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'কলারের নাম',
-                prefixIcon: const Icon(Icons.person_outline),
+                prefixIcon: Icon(Icons.person_outline),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _numberController,
               keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'কলারের নম্বর',
-                prefixIcon: const Icon(Icons.phone_outlined),
+                prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
 
             const SizedBox(height: 24),
 
             // Delay slider
-            Text('বিলম্ব',
+            const Text('বিলম্ব',
                 style: TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Text('$_delaySeconds সেকেন্ড পরে কল আসবে',
-                style: TextStyle(
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 13,
                     color: AppColors.textSecondary)),
@@ -279,7 +326,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
               child: ElevatedButton.icon(
                 onPressed: _startFakeCall,
                 icon: const Icon(Icons.phone),
-                label: Text('ফেক কল শুরু',
+                label: const Text('ফেক কল শুরু',
                     style: TextStyle(fontFamily: 'HindSiliguri')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -301,11 +348,11 @@ class _FakeCallScreenState extends State<FakeCallScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.phone_callback, color: Colors.white54, size: 48),
+              const Icon(Icons.phone_callback, color: Colors.white54, size: 48),
               const SizedBox(height: 24),
               Text(
                 '$_remainingDelay',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 64,
                   fontWeight: FontWeight.w300,
                   color: Colors.white,
@@ -313,7 +360,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'সেকেন্ড পরে কল আসবে...',
                 style: TextStyle(
                   fontSize: 16,
@@ -323,8 +370,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
               ),
               const SizedBox(height: 40),
               TextButton(
-                onPressed: _endCall,
-                child: Text('বাতিল',
+                onPressed: _cancelTimer,
+                child: const Text('বাতিল',
                     style: TextStyle(
                         color: Colors.white54, fontFamily: 'HindSiliguri')),
               ),
@@ -334,245 +381,10 @@ class _FakeCallScreenState extends State<FakeCallScreen>
       ),
     );
   }
-
-  // ==================== Incoming Call Screen ====================
-  Widget _buildIncomingScreen() {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(flex: 2),
-            // Caller avatar
-            AnimatedBuilder(
-              animation: _ringAnimation,
-              builder: (context, child) {
-                return Transform.rotate(
-                  angle: _ringAnimation.value,
-                  child: child,
-                );
-              },
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      _presets[_selectedPreset].color,
-                      _presets[_selectedPreset].color.withOpacity(0.6),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _presets[_selectedPreset]
-                          .color
-                          .withOpacity(0.4),
-                      blurRadius: 30,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  _presets[_selectedPreset].icon,
-                  color: Colors.white,
-                  size: 48,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _currentCallerName,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily: 'HindSiliguri',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ইনকামিং কল...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withOpacity(0.6),
-                fontFamily: 'HindSiliguri',
-              ),
-            ),
-            const Spacer(flex: 3),
-            // Accept/Decline buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 50),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildCallButton(
-                    icon: Icons.call_end,
-                    color: Colors.red,
-                    label: 'বাতিল',
-                    onTap: _endCall,
-                  ),
-                  _buildCallButton(
-                    icon: Icons.call,
-                    color: Colors.green,
-                    label: 'গ্রহণ',
-                    onTap: _acceptCall,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 60),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== Talking Screen ====================
-  Widget _buildTalkingScreen() {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
-            // Caller info
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    _presets[_selectedPreset].color,
-                    _presets[_selectedPreset].color.withOpacity(0.6),
-                  ],
-                ),
-              ),
-              child: Icon(
-                _presets[_selectedPreset].icon,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _currentCallerName,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily: 'HindSiliguri',
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Real-time duration
-            Text(
-              _formatDuration(_callDuration),
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white.withOpacity(0.6),
-                fontFamily: 'HindSiliguri',
-                letterSpacing: 2,
-              ),
-            ),
-            const Spacer(),
-            // Action buttons row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSmallButton(Icons.mic_off, 'মিউট'),
-                  _buildSmallButton(Icons.volume_up, 'স্পিকার'),
-                  _buildSmallButton(Icons.dialpad, 'কীপ্যাড'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-            // End call
-            _buildCallButton(
-              icon: Icons.call_end,
-              color: Colors.red,
-              label: 'কল শেষ',
-              onTap: _endCall,
-              size: 72,
-            ),
-            const SizedBox(height: 60),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCallButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-    double size = 64,
-  }) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Icon(icon, color: Colors.white, size: size * 0.45),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-            fontFamily: 'HindSiliguri',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSmallButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-            fontFamily: 'HindSiliguri',
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ==================== Models ====================
-enum _CallState { setup, waiting, incoming, talking }
+enum _CallState { setup, waiting }
 
 class _CallerPreset {
   final String name;

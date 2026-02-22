@@ -7,6 +7,7 @@ const String backgroundTaskKey = 'checkin_monitoring_task';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
+  if (kIsWeb) return; // Background tasks not supported on Web
   Workmanager().executeTask((task, inputData) async {
     print("Native called background task: $task");
     
@@ -48,14 +49,16 @@ void callbackDispatcher() {
 
 class BackgroundService {
   static Future<void> initialize() async {
+    if (kIsWeb) return; // Prevent Web crashes
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: kDebugMode,
+      isInDebugMode: kIsWeb ? false : kDebugMode,
     );
     print("Workmanager initialized");
   }
 
   static Future<void> registerPeriodicTask() async {
+    if (kIsWeb) return; // Prevent Web crashes
     await Workmanager().registerPeriodicTask(
       "1",
       backgroundTaskKey,

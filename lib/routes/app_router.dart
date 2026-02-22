@@ -10,6 +10,7 @@ import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/ai_chat/ai_chat_screen.dart';
 import '../../presentation/screens/earthquake/earthquake_screen.dart';
 import '../../presentation/screens/fake_call/fake_call_screen.dart';
+import '../../presentation/screens/fake_call/fake_call_active_screen.dart';
 import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/profile/edit_profile_screen.dart';
@@ -18,8 +19,11 @@ import '../../presentation/screens/contacts/emergency_contacts_screen.dart';
 import '../../presentation/screens/contacts/add_contact_screen.dart';
 import '../../presentation/screens/sos/sos_screen.dart';
 import '../../presentation/screens/history/checkin_history_screen.dart';
+import '../../presentation/screens/mood/mood_history_screen.dart';
 
 import '../../provider/auth_provider.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 class Routes {
   static const String splash = '/';
@@ -31,6 +35,7 @@ class Routes {
   static const String aiChat = '/ai-chat';
   static const String earthquake = '/earthquake';
   static const String fakeCall = '/fake-call';
+  static const String fakeCallActive = '/fake-call-active';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
   static const String settings = '/settings';
@@ -38,12 +43,14 @@ class Routes {
   static const String addContact = '/contacts/add';
   static const String sos = '/sos';
   static const String history = '/history';
+  static const String moodHistory = '/mood-history';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: Routes.splash,
     refreshListenable: ValueNotifier(authState),
     routes: [
@@ -129,6 +136,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.earthquake,
         builder: (context, state) => const EarthquakeScreen(),
+      ),
+      GoRoute(
+        path: Routes.moodHistory,
+        builder: (context, state) => const MoodHistoryScreen(),
       ),
       GoRoute(
         path: Routes.fakeCall,

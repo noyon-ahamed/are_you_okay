@@ -518,6 +518,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
+          if (!_isSavingMood) ...[
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => context.push(Routes.moodHistory),
+                icon: const Icon(Icons.history, size: 18),
+                label: const Text(
+                  'আমার মেজাজের ইতিহাস',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
