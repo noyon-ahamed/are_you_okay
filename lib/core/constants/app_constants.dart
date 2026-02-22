@@ -4,8 +4,8 @@ class AppConstants {
   AppConstants._();
 
   // API Configuration
-  // For production (Render): 'https://your-app.onrender.com/api'
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'https://are-you-okay.onrender.com/api';
+  // For production (VPS): 'http://76.13.246.186:3000/api'
+  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'http://76.13.246.186:3000/api';
 
   // App Information
   static const String appName = 'Bhalo Achen Ki?';

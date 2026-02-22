@@ -530,12 +530,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
           // Note input for mood
-          if (_selectedMood >= 0) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _moodNoteController,
-              decoration: InputDecoration(
-                hintText: 'নোট লিখুন (ঐচ্ছিক)...',
+          const SizedBox(height: 16),
+          TextField(
+            controller: _moodNoteController,
+            decoration: InputDecoration(
+              hintText: 'নোট লিখুন (ঐচ্ছিক)...',
                 hintStyle: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13),
                 prefixIcon: const Icon(Icons.edit_note, size: 20),
                 isDense: true,
@@ -553,7 +552,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               maxLines: 2,
               maxLength: 200,
             ),
-          ],
           if (_isSavingMood)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -567,27 +565,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           if (!_isSavingMood) ...[
             const SizedBox(height: 12),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => context.push(Routes.moodHistory),
-                icon: const Icon(Icons.history, size: 18),
-                label: const Text(
-                  'আমার মেজাজের ইতিহাস',
-                  style: TextStyle(
-                    fontFamily: 'HindSiliguri',
-                    fontWeight: FontWeight.w600,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_selectedMood >= 0) ...[
+                  ElevatedButton.icon(
+                    onPressed: _saveMood,
+                    icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                    label: const Text(
+                      'সেভ করুন',
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                TextButton.icon(
+                  onPressed: () => context.push(Routes.moodHistory),
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text(
+                    'ইতিহাস',
+                    style: TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
                 ),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
         ],
       ),
     );
@@ -741,10 +763,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _buildStatItem(
                 icon: Icons.shield,
                 value: statusData.lastCheckIn != null
-                    ? DateFormat('dd MMM\nhh:mm a').format(statusData.lastCheckIn!)
+                    ? DateFormat('dd MMM\nhh:mm a').format(statusData.lastCheckIn!.toLocal())
                     : '---',
                 label: 'শেষ চেক-ইন',
                 color: AppColors.primary,
+                valueFontSize: 14,
               ),
             ],
           ),
@@ -758,6 +781,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     required String value,
     required String label,
     required Color color,
+    double? valueFontSize,
   }) {
     return Expanded(
       child: Column(
@@ -773,11 +797,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           const SizedBox(height: 8),
           Text(
             value,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: valueFontSize ?? 22,
               fontWeight: FontWeight.bold,
               color: color,
               fontFamily: 'HindSiliguri',
+              height: 1.2,
             ),
           ),
           Text(
@@ -941,64 +967,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  /// Save mood to backend
-  void _onMoodSelected(int index) async {
+  void _onMoodSelected(int index) {
     setState(() => _selectedMood = index);
+  }
 
+  /// Save mood to backend
+  void _saveMood() async {
+    if (_selectedMood < 0) return;
+    
     // Map index to mood string for backend
     final moodKeys = ['happy', 'good', 'neutral', 'sad', 'anxious'];
-    if (index >= 0 && index < moodKeys.length) {
-      setState(() => _isSavingMood = true);
-      try {
-        final noteText = _moodNoteController.text.trim();
-        await MoodApiService().saveMood(
-          mood: moodKeys[index],
-          note: noteText.isNotEmpty ? noteText : AppConstants.moodLabels[index],
+    if (_selectedMood >= moodKeys.length) return;
+    
+    setState(() => _isSavingMood = true);
+    try {
+      final noteText = _moodNoteController.text.trim();
+      await MoodApiService().saveMood(
+        mood: moodKeys[_selectedMood],
+        note: noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood],
+      );
+      if (mounted) {
+        _moodNoteController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'মেজাজ সেভ হয়েছে ✓',
+              style: TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
         );
-        if (mounted) {
-          _moodNoteController.clear();
+        setState(() => _selectedMood = -1); // Reset selection after saving
+      }
+    } on Exception catch (e) {
+      debugPrint('Failed to save mood: $e');
+      if (mounted) {
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('403') || msg.contains('once per hour') || msg.contains('cooldown')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'মেজাজ সেভ হয়েছে ✓',
+                '⏳ প্রতি ঘণ্টায় একবার মেজাজ সেভ করতে পারবেন। আবার চেষ্টা করুন।',
                 style: TextStyle(fontFamily: 'HindSiliguri'),
               ),
-              backgroundColor: AppColors.success,
-              duration: const Duration(seconds: 2),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'মেজাজ সেভ ব্যর্থ হয়েছে',
+                style: TextStyle(fontFamily: 'HindSiliguri'),
+              ),
+              backgroundColor: AppColors.error,
             ),
           );
         }
-      } on Exception catch (e) {
-        debugPrint('Failed to save mood: $e');
-        if (mounted) {
-          final msg = e.toString();
-          if (msg.contains('403') || msg.contains('once per hour')) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '⏳ প্রতি ঘণ্টায় একবার মেজাজ সেভ করতে পারবেন। আবার চেষ্টা করুন।',
-                  style: TextStyle(fontFamily: 'HindSiliguri'),
-                ),
-                backgroundColor: AppColors.warning,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'মেজাজ সেভ ব্যর্থ হয়েছে',
-                  style: TextStyle(fontFamily: 'HindSiliguri'),
-                ),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isSavingMood = false);
-        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingMood = false);
       }
     }
   }

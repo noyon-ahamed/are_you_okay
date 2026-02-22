@@ -9,11 +9,18 @@ import '../../../provider/checkin_provider.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 
-class CheckinHistoryScreen extends ConsumerWidget {
+class CheckinHistoryScreen extends ConsumerStatefulWidget {
   const CheckinHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckinHistoryScreen> createState() => _CheckinHistoryScreenState();
+}
+
+class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
+  int _filterDays = 0; // 0 means 'All Time', 7 means '7 Days', 14 means '14 Days'
+
+  @override
+  Widget build(BuildContext context) {
     final checkins = ref.watch(checkinHistoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -21,22 +28,40 @@ class CheckinHistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('চেক-ইন ইতিহাস'),
         actions: [
-          if (checkins.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.calendar_month),
-              onPressed: () {
-                // TODO: Calendar view
-              },
-            ),
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (value) {
+              setState(() {
+                _filterDays = value;
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 0, child: Text('সব সময়', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              const PopupMenuItem(value: 7, child: Text('গত ৭ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              const PopupMenuItem(value: 14, child: Text('গত ১৪ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
+            ],
+          ),
         ],
       ),
-      body: checkins.isEmpty
-          ? const EmptyState(
+      body: Builder(
+        builder: (context) {
+          List<CheckInModel> filtered = checkins;
+          if (_filterDays > 0) {
+            final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
+            filtered = checkins.where((c) => c.timestamp.isAfter(cutoff)).toList();
+          }
+
+          if (filtered.isEmpty) {
+            return const EmptyState(
               icon: Icons.history_rounded,
-              title: 'এখনো কোনো চেক-ইন নেই',
-              description: 'আপনার প্রথম চেক-ইন করুন\nইতিহাস এখানে দেখা যাবে',
-            )
-          : _buildHistoryList(context, checkins, isDark),
+              title: 'কোনো হিস্ট্রি পাওয়া যায়নি',
+              description: 'এই সময়কালে আপনার কোনো চেক-ইন নেই',
+            );
+          }
+
+          return _buildHistoryList(context, filtered, isDark);
+        },
+      ),
     );
   }
 

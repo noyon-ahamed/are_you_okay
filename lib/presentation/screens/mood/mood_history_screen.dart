@@ -31,16 +31,38 @@ final moodHistoryProvider = FutureProvider.autoDispose<List<dynamic>>((ref) asyn
 
 // --- Screen --- //
 
-class MoodHistoryScreen extends ConsumerWidget {
+class MoodHistoryScreen extends ConsumerStatefulWidget {
   const MoodHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MoodHistoryScreen> createState() => _MoodHistoryScreenState();
+}
+
+class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
+  int _filterDays = 0; // 0 means 'All Time', 7, 14, etc.
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('মেজাজের ইতিহাস', style: TextStyle(fontFamily: 'HindSiliguri')),
+        actions: [
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (value) {
+              setState(() {
+                _filterDays = value;
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 0, child: Text('সব সময়', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              const PopupMenuItem(value: 7, child: Text('গত ৭ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              const PopupMenuItem(value: 14, child: Text('গত ১৪ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
+            ],
+          ),
+        ],
       ),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -66,6 +88,9 @@ class MoodHistoryScreen extends ConsumerWidget {
   }
 
   Widget _buildStatsSection(WidgetRef ref, bool isDark, BuildContext context) {
+    // If filtering is applied, we could theoretically fetch stats for those days,
+    // but the API getStats currently only fetches logic without dynamic days easily unless we modify it.
+    // We will leave stats as last 30 days for now or the API default.
     final statsAsyncValue = ref.watch(moodStatsProvider);
 
     return statsAsyncValue.when(
@@ -185,7 +210,19 @@ class MoodHistoryScreen extends ConsumerWidget {
     final historyAsyncValue = ref.watch(moodHistoryProvider);
 
     return historyAsyncValue.when(
-      data: (history) {
+      data: (allHistory) {
+        List<dynamic> history = allHistory;
+        if (_filterDays > 0) {
+          final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
+          history = allHistory.where((item) {
+            if (item['timestamp'] != null) {
+              final date = DateTime.tryParse(item['timestamp'].toString());
+              if (date != null) return date.toLocal().isAfter(cutoff);
+            }
+            return true;
+          }).toList();
+        }
+
         if (history.isEmpty) {
           return const SliverToBoxAdapter(
             child: Padding(
