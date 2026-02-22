@@ -60,6 +60,8 @@ class AuthApiService {
         
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
+        await SharedPrefsService().setUserToken(token);
+        await SharedPrefsService().setUserId(userId);
         
         return response.data['data'];
       } else {
@@ -90,6 +92,8 @@ class AuthApiService {
         
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
+        await SharedPrefsService().setUserToken(token);
+        await SharedPrefsService().setUserId(userId);
         
         return response.data['data'];
       } else {

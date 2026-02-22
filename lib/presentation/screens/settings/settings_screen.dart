@@ -96,17 +96,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(settingsProvider.notifier).toggleLocation();
               },
             ),
-            _buildDivider(),
-            _buildSwitchTile(
-              icon: Icons.fingerprint_rounded,
-              iconColor: const Color(0xFF9C27B0),
-              title: 'বায়োমেট্রিক লক',
-              subtitle: 'অ্যাপ খুলতে ফিঙ্গারপ্রিন্ট ব্যবহার করুন',
-              value: settings.biometricEnabled,
-              onChanged: (_) {
-                ref.read(settingsProvider.notifier).toggleBiometric();
-              },
-            ),
+            // _buildDivider(),
+            // _buildSwitchTile(
+            //   icon: Icons.fingerprint_rounded,
+            //   iconColor: const Color(0xFF9C27B0),
+            //   title: 'বায়োমেট্রিক লক',
+            //   subtitle: 'অ্যাপ খুলতে ফিঙ্গারপ্রিন্ট ব্যবহার করুন',
+            //   value: settings.biometricEnabled,
+            //   onChanged: (_) {
+            //     ref.read(settingsProvider.notifier).toggleBiometric();
+            //   },
+            // ),
           ]),
 
           const SizedBox(height: 24),

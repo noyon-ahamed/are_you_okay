@@ -104,7 +104,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
       if (route != null) {
         if (_isAnimationDone) {
-          context.go(route);
+          final currentRoute = GoRouterState.of(context).uri.toString();
+          if (currentRoute != Routes.fakeCallActive) {
+            context.go(route);
+          }
         } else {
           _targetRoute = route;
         }

@@ -7,6 +7,10 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/call_event.dart';
+import 'package:go_router/go_router.dart';
+
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'provider/settings_provider.dart';
@@ -15,6 +19,9 @@ import 'services/shared_prefs_service.dart';
 import 'services/offline_sync_service.dart';
 import 'services/background_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
+import 'presentation/screens/fake_call/fake_call_active_screen.dart';
+
+final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier = ValueNotifier(null);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,11 +76,91 @@ void main() async {
   );
 }
 
-class AreYouOkayApp extends ConsumerWidget {
+class AreYouOkayApp extends ConsumerStatefulWidget {
   const AreYouOkayApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AreYouOkayApp> createState() => _AreYouOkayAppState();
+}
+
+class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _listenToCallKitEvents();
+    _checkActiveCalls();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkActiveCalls();
+    }
+  }
+
+  Future<void> _checkActiveCalls() async {
+    final calls = await FlutterCallkitIncoming.activeCalls();
+    if (calls is List && calls.isNotEmpty) {
+      final currentCall = calls.first;
+      final callerFullName = currentCall['nameCaller'] as String? ?? 'Unknown';
+      final parts = callerFullName.split('\n');
+      final name = parts.isNotEmpty ? parts[0] : 'Unknown';
+      final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
+      final callId = currentCall['id'] as String? ?? '';
+
+      globalActiveCallNotifier.value = {
+        'callerName': name,
+        'callerNumber': number,
+        'callId': callId,
+      };
+    } else {
+      globalActiveCallNotifier.value = null;
+    }
+  }
+
+  void _listenToCallKitEvents() {
+    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
+      if (event == null) return;
+
+      switch (event.event) {
+        case Event.actionCallAccept:
+          debugPrint('Global CallKit Accept received');
+          final body = event.body as Map<dynamic, dynamic>?;
+          if (body != null) {
+            final callerFullName = body['nameCaller'] as String? ?? 'Unknown';
+            // Parse "Name\nNumber" trick
+            final parts = callerFullName.split('\n');
+            final name = parts.isNotEmpty ? parts[0] : 'Unknown';
+            final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
+            final callId = body['id'] as String? ?? '';
+
+            globalActiveCallNotifier.value = {
+              'callerName': name,
+              'callerNumber': number,
+              'callId': callId,
+            };
+          }
+          break;
+        case Event.actionCallEnded:
+        case Event.actionCallDecline:
+        case Event.actionCallTimeout:
+          globalActiveCallNotifier.value = null;
+          break;
+        default:
+          break;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
@@ -84,6 +171,24 @@ class AreYouOkayApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            if (child != null) child,
+            ValueListenableBuilder<Map<String, dynamic>?>(
+              valueListenable: globalActiveCallNotifier,
+              builder: (context, activeCall, _) {
+                if (activeCall == null) return const SizedBox.shrink();
+                return FakeCallActiveScreen(
+                  callerName: activeCall['callerName'] ?? 'Unknown',
+                  callerNumber: activeCall['callerNumber'] ?? '',
+                  callId: activeCall['callId'] ?? '',
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
