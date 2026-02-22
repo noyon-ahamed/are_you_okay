@@ -529,29 +529,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
-          // Note input for mood
-          const SizedBox(height: 16),
-          TextField(
-            controller: _moodNoteController,
-            decoration: InputDecoration(
-              hintText: 'নোট লিখুন (ঐচ্ছিক)...',
-                hintStyle: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13),
-                prefixIcon: const Icon(Icons.edit_note, size: 20),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.border),
-                ),
-              ),
-              style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13),
-              maxLines: 2,
-              maxLength: 200,
-            ),
+
           if (_isSavingMood)
             const Padding(
               padding: EdgeInsets.only(top: 8),
