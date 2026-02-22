@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/settings_provider.dart';
+import '../../../provider/checkin_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
 
@@ -20,6 +21,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final statusData = ref.watch(checkinStatusProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -60,6 +62,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSectionHeader('নিরাপত্তা'),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
+            _buildListTile(
+              icon: Icons.local_fire_department,
+              iconColor: Colors.deepOrange,
+              title: 'বর্তমান স্ট্রিক',
+              subtitle: '${statusData.streak} দিন',
+              onTap: () {},
+            ),
+            _buildDivider(),
             _buildListTile(
               icon: Icons.timer_rounded,
               iconColor: AppColors.primary,

@@ -22,6 +22,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final checkins = ref.watch(checkinHistoryProvider);
+    final statusData = ref.watch(checkinStatusProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -59,7 +60,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
             );
           }
 
-          return _buildHistoryList(context, filtered, isDark);
+          return _buildHistoryList(context, filtered, isDark, statusData.streak);
         },
       ),
     );
@@ -68,7 +69,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
 
 
   Widget _buildHistoryList(
-      BuildContext context, List<CheckInModel> checkins, bool isDark) {
+      BuildContext context, List<CheckInModel> checkins, bool isDark, int streak) {
     // Group by date
     final grouped = <String, List<CheckInModel>>{};
     for (final checkin in checkins) {
@@ -78,19 +79,6 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
 
     final sortedKeys = grouped.keys.toList()
       ..sort((a, b) => b.compareTo(a));
-
-    // Streak calculation
-    int streak = 0;
-    final today = DateTime.now();
-    for (int i = 0; i < sortedKeys.length; i++) {
-      final date = DateTime.parse(sortedKeys[i]);
-      final diff = today.difference(date).inDays;
-      if (diff == i || (i == 0 && diff <= 1)) {
-        streak++;
-      } else {
-        break;
-      }
-    }
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
