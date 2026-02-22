@@ -45,7 +45,9 @@ class MoodApiService {
         throw Exception(response.data['error'] ?? 'Failed to save mood');
       }
     } on DioException catch (e) {
-      throw Exception(e.response?.data['error'] ?? 'Network error');
+      final statusCode = e.response?.statusCode ?? 0;
+      final errorMsg = e.response?.data?['error']?.toString() ?? 'Network error';
+      throw Exception('$statusCode: $errorMsg');
     }
   }
 

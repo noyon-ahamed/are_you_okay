@@ -123,6 +123,7 @@ class EmergencyApiService {
     required double latitude,
     required double longitude,
     String? customMessage,
+    List<String>? serviceTypes,
   }) async {
     try {
       final response = await _dio.post(
@@ -133,6 +134,7 @@ class EmergencyApiService {
             'longitude': longitude,
           },
           if (customMessage != null) 'customMessage': customMessage,
+          if (serviceTypes != null) 'serviceTypes': serviceTypes,
         },
       );
 

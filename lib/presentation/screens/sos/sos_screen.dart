@@ -34,6 +34,10 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   String? _activeAlertId;
   final _emergencyApi = EmergencyApiService();
 
+  bool _needPolice = true;
+  bool _needFire = false;
+  bool _needAmbulance = false;
+
   @override
   void initState() {
     super.initState();
@@ -138,11 +142,19 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
       socketService.emitLocationUpdate(position.latitude, position.longitude);
     });
 
+    // Prepare selected services
+    final selectedServices = <String>[];
+    if (_needPolice) selectedServices.add('police');
+    if (_needFire) selectedServices.add('fire');
+    if (_needAmbulance) selectedServices.add('ambulance');
+    if (selectedServices.isEmpty) selectedServices.add('general');
+
     // === Call backend SOS endpoint to send SMS+Email alerts ===
     try {
       final result = await _emergencyApi.triggerSOS(
         latitude: _currentPosition?.latitude ?? 23.8103,
         longitude: _currentPosition?.longitude ?? 90.4125,
+        serviceTypes: selectedServices,
       );
       _activeAlertId = result['alert']?['_id']?.toString();
       
@@ -202,6 +214,10 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                         : _buildSOSButton(),
               ),
             ),
+
+            // Service Selection
+            if (!_isActivating && !_isActivated)
+              _buildServiceSelection(isDark),
 
             // Emergency contacts
             if (!_isActivating && !_isActivated) ...[
@@ -289,6 +305,59 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildServiceSelection(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'প্রয়োজনীয় পরিষেবা নির্বাচন করুন:',
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildCheckbox('পুলিশ', _needPolice, (v) => setState(() => _needPolice = v!)),
+              _buildCheckbox('ফায়ার সার্ভিস', _needFire, (v) => setState(() => _needFire = v!)),
+              _buildCheckbox('অ্যাম্বুলেন্স', _needAmbulance, (v) => setState(() => _needAmbulance = v!)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckbox(String label, bool value, ValueChanged<bool?> onChanged) {
+    return Expanded(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.error,
+            visualDensity: VisualDensity.compact,
+          ),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -22,6 +22,8 @@ import 'presentation/widgets/lifecycle_manager.dart';
 import 'presentation/screens/fake_call/fake_call_active_screen.dart';
 
 final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier = ValueNotifier(null);
+/// Track handled call IDs to avoid re-showing on app resume
+final Set<String> _handledCallIds = {};
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -109,11 +111,17 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
     final calls = await FlutterCallkitIncoming.activeCalls();
     if (calls is List && calls.isNotEmpty) {
       final currentCall = calls.first;
+      final callId = currentCall['id'] as String? ?? '';
+      
+      // Skip if this call was already handled
+      if (_handledCallIds.contains(callId)) {
+        return;
+      }
+
       final callerFullName = currentCall['nameCaller'] as String? ?? 'Unknown';
       final parts = callerFullName.split('\n');
       final name = parts.isNotEmpty ? parts[0] : 'Unknown';
       final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
-      final callId = currentCall['id'] as String? ?? '';
 
       globalActiveCallNotifier.value = {
         'callerName': name,
@@ -135,11 +143,13 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
           final body = event.body as Map<dynamic, dynamic>?;
           if (body != null) {
             final callerFullName = body['nameCaller'] as String? ?? 'Unknown';
-            // Parse "Name\nNumber" trick
             final parts = callerFullName.split('\n');
             final name = parts.isNotEmpty ? parts[0] : 'Unknown';
             final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
             final callId = body['id'] as String? ?? '';
+
+            // Mark as handled to prevent re-show on app resume
+            _handledCallIds.add(callId);
 
             globalActiveCallNotifier.value = {
               'callerName': name,
@@ -151,6 +161,11 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
         case Event.actionCallEnded:
         case Event.actionCallDecline:
         case Event.actionCallTimeout:
+          // Clear handled call ID on end
+          final body = event.body as Map<dynamic, dynamic>?;
+          if (body != null) {
+            _handledCallIds.remove(body['id'] as String? ?? '');
+          }
           globalActiveCallNotifier.value = null;
           break;
         default:

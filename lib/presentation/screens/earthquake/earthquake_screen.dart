@@ -64,7 +64,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
             final lng = coords != null && coords.isNotEmpty ? (coords[0] as num).toDouble() : 0.0;
             final lat = coords != null && coords.length > 1 ? (coords[1] as num).toDouble() : 0.0;
             final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
-            final timestamp = DateTime.tryParse(e['timestamp']?.toString() ?? '') ?? DateTime.now();
+            final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
+            final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
 
             return _EarthquakeData(
               eventId: e['eventId']?.toString() ?? '',

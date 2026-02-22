@@ -7,6 +7,7 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../routes/app_router.dart';
+import '../../../services/api/checkin_api_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -59,20 +60,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSectionHeader('নিরাপত্তা'),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
-            _buildSliderTile(
+            _buildListTile(
               icon: Icons.timer_rounded,
               iconColor: AppColors.primary,
               title: 'চেক-ইন ইন্টারভাল',
               subtitle: 'প্রতি ${settings.checkinIntervalHours} ঘণ্টা পর',
-              value: settings.checkinIntervalHours.toDouble(),
-              min: 1,
-              max: 48,
-              divisions: 47,
-              onChanged: (val) {
-                ref
-                    .read(settingsProvider.notifier)
-                    .setCheckinInterval(val.round());
-              },
+              onTap: () => _showIntervalDialog(),
             ),
             _buildDivider(),
             _buildSwitchTile(
@@ -522,5 +515,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  void _showIntervalDialog() {
+    final settings = ref.read(settingsProvider);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('চেক-ইন সময়সীমা',
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                )),
+            const SizedBox(height: 16),
+            _buildIntervalOption('২৪ ঘণ্টা (দৈনিক)', 24, settings.checkinIntervalHours == 24),
+            _buildIntervalOption('৪৮ ঘণ্টা (২ দিন)', 48, settings.checkinIntervalHours == 48),
+            _buildIntervalOption('৭২ ঘণ্টা (৩ দিন)', 72, settings.checkinIntervalHours == 72),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntervalOption(String label, int value, bool isSelected) {
+    return ListTile(
+      title: Text(label, style: TextStyle(fontFamily: 'HindSiliguri')),
+      leading: Radio<int>(
+        value: value,
+        groupValue: isSelected ? value : null,
+        onChanged: (val) => _updateInterval(value),
+        activeColor: AppColors.primary,
+      ),
+      onTap: () => _updateInterval(value),
+    );
+  }
+
+  void _updateInterval(int value) async {
+    Navigator.pop(context);
+    try {
+      // Sync with local provider
+      ref.read(settingsProvider.notifier).setCheckinInterval(value);
+      // Sync with backend API
+      await CheckinApiService().setCheckInInterval(value);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ইন্টারভাল আপডেট হয়েছে ✓', style: TextStyle(fontFamily: 'HindSiliguri')),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to set interval: \$e');
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ইন্টারভাল আপডেট ব্যর্থ হয়েছে', style: TextStyle(fontFamily: 'HindSiliguri')),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   int _selectedMood = -1;
   int _bottomNavIndex = 0;
   bool _isSavingMood = false;
+  final TextEditingController _moodNoteController = TextEditingController();
 
   // Countdown — will be synced from server
   Duration _timeRemaining = const Duration(hours: 24);
@@ -95,6 +97,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _pulseController.dispose();
     _ringController.dispose();
     _countdownTimer?.cancel();
+    _moodNoteController.dispose();
     ref.read(shakeDetectorProvider).stopListening();
     super.dispose();
   }
@@ -268,6 +271,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final isLoading = state is CheckInLoading;
     final hasCheckedIn = statusData.hasCheckedInToday;
 
+    final hours = _timeRemaining.inHours;
+    final minutes = _timeRemaining.inMinutes.remainder(60);
+    final seconds = _timeRemaining.inSeconds.remainder(60);
+
     return Center(
       child: AnimatedBuilder(
         animation: _pulseAnimation,
@@ -278,7 +285,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
         },
         child: GestureDetector(
-          onTap: (isLoading || hasCheckedIn) ? null : _performCheckin,
+          onTap: isLoading 
+              ? null 
+              : hasCheckedIn 
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'পরবর্তী চেক-ইন সম্ভব: $hours ঘণ্টা $minutes মিনিট পর',
+                            style: const TextStyle(fontFamily: 'HindSiliguri'),
+                          ),
+                          backgroundColor: AppColors.warning,
+                        ),
+                      );
+                    }
+                  : _performCheckin,
           child: Container(
             width: 180,
             height: 180,
@@ -342,7 +363,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'চেক-ইন সম্পন্ন ✓',
+                                  'চেক-ইন সম্পন্ন ✓\n${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
@@ -507,6 +529,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
+          // Note input for mood
+          if (_selectedMood >= 0) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _moodNoteController,
+              decoration: InputDecoration(
+                hintText: 'নোট লিখুন (ঐচ্ছিক)...',
+                hintStyle: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13),
+                prefixIcon: const Icon(Icons.edit_note, size: 20),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.border),
+                ),
+              ),
+              style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13),
+              maxLines: 2,
+              maxLength: 200,
+            ),
+          ],
           if (_isSavingMood)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -519,7 +566,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           if (!_isSavingMood) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Center(
               child: TextButton.icon(
                 onPressed: () => context.push(Routes.moodHistory),
@@ -693,7 +740,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               _buildStatItem(
                 icon: Icons.shield,
-                value: '${statusData.hoursSinceLastCheckIn ?? 0}h',
+                value: statusData.lastCheckIn != null
+                    ? DateFormat('dd MMM\nhh:mm a').format(statusData.lastCheckIn!)
+                    : '---',
                 label: 'শেষ চেক-ইন',
                 color: AppColors.primary,
               ),
@@ -778,19 +827,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final isSelected = _bottomNavIndex == index;
     return GestureDetector(
       onTap: () {
+        if (index == 0) return; // Already on home
         setState(() => _bottomNavIndex = index);
+        
+        String? route;
         switch (index) {
-          case 0:
-            break; // Already on home
           case 1:
-            context.push(Routes.history);
+            route = Routes.history;
             break;
           case 2:
-            context.push(Routes.contacts);
+            route = Routes.contacts;
             break;
           case 3:
-            context.push(Routes.settings);
+            route = Routes.settings;
             break;
+        }
+        if (route != null) {
+          context.push(route).then((_) {
+            // Reset to home when returning
+            if (mounted) setState(() => _bottomNavIndex = 0);
+          });
         }
       },
       child: AnimatedContainer(
@@ -894,13 +950,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (index >= 0 && index < moodKeys.length) {
       setState(() => _isSavingMood = true);
       try {
+        final noteText = _moodNoteController.text.trim();
         await MoodApiService().saveMood(
           mood: moodKeys[index],
-          note: AppConstants.moodLabels[index],
+          note: noteText.isNotEmpty ? noteText : AppConstants.moodLabels[index],
         );
-      } catch (e) {
+        if (mounted) {
+          _moodNoteController.clear();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'মেজাজ সেভ হয়েছে ✓',
+                style: TextStyle(fontFamily: 'HindSiliguri'),
+              ),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } on Exception catch (e) {
         debugPrint('Failed to save mood: $e');
-        // Silently fail — mood will be saved with check-in
+        if (mounted) {
+          final msg = e.toString();
+          if (msg.contains('403') || msg.contains('once per hour')) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '⏳ প্রতি ঘণ্টায় একবার মেজাজ সেভ করতে পারবেন। আবার চেষ্টা করুন।',
+                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                ),
+                backgroundColor: AppColors.warning,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'মেজাজ সেভ ব্যর্থ হয়েছে',
+                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                ),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
       } finally {
         if (mounted) {
           setState(() => _isSavingMood = false);
