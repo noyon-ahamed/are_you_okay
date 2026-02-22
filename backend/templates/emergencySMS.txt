@@ -1,3 +1,0 @@
-SOS ALERT: {{userName}} has triggered an emergency alert.
-Location: https://www.google.com/maps?q={{latitude}},{{longitude}}
-Please contact them immediately. - Are You Okay? App
