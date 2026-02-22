@@ -19,7 +19,8 @@ class EarthquakeScreen extends ConsumerStatefulWidget {
 class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   bool _isLoading = true;
   String? _error;
-  List<_EarthquakeData> _recentQuakes = [];
+  List<_EarthquakeData> _localQuakes = [];
+  List<_EarthquakeData> _globalQuakes = [];
 
   @override
   void initState() {
@@ -55,34 +56,17 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       }
 
       final earthquakeService = ref.read(earthquakeServiceProvider);
-      final data = await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
+      final responseData = await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
 
       if (mounted) {
         setState(() {
-          _recentQuakes = data.map((e) {
-            final coords = e['location']?['coordinates'] as List?;
-            final lng = coords != null && coords.isNotEmpty ? (coords[0] as num).toDouble() : 0.0;
-            final lat = coords != null && coords.length > 1 ? (coords[1] as num).toDouble() : 0.0;
-            final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
-            final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
-            final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
-
-            return _EarthquakeData(
-              eventId: e['eventId']?.toString() ?? '',
-              magnitude: magnitude,
-              location: e['place']?.toString() ?? 'Unknown',
-              time: timeago.format(timestamp),
-              latitude: lat,
-              longitude: lng,
-              depth: '${(e['depth'] as num?)?.toStringAsFixed(0) ?? '?'} km',
-              timestamp: timestamp,
-            );
-          }).toList();
+          _localQuakes = _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
+          _globalQuakes = _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
           _isLoading = false;
         });
 
-        // Check for dangerous earthquakes and play siren
-        final dangerous = _recentQuakes.where((q) => q.magnitude >= 6.0);
+        // Check for dangerous earthquakes in local vicinity and play siren
+        final dangerous = _localQuakes.where((q) => q.magnitude >= 6.0);
         if (dangerous.isNotEmpty) {
           _playSirenAlert();
         }
@@ -153,7 +137,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           ? _buildLoadingList()
           : _error != null
               ? _buildErrorView()
-              : _recentQuakes.isEmpty
+              : (_localQuakes.isEmpty && _globalQuakes.isEmpty)
                   ? _buildEmptyView()
                   : RefreshIndicator(
                       onRefresh: _fetchEarthquakeData,
@@ -162,18 +146,43 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     );
   }
 
+  List<_EarthquakeData> _parseQuakes(List? dataList, double? userLat, double? userLng) {
+    if (dataList == null) return [];
+    return dataList.map((e) {
+      final coords = e['location']?['coordinates'] as List?;
+      final eqLng = coords != null && coords.isNotEmpty ? (coords[0] as num).toDouble() : 0.0;
+      final eqLat = coords != null && coords.length > 1 ? (coords[1] as num).toDouble() : 0.0;
+      final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
+      final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
+      final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
+
+      double? distance;
+      if (userLat != null && userLng != null && eqLat != 0.0 && eqLng != 0.0) {
+        distance = Geolocator.distanceBetween(userLat, userLng, eqLat, eqLng) / 1000; // in km
+      }
+
+      return _EarthquakeData(
+        eventId: e['eventId']?.toString() ?? '',
+        magnitude: magnitude,
+        location: e['place']?.toString() ?? 'Unknown',
+        time: timeago.format(timestamp),
+        latitude: eqLat,
+        longitude: eqLng,
+        depth: '${(e['depth'] as num?)?.toStringAsFixed(0) ?? '?'} km',
+        timestamp: timestamp,
+        distanceKm: distance,
+      );
+    }).toList();
+  }
+
   Widget _buildHistoryList(BuildContext context, bool isDark) {
-    // Highest magnitude calculation
+    // Highest magnitude calculation (using both sets for stats, or just local. Let's use local for stats to be relevant to user)
     double highestMag = 0.0;
     int highMagnitudeCount = 0;
 
-    for (var quake in _recentQuakes) {
-      if (quake.magnitude > highestMag) {
-        highestMag = quake.magnitude;
-      }
-      if (quake.magnitude >= 4.5) {
-        highMagnitudeCount++;
-      }
+    for (var quake in _localQuakes) {
+      if (quake.magnitude > highestMag) highestMag = quake.magnitude;
+      if (quake.magnitude >= 4.5) highMagnitudeCount++;
     }
 
     return CustomScrollView(
@@ -189,19 +198,57 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           ),
         ),
 
-        // Timeline list
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final quake = _recentQuakes[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildQuakeItem(context, quake, isDark),
-              );
-            },
-            childCount: _recentQuakes.length,
+        // Local Header
+        if (_localQuakes.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Text(
+                'আপনার কাছাকাছি (১০০০ কি.মি)',
+                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
-        ),
+
+        // Local Timeline list
+        if (_localQuakes.isNotEmpty)
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildQuakeItem(context, _localQuakes[index], isDark),
+                );
+              },
+              childCount: _localQuakes.length,
+            ),
+          ),
+
+        // Global Header
+        if (_globalQuakes.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 24, bottom: 8),
+              child: Text(
+                'বিশ্বের বড় ভূমিকম্প (টপ ৫)',
+                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+
+        // Global Timeline list
+        if (_globalQuakes.isNotEmpty)
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildQuakeItem(context, _globalQuakes[index], isDark),
+                );
+              },
+              childCount: _globalQuakes.length,
+            ),
+          ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
@@ -224,9 +271,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildStat(
-            icon: Icons.public,
-            value: '${_recentQuakes.length}',
-            label: 'মোট',
+            icon: Icons.my_location,
+            value: '${_localQuakes.length}',
+            label: 'কাছাকাছি',
           ),
           Container(
             width: 1,
@@ -366,6 +413,22 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                         color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                     ),
+                    if (quake.distanceKm != null) ...[
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.map,
+                        size: 14,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${quake.distanceKm!.toStringAsFixed(0)} কি.মি. দূরে',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -453,6 +516,7 @@ class _EarthquakeData {
   final double longitude;
   final String depth;
   final DateTime timestamp;
+  final double? distanceKm;
 
   _EarthquakeData({
     required this.eventId,
@@ -463,5 +527,6 @@ class _EarthquakeData {
     required this.longitude,
     required this.depth,
     required this.timestamp,
+    this.distanceKm,
   });
 }
