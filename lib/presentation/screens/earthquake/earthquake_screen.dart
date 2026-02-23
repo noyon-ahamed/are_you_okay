@@ -156,9 +156,18 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
       final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
 
-      double? distance;
-      if (userLat != null && userLng != null && eqLat != 0.0 && eqLng != 0.0) {
-        distance = Geolocator.distanceBetween(userLat, userLng, eqLat, eqLng) / 1000; // in km
+      double? displayDistance;
+      // Backend returns 'distance' key for local alerts
+      if (e['distance'] != null) {
+        if (e['distance'] is num) {
+          displayDistance = (e['distance'] as num).toDouble();
+        } else if (e['distance'] is String) {
+          displayDistance = double.tryParse(e['distance']);
+        }
+      } 
+      // Fallback calculation if not present but we have coordinates
+      if (displayDistance == null && userLat != null && userLng != null && eqLat != 0.0 && eqLng != 0.0) {
+        displayDistance = Geolocator.distanceBetween(userLat, userLng, eqLat, eqLng) / 1000;
       }
 
       return _EarthquakeData(
@@ -170,7 +179,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         longitude: eqLng,
         depth: '${(e['depth'] as num?)?.toStringAsFixed(0) ?? '?'} km',
         timestamp: timestamp,
-        distanceKm: distance,
+        distanceKm: displayDistance,
       );
     }).toList();
   }
