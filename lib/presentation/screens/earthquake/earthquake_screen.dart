@@ -466,10 +466,10 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                       ),
                   ],
                 ),
-              ],
             ),
           ),
         ],
+      ),
       ),
     );
   }

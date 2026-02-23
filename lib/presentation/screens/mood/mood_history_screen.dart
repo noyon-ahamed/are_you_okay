@@ -101,6 +101,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
           return const SizedBox.shrink(); // Hide if no data
         }
 
+        final totalEntries = stats['totalEntries'] as int? ?? 0;
         final distribution = stats['distribution'] as Map<String, dynamic>? ?? {};
         
         // Calculate most frequent mood from distribution
