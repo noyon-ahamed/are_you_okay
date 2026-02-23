@@ -4,6 +4,7 @@ import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -60,12 +61,14 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
         case Event.actionCallAccept:
           // Global listener in main.dart handles navigation
           setState(() => _callState = _CallState.setup);
+          WakelockPlus.disable();
           break;
         case Event.actionCallDecline:
         case Event.actionCallEnded:
         case Event.actionCallTimeout:
           debugPrint('Call ended or declined natively');
           setState(() => _callState = _CallState.setup);
+          WakelockPlus.disable();
           break;
         default:
           break;
@@ -95,6 +98,9 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
       _callState = _CallState.waiting;
       _remainingDelay = _delaySeconds;
     });
+
+    // Ensure the screen wakes up in case the phone is locked when the timer hits
+    WakelockPlus.enable();
 
     _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
@@ -170,6 +176,7 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
 
   void _cancelTimer() {
     _delayTimer?.cancel();
+    WakelockPlus.disable();
     setState(() {
       _callState = _CallState.setup;
     });

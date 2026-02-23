@@ -90,6 +90,7 @@ dependencies:
   audioplayers: ^6.5.1
   flutter_vibrate: ^1.4.0
   flutter_callkit_incoming: ^3.0.0
+  wakelock_plus: ^1.4.0
 
 dev_dependencies:
   flutter_test:
