@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_colors.dart';
@@ -341,6 +342,15 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     );
   }
 
+  Future<void> _launchMap(double lat, double lng) async {
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      debugPrint('Could not launch $uri');
+    }
+  }
+
   Widget _buildQuakeItem(BuildContext context, _EarthquakeData quake, bool isDark) {
     Color magColor;
     if (quake.magnitude >= 6.0) {
@@ -351,11 +361,13 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       magColor = AppColors.success;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: AppDecorations.cardDecoration(context: context),
-      child: Row(
+    return GestureDetector(
+      onTap: () => _launchMap(quake.latitude, quake.longitude),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: AppDecorations.cardDecoration(context: context),
+        child: Row(
         children: [
           // Magnitude Circle
           Container(
@@ -393,51 +405,65 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
                   children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 14,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      quake.time,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.layers,
-                      size: 14,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      quake.depth,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                    ),
-                    if (quake.distanceKm != null) ...[
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.map,
-                        size: 14,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${quake.distanceKm!.toStringAsFixed(0)} কি.মি. দূরে',
-                        style: TextStyle(
-                          fontSize: 12,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 14,
                           color: Theme.of(context).textTheme.bodySmall?.color,
                         ),
+                        const SizedBox(width: 4),
+                        Text(
+                          quake.time,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.layers,
+                          size: 14,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          quake.depth,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (quake.distanceKm != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.map,
+                            size: 14,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${quake.distanceKm!.toStringAsFixed(0)} কি.মি. দূরে',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).textTheme.bodySmall?.color,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
                   ],
                 ),
               ],
