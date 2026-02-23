@@ -27,7 +27,7 @@ class EarthquakeService {
   }
 
   /// Get latest earthquake alerts from backend
-  Future<List<Map<String, dynamic>>> getLatestEarthquakes({double? lat, double? lng}) async {
+  Future<Map<String, dynamic>> getLatestEarthquakes({double? lat, double? lng}) async {
     try {
       final queryParams = <String, dynamic>{};
       if (lat != null && lng != null) {
@@ -41,7 +41,7 @@ class EarthquakeService {
       );
 
       if (response.data['success'] == true) {
-        return List<Map<String, dynamic>>.from(response.data['data'] ?? []);
+        return response.data['data'] as Map<String, dynamic>? ?? {};
       } else {
         throw Exception('Failed to fetch earthquakes');
       }
