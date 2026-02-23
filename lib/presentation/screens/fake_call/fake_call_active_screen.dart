@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../main.dart';
 
@@ -29,6 +30,7 @@ class _FakeCallActiveScreenState extends State<FakeCallActiveScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _startDurationTimer();
   }
 
@@ -43,11 +45,13 @@ class _FakeCallActiveScreenState extends State<FakeCallActiveScreen> {
   @override
   void dispose() {
     _durationTimer?.cancel();
+    WakelockPlus.disable();
     super.dispose();
   }
 
   Future<void> _endFakeCall() async {
     await FlutterCallkitIncoming.endCall(widget.callId);
+    WakelockPlus.disable();
     globalActiveCallNotifier.value = null;
   }
 
