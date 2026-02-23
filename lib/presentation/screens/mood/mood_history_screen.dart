@@ -9,6 +9,7 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
+import '../../../provider/checkin_provider.dart';
 
 // --- Providers --- //
 
@@ -90,7 +91,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   Widget _buildStatsSection(WidgetRef ref, bool isDark, BuildContext context) {
     // If filtering is applied, we could theoretically fetch stats for those days,
     // but the API getStats currently only fetches logic without dynamic days easily unless we modify it.
-    // We will leave stats as last 30 days for now or the API default.
+    final statusData = ref.watch(checkinStatusProvider);
     final statsAsyncValue = ref.watch(moodStatsProvider);
 
     return statsAsyncValue.when(
@@ -100,15 +101,29 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
           return const SizedBox.shrink(); // Hide if no data
         }
 
-        final mostFrequentMood = stats['mostFrequentMood'] as String?;
-        final currentStreak = stats['currentStreak'] as int? ?? 0;
-        final totalEntries = stats['totalEntries'] as int? ?? 0;
+        final distribution = stats['distribution'] as Map<String, dynamic>? ?? {};
         
-        // Find the emoji for the most frequent mood
+        // Calculate most frequent mood from distribution
+        String? mostFrequentMood;
+        int maxCount = 0;
+        distribution.forEach((key, value) {
+          final count = (value as num).toInt();
+          if (count > maxCount) {
+            maxCount = count;
+            mostFrequentMood = key;
+          }
+        });
+
+        final currentStreak = statusData.streak; // Use global streak
+        
+        // Find the emoji for the most frequent mood using backend keys
         String freqEmoji = '😶';
+        final backendKeys = ['happy', 'good', 'neutral', 'sad', 'anxious', 'angry'];
         if (mostFrequentMood != null) {
-          final index = AppConstants.moodLabels.indexOf(mostFrequentMood);
-          if (index != -1) freqEmoji = AppConstants.moodEmojis[index];
+          final index = backendKeys.indexOf(mostFrequentMood!);
+          if (index != -1 && index < AppConstants.moodEmojis.length) {
+            freqEmoji = AppConstants.moodEmojis[index];
+          }
         }
 
         return Container(
