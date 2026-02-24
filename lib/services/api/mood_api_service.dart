@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import '../../core/constants/app_constants.dart';
 import '../auth/token_storage_service.dart';
+import '../shared_prefs_service.dart';
+import '../../routes/app_router.dart';
+import 'package:go_router/go_router.dart';
 
 /// MoodApiService
 /// Handles mood tracking API calls
@@ -20,6 +23,16 @@ class MoodApiService {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
+        },
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            await SharedPrefsService().logout();
+            await TokenStorageService.clearAll();
+            if (rootNavigatorKey.currentContext != null) {
+              rootNavigatorKey.currentContext!.go(Routes.login);
+            }
+          }
+          return handler.next(error);
         },
       ),
     );

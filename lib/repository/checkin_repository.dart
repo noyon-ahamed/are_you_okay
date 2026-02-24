@@ -48,8 +48,8 @@ class CheckInRepository {
         await Geolocator.requestPermission();
       }
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 5));
+        desiredAccuracy: LocationAccuracy.low,
+      ).timeout(const Duration(seconds: 2));
       lat = position.latitude;
       lng = position.longitude;
     } catch (e) {
