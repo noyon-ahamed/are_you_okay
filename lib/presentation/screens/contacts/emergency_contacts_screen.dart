@@ -28,13 +28,11 @@ class EmergencyContactsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddContactSheet(context, ref),
-        icon: const Icon(Icons.person_add),
-        label: Text('যোগ করুন',
-            style: TextStyle(fontFamily: 'HindSiliguri', fontWeight: FontWeight.w600)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
       body: _buildBody(context, ref, contactState, isDark),
     );

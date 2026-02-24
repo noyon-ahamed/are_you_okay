@@ -4,9 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
-import '../../../model/checkin_model.dart';
 import '../../../provider/checkin_provider.dart';
-import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 
 class CheckinHistoryScreen extends ConsumerStatefulWidget {
@@ -21,7 +19,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final checkins = ref.watch(checkinHistoryProvider);
+    final historyAsync = ref.watch(checkinHistoryFromBackendProvider);
     final statusData = ref.watch(checkinStatusProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -37,43 +35,73 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 0, child: Text('সব সময়', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              const PopupMenuItem(value: 0, child: Text('সব সময়', style: TextStyle(fontFamily: 'HindSiliguri'))),
               const PopupMenuItem(value: 7, child: Text('গত ৭ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
               const PopupMenuItem(value: 14, child: Text('গত ১৪ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
             ],
           ),
         ],
       ),
-      body: Builder(
-        builder: (context) {
-          List<CheckInModel> filtered = checkins;
+      body: historyAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('ত্রুটি: $error', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(checkinHistoryFromBackendProvider),
+                child: const Text('আবার চেষ্টা করুন'),
+              ),
+            ],
+          ),
+        ),
+        data: (checkins) {
+          List<Map<String, dynamic>> filtered = checkins;
           if (_filterDays > 0) {
             final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
-            filtered = checkins.where((c) => c.timestamp.isAfter(cutoff)).toList();
+            filtered = checkins.where((c) {
+              final timestamp = _parseTimestamp(c);
+              return timestamp != null && timestamp.isAfter(cutoff);
+            }).toList();
           }
 
           if (filtered.isEmpty) {
             return const EmptyState(
               icon: Icons.history_rounded,
-              title: 'কোনো হিস্ট্রি পাওয়া যায়নি',
-              description: 'এই সময়কালে আপনার কোনো চেক-ইন নেই',
+              title: 'কোনো হিস্ট্রি পাওয়া যায়নি',
+              description: 'এই সময়কালে আপনার কোনো চেক-ইন নেই',
             );
           }
 
-          return _buildHistoryList(context, filtered, isDark, statusData.streak);
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(checkinHistoryFromBackendProvider);
+            },
+            child: _buildHistoryList(context, filtered, isDark, statusData.streak),
+          );
         },
       ),
     );
   }
 
-
+  DateTime? _parseTimestamp(Map<String, dynamic> checkin) {
+    final ts = checkin['checkInTime'] ?? checkin['timestamp'] ?? checkin['createdAt'];
+    if (ts == null) return null;
+    return DateTime.tryParse(ts.toString())?.toLocal();
+  }
 
   Widget _buildHistoryList(
-      BuildContext context, List<CheckInModel> checkins, bool isDark, int streak) {
+      BuildContext context, List<Map<String, dynamic>> checkins, bool isDark, int streak) {
     // Group by date
-    final grouped = <String, List<CheckInModel>>{};
+    final grouped = <String, List<Map<String, dynamic>>>{};
     for (final checkin in checkins) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(checkin.timestamp);
+      final ts = _parseTimestamp(checkin);
+      if (ts == null) continue;
+      final dateKey = DateFormat('yyyy-MM-dd').format(ts);
       grouped.putIfAbsent(dateKey, () => []).add(checkin);
     }
 
@@ -81,7 +109,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
       ..sort((a, b) => b.compareTo(a));
 
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       slivers: [
         // Stats header
         SliverToBoxAdapter(
@@ -90,7 +118,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
             child: _buildStatsHeader(context, checkins, streak, isDark),
           ),
         ),
-        
+
         // Timeline list
         SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -148,13 +176,13 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
             childCount: sortedKeys.length,
           ),
         ),
-        
+
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
 
-  Widget _buildStatsHeader(BuildContext context, List<CheckInModel> checkins,
+  Widget _buildStatsHeader(BuildContext context, List<Map<String, dynamic>> checkins,
       int streak, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -192,12 +220,15 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
     );
   }
 
-  int _todayCount(List<CheckInModel> checkins) {
+  int _todayCount(List<Map<String, dynamic>> checkins) {
     final today = DateTime.now();
-    return checkins.where((c) =>
-        c.timestamp.year == today.year &&
-        c.timestamp.month == today.month &&
-        c.timestamp.day == today.day).length;
+    return checkins.where((c) {
+      final ts = _parseTimestamp(c);
+      return ts != null &&
+          ts.year == today.year &&
+          ts.month == today.month &&
+          ts.day == today.day;
+    }).length;
   }
 
   Widget _buildStat({
@@ -231,13 +262,14 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
   }
 
   Widget _buildCheckinItem(
-      BuildContext context, CheckInModel checkin, bool isDark) {
-    final time = DateFormat('hh:mm a').format(checkin.timestamp);
-    final methodIcon = checkin.method == 'button'
-        ? Icons.touch_app
-        : checkin.method == 'shake'
-            ? Icons.vibration
-            : Icons.timer;
+      BuildContext context, Map<String, dynamic> checkin, bool isDark) {
+    final ts = _parseTimestamp(checkin);
+    final time = ts != null ? DateFormat('hh:mm a').format(ts) : '--:--';
+    final status = checkin['status']?.toString() ?? 'safe';
+    final notes = checkin['notes']?.toString() ?? '';
+    final location = checkin['location'] as Map<String, dynamic>?;
+    final hasLocation = location != null &&
+        (location['latitude'] != null || location['address'] != null);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -264,13 +296,13 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
           // Time
           Text(
             time,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 14,
             ),
           ),
           const SizedBox(width: 12),
-          // Method
+          // Status pill
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -280,10 +312,10 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(methodIcon, size: 14, color: AppColors.primary),
+                Icon(Icons.check_circle_outline, size: 14, color: AppColors.primary),
                 const SizedBox(width: 4),
                 Text(
-                  _methodLabel(checkin.method),
+                  status == 'safe' ? 'নিরাপদ' : status,
                   style: TextStyle(
                     fontSize: 11,
                     color: AppColors.primary,
@@ -293,9 +325,22 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
               ],
             ),
           ),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                notes,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
           const Spacer(),
           // Location indicator
-          if (checkin.latitude != null && checkin.longitude != null)
+          if (hasLocation)
             Icon(
               Icons.location_on,
               size: 16,
@@ -304,19 +349,6 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
         ],
       ),
     );
-  }
-
-  String _methodLabel(String method) {
-    switch (method) {
-      case 'button':
-        return 'বাটন';
-      case 'shake':
-        return 'শেইক';
-      case 'auto':
-        return 'অটো';
-      default:
-        return method;
-    }
   }
 
   String _formatDateHeader(DateTime date) {

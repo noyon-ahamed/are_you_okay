@@ -1,14 +1,25 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/contact_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
+import '../../../services/hive_service.dart';
+import '../../../services/shared_prefs_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -146,17 +157,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.download_rounded,
               iconColor: const Color(0xFF795548),
               title: 'ডেটা এক্সপোর্ট',
-              subtitle: 'চেক-ইন ইতিহাস ডাউনলোড',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'ডেটা এক্সপোর্ট শীঘ্রই আসছে...',
-                      style: TextStyle(fontFamily: 'HindSiliguri'),
-                    ),
-                  ),
-                );
-              },
+              subtitle: 'মুড ইতিহাস CSV ডাউনলোড',
+              onTap: () => _exportMoodData(),
             ),
             _buildDivider(),
             _buildListTile(
@@ -470,7 +472,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text('ক্যাশ পরিষ্কার',
             style: TextStyle(fontFamily: 'HindSiliguri')),
         content: Text(
-          'আপনি কি নিশ্চিত? স্থানীয় ডেটা মুছে যাবে।',
+          'চেক-ইন, মুড এবং কন্টাক্ট ক্যাশ মুছে যাবে। আপনার অ্যাকাউন্ট এবং লগইন ডেটা নিরাপদ থাকবে।',
           style: TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
@@ -480,13 +482,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(fontFamily: 'HindSiliguri')),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('ক্যাশ পরিষ্কার হয়েছে',
-                        style: TextStyle(fontFamily: 'HindSiliguri'))),
-              );
+              try {
+                // Clear specific Hive boxes (not user data)
+                final hive = ref.read(hiveServiceProvider);
+                // Clear check-in cache
+                final checkInBox = await Hive.openBox('checkin_box');
+                await checkInBox.clear();
+                // Clear contact cache (will re-fetch from backend)
+                final contactBox = await Hive.openBox('contact_box');
+                await contactBox.clear();
+                
+                // Also clear mood cache just in case
+                final moodBox = await Hive.openBox('mood_box');
+                await moodBox.clear();
+
+                // Invalidate providers to refetch/empty screen
+                ref.invalidate(checkinHistoryFromBackendProvider);
+                ref.invalidate(checkinStatusProvider);
+                ref.invalidate(contactProvider);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে',
+                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
+                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: Text('পরিষ্কার করুন',
                 style: TextStyle(
@@ -591,6 +627,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(
             content: Text('ইন্টারভাল আপডেট ব্যর্থ হয়েছে', style: TextStyle(fontFamily: 'HindSiliguri')),
             backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _exportMoodData() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('মুড ডেটা এক্সপোর্ট হচ্ছে...', style: TextStyle(fontFamily: 'HindSiliguri')),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+    try {
+      final dio = Dio();
+      final token = await SharedPrefsService.getToken() ?? '';
+      final response = await dio.get(
+        '${AppConstants.apiBaseUrl}/mood/export',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          responseType: ResponseType.plain,
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final csvData = response.data.toString();
+        
+        // Parse CSV string
+        final lines = csvData.split('\n');
+        final tableData = lines
+            .where((line) => line.trim().isNotEmpty)
+            .map((line) => line.split(','))
+            .toList();
+
+        // Generate PDF
+        final pdf = pw.Document();
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Mood History Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 20),
+                  pw.TableHelper.fromTextArray(
+                    context: context,
+                    data: tableData,
+                    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    cellAlignment: pw.Alignment.centerLeft,
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+
+        // Save PDF to temp directory
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/mood_history.pdf');
+        await file.writeAsBytes(await pdf.save());
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('মুড ডেটা সফলভাবে এক্সপোর্ট হয়েছে! ✓', style: TextStyle(fontFamily: 'HindSiliguri')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Share the file
+          await Share.shareXFiles([XFile(file.path)], text: 'Mood History Report');
+        }
+      } else {
+        throw Exception('Export failed');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('এক্সপোর্ট ব্যর্থ: $e', style: TextStyle(fontFamily: 'HindSiliguri')),
+            backgroundColor: Colors.red,
           ),
         );
       }

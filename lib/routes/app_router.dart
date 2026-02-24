@@ -20,6 +20,7 @@ import '../../presentation/screens/contacts/add_contact_screen.dart';
 import '../../presentation/screens/sos/sos_screen.dart';
 import '../../presentation/screens/history/checkin_history_screen.dart';
 import '../../presentation/screens/mood/mood_history_screen.dart';
+import '../../presentation/screens/notification/notification_screen.dart';
 
 import '../../provider/auth_provider.dart';
 import '../../provider/splash_provider.dart';
@@ -45,6 +46,7 @@ class Routes {
   static const String sos = '/sos';
   static const String history = '/history';
   static const String moodHistory = '/mood-history';
+  static const String notifications = '/notifications';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -192,6 +194,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.history,
         builder: (context, state) => const CheckinHistoryScreen(),
+      ),
+      GoRoute(
+        path: Routes.notifications,
+        builder: (context, state) => const NotificationScreen(),
       ),
     ],
 

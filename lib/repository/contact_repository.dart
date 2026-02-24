@@ -1,23 +1,71 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../model/emergency_contact_model.dart';
 import '../services/hive_service.dart';
+import '../services/api/emergency_api_service.dart';
 import '../core/constants/app_constants.dart';
-import 'auth_repository.dart';
 
 final contactRepositoryProvider = Provider<ContactRepository>((ref) {
   return ContactRepository(
     hive: ref.watch(hiveServiceProvider),
+    api: EmergencyApiService(),
   );
 });
 
 class ContactRepository {
   final HiveService hive;
+  final EmergencyApiService api;
   final _uuid = const Uuid();
 
-  ContactRepository({required this.hive});
+  ContactRepository({required this.hive, required this.api});
 
-  /// Add new emergency contact
+  /// Load contacts from backend, cache in Hive
+  Future<List<EmergencyContactModel>> loadContactsFromBackend() async {
+    try {
+      final backendContacts = await api.getContacts();
+      
+      // Clear local cache and replace with backend data
+      final currentLocal = hive.getAllContacts();
+      for (final c in currentLocal) {
+        await hive.deleteContact(c.id);
+      }
+
+      final List<EmergencyContactModel> contacts = [];
+      for (final bc in backendContacts) {
+        final contact = EmergencyContactModel(
+          id: bc['_id']?.toString() ?? _uuid.v4(),
+          userId: bc['userId']?.toString() ?? '',
+          name: bc['name']?.toString() ?? '',
+          phoneNumber: bc['phone']?.toString() ?? '',
+          email: bc['email']?.toString(),
+          relationship: bc['relation']?.toString() ?? 'Other',
+          priority: bc['priority'] as int? ?? 1,
+          notifyViaSMS: true,
+          notifyViaCall: false,
+          notifyViaEmail: bc['email'] != null && bc['email'].toString().isNotEmpty,
+          notifyViaApp: true,
+          createdAt: bc['createdAt'] != null
+              ? DateTime.tryParse(bc['createdAt'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+          updatedAt: bc['updatedAt'] != null
+              ? DateTime.tryParse(bc['updatedAt'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+        );
+        await hive.saveContact(contact);
+        contacts.add(contact);
+      }
+
+      contacts.sort((a, b) => a.priority.compareTo(b.priority));
+      return contacts;
+    } catch (e) {
+      debugPrint('Failed to load contacts from backend: $e');
+      // Fallback to local data
+      return hive.getAllContacts();
+    }
+  }
+
+  /// Add new emergency contact — saves to backend first, then caches locally
   Future<EmergencyContactModel> addContact({
     required String name,
     required String phoneNumber,
@@ -29,22 +77,50 @@ class ContactRepository {
     bool notifyViaEmail = true,
     bool notifyViaApp = true,
   }) async {
-    try {
-      final user = hive.getCurrentUser();
-      if (user == null) {
-        throw Exception('User not logged in');
-      }
+    // Check max contacts limit
+    final currentCount = await _getContactCount();
+    if (currentCount >= AppConstants.maxEmergencyContacts) {
+      throw Exception(
+        'সর্বোচ্চ ${AppConstants.maxEmergencyContacts}টি কন্টাক্ট যোগ করা যায়',
+      );
+    }
 
-      // Check max contacts limit
-      if (hive.getContactCount() >= AppConstants.maxEmergencyContacts) {
-        throw Exception(
-          'Maximum ${AppConstants.maxEmergencyContacts} contacts allowed',
-        );
-      }
+    try {
+      // Save to backend first
+      final backendContact = await api.addContact(
+        name: name,
+        phone: phoneNumber,
+        email: email,
+        relation: relationship,
+        priority: priority,
+      );
 
       final contact = EmergencyContactModel(
+        id: backendContact['_id']?.toString() ?? _uuid.v4(),
+        userId: backendContact['userId']?.toString() ?? '',
+        name: name,
+        phoneNumber: phoneNumber,
+        email: email,
+        relationship: relationship,
+        priority: backendContact['priority'] as int? ?? priority,
+        notifyViaSMS: notifyViaSMS,
+        notifyViaCall: notifyViaCall,
+        notifyViaEmail: notifyViaEmail,
+        notifyViaApp: notifyViaApp,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Cache locally
+      await hive.saveContact(contact);
+      return contact;
+    } catch (e) {
+      // If backend fails, still save locally
+      debugPrint('Backend addContact failed, saving locally: $e');
+      final user = hive.getCurrentUser();
+      final contact = EmergencyContactModel(
         id: _uuid.v4(),
-        userId: user.id,
+        userId: user?.id ?? 'offline',
         name: name,
         phoneNumber: phoneNumber,
         email: email,
@@ -57,18 +133,12 @@ class ContactRepository {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-
       await hive.saveContact(contact);
-
-      // TODO: Sync with backend
-
-      return contact;
-    } catch (e) {
-      throw Exception('Failed to add contact: $e');
+      rethrow;
     }
   }
 
-  /// Get all contacts
+  /// Get all contacts (from local cache)
   List<EmergencyContactModel> getAllContacts() {
     return hive.getAllContacts();
   }
@@ -78,34 +148,50 @@ class ContactRepository {
     return hive.getContact(id);
   }
 
-  /// Update contact
+  /// Update contact — updates backend first, then local cache
   Future<EmergencyContactModel> updateContact(
     EmergencyContactModel contact,
   ) async {
     try {
-      final updated = contact.copyWith(updatedAt: DateTime.now());
-      await hive.updateContact(updated);
-
-      // TODO: Sync with backend
-
-      return updated;
+      await api.updateContact(
+        id: contact.id,
+        name: contact.name,
+        phone: contact.phoneNumber,
+        email: contact.email,
+        relation: contact.relationship,
+        priority: contact.priority,
+      );
     } catch (e) {
-      throw Exception('Failed to update contact: $e');
+      debugPrint('Backend updateContact failed: $e');
     }
+
+    final updated = contact.copyWith(updatedAt: DateTime.now());
+    await hive.updateContact(updated);
+    return updated;
   }
 
-  /// Delete contact
+  /// Delete contact — deletes from backend first, then local
   Future<void> deleteContact(String id) async {
     try {
-      await hive.deleteContact(id);
-
-      // TODO: Sync with backend
+      await api.deleteContact(id);
     } catch (e) {
-      throw Exception('Failed to delete contact: $e');
+      debugPrint('Backend deleteContact failed: $e');
     }
+
+    await hive.deleteContact(id);
   }
 
   /// Get contact count
+  Future<int> _getContactCount() async {
+    try {
+      final backendContacts = await api.getContacts();
+      return backendContacts.length;
+    } catch (e) {
+      return hive.getContactCount();
+    }
+  }
+
+  /// Get contact count (sync)
   int getContactCount() {
     return hive.getContactCount();
   }
@@ -115,22 +201,27 @@ class ContactRepository {
     return getContactCount() < AppConstants.maxEmergencyContacts;
   }
 
-  /// Reorder contacts (change priority)
+  /// Reorder contacts (change priority) — updates backend for each
   Future<void> reorderContacts(List<String> orderedIds) async {
-    try {
-      for (int i = 0; i < orderedIds.length; i++) {
-        final contact = hive.getContact(orderedIds[i]);
-        if (contact != null) {
-          await hive.updateContact(
-            contact.copyWith(
-              priority: i + 1,
-              updatedAt: DateTime.now(),
-            ),
+    for (int i = 0; i < orderedIds.length; i++) {
+      final contact = hive.getContact(orderedIds[i]);
+      if (contact != null) {
+        final updated = contact.copyWith(
+          priority: i + 1,
+          updatedAt: DateTime.now(),
+        );
+        await hive.updateContact(updated);
+
+        // Update backend priority
+        try {
+          await api.updateContact(
+            id: contact.id,
+            priority: i + 1,
           );
+        } catch (e) {
+          debugPrint('Backend reorder failed for ${contact.id}: $e');
         }
       }
-    } catch (e) {
-      throw Exception('Failed to reorder contacts: $e');
     }
   }
 

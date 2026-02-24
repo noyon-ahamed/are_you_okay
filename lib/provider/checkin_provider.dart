@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/checkin_model.dart';
 import '../repository/checkin_repository.dart';
+import '../services/api/auth_api_service.dart';
 
 // ==================== Check-In Action State ====================
 
@@ -221,10 +222,32 @@ final checkinStatusProvider =
   return CheckInStatusNotifier(ref.watch(checkinRepositoryProvider));
 });
 
-// Provider for check-in history
+// Provider for check-in history (local Hive fallback)
 final checkinHistoryProvider = Provider<List<CheckInModel>>((ref) {
   final repository = ref.watch(checkinRepositoryProvider);
   return repository.getAllCheckIns();
+});
+
+// Provider for check-in history from BACKEND API
+final checkinHistoryFromBackendProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final repository = ref.watch(checkinRepositoryProvider);
+  return await repository.fetchHistory(limit: 100, skip: 0);
+});
+
+// Provider for user stats from backend
+final userStatsFromBackendProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  try {
+    final authApi = AuthApiService();
+    final profileData = await authApi.getProfile();
+    final user = profileData['user'] as Map<String, dynamic>? ?? {};
+    return {
+      'totalCheckIns': user['checkInStreak'] ?? 0,
+      'streak': user['checkInStreak'] ?? 0,
+    };
+  } catch (e) {
+    debugPrint('Failed to fetch user stats: $e');
+    return {'totalCheckIns': 0, 'streak': 0};
+  }
 });
 
 // Provider for last check-in
