@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,8 +63,12 @@ void main() async {
   await BackgroundService.initialize();
   await BackgroundService.registerPeriodicTask();
 
-  // Initialize Mobile Ads
-  await MobileAds.instance.initialize();
+  // Initialize Mobile Ads (skip on iOS Simulator - crashes with SIGABRT)
+  final bool isSimulator = Platform.isIOS &&
+      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
+  if (!isSimulator) {
+    await MobileAds.instance.initialize();
+  }
 
   runApp(
     ProviderScope(

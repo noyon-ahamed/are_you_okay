@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -28,6 +31,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final List<String> _bloodGroups = [
     'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'
   ];
+  File? _selectedImage;
+  String? _existingImageUrl;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -39,6 +54,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _addressController = TextEditingController(text: user?.address ?? '');
     _selectedBloodGroup = user?.bloodGroup;
     _selectedInterval = user?.checkinInterval ?? 24;
+    _existingImageUrl = user?.profilePicture;
   }
 
   @override
@@ -69,16 +85,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: AppColors.primary,
-                      ),
+                      backgroundImage: _selectedImage != null
+                          ? FileImage(_selectedImage!)
+                          : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty
+                              ? (_existingImageUrl!.startsWith('data:image') 
+                                  ? MemoryImage(base64Decode(_existingImageUrl!.split(',').last)) as ImageProvider
+                                  : NetworkImage(_existingImageUrl!))
+                              : null),
+                      child: (_selectedImage == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
+                          ? const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: AppColors.primary,
+                            )
+                          : null,
                     ),
                     TextButton.icon(
-                      onPressed: () {
-                        // TODO: Change image
-                      },
+                      onPressed: _pickImage,
                       icon: const Icon(Icons.photo_camera),
                       label: const Text('ছবি পরিবর্তন করুন'),
                     ),
@@ -153,37 +176,37 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Check-in Interval
-              const Text(
-                'চেক-ইন ইন্টারভাল (ঘণ্টা)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Slider(
-                value: _selectedInterval.toDouble(),
-                min: 1,
-                max: 72,
-                divisions: 71,
-                label: '$_selectedInterval ঘণ্টা',
-                onChanged: (value) {
-                  setState(() {
-                    _selectedInterval = value.round();
-                  });
-                },
-              ),
-              Center(
-                child: Text(
-                  'প্রতি $_selectedInterval ঘণ্টা পর পর অ্যাপে চেক-ইন করতে হবে।',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
+              // // Check-in Interval
+              // const Text(
+              //   'চেক-ইন ইন্টারভাল (ঘণ্টা)',
+              //   style: TextStyle(
+              //     fontSize: 14,
+              //     fontWeight: FontWeight.w600,
+              //     color: AppColors.textPrimary,
+              //   ),
+              // ),
+              // const SizedBox(height: 8),
+              // Slider(
+              //   value: _selectedInterval.toDouble(),
+              //   min: 1,
+              //   max: 72,
+              //   divisions: 71,
+              //   label: '$_selectedInterval ঘণ্টা',
+              //   onChanged: (value) {
+              //     setState(() {
+              //       _selectedInterval = value.round();
+              //     });
+              //   },
+              // ),
+              // Center(
+              //   child: Text(
+              //     'প্রতি $_selectedInterval ঘণ্টা পর পর অ্যাপে চেক-ইন করতে হবে।',
+              //     style: const TextStyle(
+              //       fontSize: 12,
+              //       color: AppColors.textSecondary,
+              //     ),
+              //   ),
+              // ),
               const SizedBox(height: 40),
 
               CustomButton(
@@ -197,13 +220,48 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
+  bool _isSaving = false;
+
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement actual save logic via authProvider or userRepository
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('আপনার প্রোফাইল সফলভাবে আপডেট করা হয়েছে।')),
-      );
-      Navigator.pop(context);
+      setState(() => _isSaving = true);
+      try {
+        String? base64Image;
+        if (_selectedImage != null) {
+          final bytes = await _selectedImage!.readAsBytes();
+          base64Image = 'data:image/jpeg;base64,' + base64Encode(bytes);
+        }
+
+        // Update profile on backend
+        await ref.read(authProvider.notifier).updateProfile(
+          name: _nameController.text.trim(),
+          phone: null, // phone is read-only on this screen
+          address: _addressController.text.trim(),
+          bloodGroup: _selectedBloodGroup,
+          profilePicture: base64Image,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('আপনার প্রোফাইল সফলভাবে আপডেট করা হয়েছে।'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('প্রোফাইল আপডেট ব্যর্থ: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isSaving = false);
+      }
     }
   }
 }

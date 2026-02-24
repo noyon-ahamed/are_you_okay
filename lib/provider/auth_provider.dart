@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/user_model.dart';
 import '../repository/auth_repository.dart';
+import '../services/api/auth_api_service.dart';
 import '../services/socket_service.dart';
+import '../services/hive_service.dart';
 
 // Auth State
 abstract class AuthState {
@@ -94,6 +97,63 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = const AuthUnauthenticated();
     } catch (e) {
       state = AuthError(e.toString());
+    }
+  }
+
+  /// Update profile on backend and locally
+  Future<void> updateProfile({
+    String? name,
+    String? phone,
+    String? profilePicture,
+    String? address,
+    String? bloodGroup,
+  }) async {
+    try {
+      final api = AuthApiService();
+      final result = await api.updateProfile(
+        name: name,
+        phone: phone,
+        profilePicture: profilePicture,
+        address: address,
+        bloodGroup: bloodGroup,
+      );
+
+      // Update local user model
+      final currentState = state;
+      if (currentState is AuthAuthenticated) {
+        final updatedUser = currentState.user.copyWith(
+          name: name ?? currentState.user.name,
+          phone: phone ?? currentState.user.phone,
+          profilePicture: profilePicture ?? currentState.user.profilePicture,
+          address: address ?? currentState.user.address,
+          bloodGroup: bloodGroup ?? currentState.user.bloodGroup,
+          updatedAt: DateTime.now(),
+        );
+        // Save to Hive
+        final hive = HiveService();
+        await hive.saveUser(updatedUser);
+        state = AuthAuthenticated(updatedUser);
+      }
+    } catch (e) {
+      debugPrint('Failed to update profile: $e');
+      rethrow;
+    }
+  }
+
+  /// Refresh profile from backend
+  Future<void> refreshProfile() async {
+    try {
+      final api = AuthApiService();
+      final profileData = await api.getProfile();
+      final userData = profileData['user'] as Map<String, dynamic>?;
+      if (userData != null) {
+        final user = UserModel.fromJson(userData);
+        final hive = HiveService();
+        await hive.saveUser(user);
+        state = AuthAuthenticated(user);
+      }
+    } catch (e) {
+      debugPrint('Failed to refresh profile: $e');
     }
   }
 }

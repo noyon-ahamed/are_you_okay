@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,11 +20,17 @@ class ProfileScreen extends ConsumerWidget {
     String name = 'ব্যবহারকারী';
     String email = '';
     String phone = '';
+    String address = '';
+    String bloodGroup = '';
+    String profilePicture = '';
 
     if (authState is AuthAuthenticated) {
       name = authState.user.name;
       email = authState.user.email;
       phone = authState.user.phone ?? '';
+      address = authState.user.address ?? '';
+      bloodGroup = authState.user.bloodGroup ?? '';
+      profilePicture = authState.user.profilePicture ?? '';
     }
 
     return Scaffold(
@@ -62,18 +69,28 @@ class ProfileScreen extends ConsumerWidget {
                                 color: Colors.white.withOpacity(0.4),
                                 width: 3,
                               ),
+                              image: profilePicture.isNotEmpty
+                                  ? DecorationImage(
+                                      image: profilePicture.startsWith('data:image')
+                                          ? MemoryImage(base64Decode(profilePicture.split(',').last)) as ImageProvider
+                                          : NetworkImage(profilePicture),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                            child: Center(
-                              child: Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: const TextStyle(
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
+                            child: profilePicture.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        fontSize: 42,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -94,6 +111,46 @@ class ProfileScreen extends ConsumerWidget {
                             color: Colors.white.withOpacity(0.8),
                           ),
                         ),
+                        if (address.isNotEmpty || bloodGroup.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (bloodGroup.isNotEmpty) ...[
+                                  const Icon(Icons.bloodtype, color: Colors.redAccent, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    bloodGroup,
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  if (address.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Container(width: 1, height: 12, color: Colors.white30),
+                                    const SizedBox(width: 8),
+                                  ]
+                                ],
+                                if (address.isNotEmpty) ...[
+                                  const Icon(Icons.location_on, color: Colors.white70, size: 16),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      address,
+                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'HindSiliguri'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -135,17 +192,31 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildStatsRow(BuildContext context, bool isDark, WidgetRef ref) {
-    final checkins = ref.watch(checkinHistoryProvider);
     final status = ref.watch(checkinStatusProvider);
+    final historyAsync = ref.watch(checkinHistoryFromBackendProvider);
 
-    final activeDays = checkins.map((c) => "${c.timestamp.year}-${c.timestamp.month}-${c.timestamp.day}").toSet().length;
+    // Get total check-ins and active days from backend data
+    int totalCheckIns = 0;
+    int activeDays = 0;
+    historyAsync.whenData((checkins) {
+      totalCheckIns = checkins.length;
+      final uniqueDays = <String>{};
+      for (final c in checkins) {
+        final ts = c['checkInTime'] ?? c['timestamp'];
+        if (ts != null) {
+          final dt = DateTime.tryParse(ts.toString());
+          if (dt != null) uniqueDays.add("${dt.year}-${dt.month}-${dt.day}");
+        }
+      }
+      activeDays = uniqueDays.length;
+    });
 
     return Row(
       children: [
         _buildStatCard(
           context: context,
           icon: Icons.check_circle,
-          value: checkins.length.toString(),
+          value: totalCheckIns.toString(),
           label: 'মোট চেক-ইন',
           color: AppColors.success,
           isDark: isDark,

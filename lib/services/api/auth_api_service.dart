@@ -142,6 +142,8 @@ class AuthApiService {
     String? name,
     String? phone,
     String? profilePicture,
+    String? address,
+    String? bloodGroup,
   }) async {
     try {
       final response = await _dio.put(
@@ -150,6 +152,8 @@ class AuthApiService {
           if (name != null) 'name': name,
           if (phone != null) 'phone': phone,
           if (profilePicture != null) 'profilePicture': profilePicture,
+          if (address != null) 'address': address,
+          if (bloodGroup != null) 'bloodGroup': bloodGroup,
         },
       );
 

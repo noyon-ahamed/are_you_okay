@@ -214,7 +214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         Row(
           children: [
             _buildHeaderIcon(Icons.notifications_outlined, () {
-              // TODO: Notification center
+              context.push(Routes.notifications);
             }),
             const SizedBox(width: 8),
             GestureDetector(
