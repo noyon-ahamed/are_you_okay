@@ -20,9 +20,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
+    // Watch for theme changes but not rebuild entire widget from top-down watcher
     final settings = ref.watch(settingsProvider);
+    final isDark = settings.themeIsDark;
     final statusData = ref.watch(checkinStatusProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(

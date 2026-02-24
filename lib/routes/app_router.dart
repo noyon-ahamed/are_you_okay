@@ -22,6 +22,7 @@ import '../../presentation/screens/history/checkin_history_screen.dart';
 import '../../presentation/screens/mood/mood_history_screen.dart';
 
 import '../../provider/auth_provider.dart';
+import '../../provider/splash_provider.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -48,11 +49,12 @@ class Routes {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
+  final isSplashComplete = ref.watch(splashDisplayCompleteProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: Routes.splash,
-    refreshListenable: ValueNotifier(authState),
+    refreshListenable: ValueNotifier(isSplashComplete ? authState : null),
     routes: [
       // ==================== Auth Flow ====================
       GoRoute(
@@ -195,18 +197,20 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     // ==================== Auth Guard ====================
     redirect: (context, state) {
+       // Wait for 2 second splash animation
+      if (!isSplashComplete) {
+        return Routes.splash;
+      }
+      
       final isAuthenticated = authState is AuthAuthenticated;
       final isLoading = authState is AuthLoading || authState is AuthInitial;
       final currentPath = state.uri.path;
 
-      // Allow splash to load
-      if (currentPath == Routes.splash) return null;
-
       // Allow onboarding regardless of auth state
       if (currentPath == Routes.onboarding) return null;
 
-      // While loading auth state, stay on current page
-      if (isLoading) return null;
+      // While loading auth state, stay on splash instead of hanging
+      if (isLoading) return Routes.splash;
 
       // Auth pages list
       final authPages = [
@@ -217,13 +221,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthPage = authPages.contains(currentPath);
 
       // If not authenticated and trying to access protected page
-      if (!isAuthenticated && !isAuthPage) {
+      if (!isAuthenticated && !isAuthPage && currentPath != Routes.splash) {
         return Routes.login;
       }
 
-      // If authenticated and trying to access auth page
-      if (isAuthenticated && isAuthPage) {
+      // If authenticated and trying to access auth page or splash
+      if (isAuthenticated && (isAuthPage || currentPath == Routes.splash)) {
         return Routes.home;
+      }
+      
+      // If unauthenticated but splash is complete, go to login
+      if (!isAuthenticated && currentPath == Routes.splash) {
+        return Routes.login;
       }
 
       return null;

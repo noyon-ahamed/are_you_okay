@@ -8,6 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 import 'package:are_you_okay/routes/app_router.dart';
 import '../../../provider/auth_provider.dart';
+import '../../../provider/splash_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -31,15 +32,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.initState();
     _initializeAnimations();
     
-    // Ensure splash screen stays for at least 2 seconds
+    // Animation completes after 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() {
           _isAnimationDone = true;
         });
-        if (_targetRoute != null) {
-          context.go(_targetRoute!);
-        }
+        
+        // We only trigger a provider update to forcefully trigger a GoRouter refresh
+        // if auth completed while we were animating. GoRouter's redirect logic
+        // will handle the actual navigation once we are no longer explicitly waiting.
+        ref.read(splashDisplayCompleteProvider.notifier).state = true;
       }
     });
   }
@@ -93,41 +96,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Listen to Auth State changes
-    void handleAuth(AuthState state) {
-      String? route;
-      if (state is AuthAuthenticated) {
-        route = Routes.home;
-      } else if (state is AuthUnauthenticated || state is AuthError) {
-        route = Routes.login;
-      }
-
-      if (route != null) {
-        if (_isAnimationDone) {
-          final currentRoute = GoRouterState.of(context).uri.toString();
-          if (currentRoute != Routes.fakeCallActive) {
-            context.go(route);
-          }
-        } else {
-          _targetRoute = route;
-        }
-      }
-    }
-
-    // Check current state immediately
-    final authState = ref.watch(authProvider);
-    // Use addPostFrameCallback to avoid navigation during build
-    if (authState is! AuthLoading && authState is! AuthInitial) {
-       WidgetsBinding.instance.addPostFrameCallback((_) {
-         handleAuth(authState);
-       });
-    }
-
-    // Listen to future changes
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      handleAuth(next);
-    });
-
     final size = MediaQuery.of(context).size;
 
     return Scaffold(

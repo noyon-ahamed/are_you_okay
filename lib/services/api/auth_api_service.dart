@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 import '../auth/token_storage_service.dart';
+import '../../routes/app_router.dart';
+import 'package:go_router/go_router.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -28,7 +30,12 @@ class AuthApiService {
           // Handle 401 Unauthorized - token expired
           if (error.response?.statusCode == 401) {
             await SharedPrefsService().logout();
-            // Optionally navigate to login screen here
+            await TokenStorageService.clearAll();
+            
+            // Navigate to login screen
+            if (rootNavigatorKey.currentContext != null) {
+              rootNavigatorKey.currentContext!.go(Routes.login);
+            }
           }
           return handler.next(error);
         },

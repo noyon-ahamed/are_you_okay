@@ -47,19 +47,16 @@ void main() async {
 
   // Initialize Hive
   await Hive.initFlutter();
-  
-  // Create ProviderContainer
-  final container = ProviderContainer();
 
   // Initialize Date formatting for Bengali
   await initializeDateFormatting('bn', null);
 
-  // Initialize Services via their providers
-  await container.read(hiveServiceProvider).init();
-  await container.read(sharedPrefsServiceProvider).init();
-  
-  // Initialize Offline Sync Service (depends on Ref)
-  await container.read(offlineSyncServiceProvider).init();
+  // Pre-initialize services BEFORE building widget tree
+  final hiveService = HiveService();
+  await hiveService.init();
+
+  final sharedPrefsService = SharedPrefsService();
+  await sharedPrefsService.init();
 
   // Initialize Background Service
   await BackgroundService.initialize();
@@ -69,9 +66,12 @@ void main() async {
   await MobileAds.instance.initialize();
 
   runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: LifecycleManager(
+    ProviderScope(
+      overrides: [
+        hiveServiceProvider.overrideWithValue(hiveService),
+        sharedPrefsServiceProvider.overrideWithValue(sharedPrefsService),
+      ],
+      child: const LifecycleManager(
         child: AreYouOkayApp(),
       ),
     ),
@@ -187,21 +187,27 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
       themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
-        return Stack(
-          children: [
-            if (child != null) child,
-            ValueListenableBuilder<Map<String, dynamic>?>(
-              valueListenable: globalActiveCallNotifier,
-              builder: (context, activeCall, _) {
-                if (activeCall == null) return const SizedBox.shrink();
-                return FakeCallActiveScreen(
-                  callerName: activeCall['callerName'] ?? 'Unknown',
-                  callerNumber: activeCall['callerNumber'] ?? '',
-                  callId: activeCall['callId'] ?? '',
-                );
-              },
-            ),
-          ],
+        return Scaffold(
+          body: Stack(
+            children: [
+              if (child != null) child,
+              ValueListenableBuilder<Map<String, dynamic>?>(
+                valueListenable: globalActiveCallNotifier,
+                builder: (context, activeCall, _) {
+                  if (activeCall == null) return const SizedBox.shrink();
+                  // Wrap in Scaffold/Material to ensure no GlobalKey collisions 
+                  // with the underlying GoRouter scaffold contexts.
+                  return Positioned.fill(
+                    child: FakeCallActiveScreen(
+                      callerName: activeCall['callerName'] ?? 'Unknown',
+                      callerNumber: activeCall['callerNumber'] ?? '',
+                      callId: activeCall['callId'] ?? '',
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
