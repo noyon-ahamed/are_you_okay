@@ -49,11 +49,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user != null) {
         state = AuthAuthenticated(user);
         _socketService.init(); // Connect socket
+        _syncProfileQuietly();
       } else {
         state = const AuthUnauthenticated();
       }
     } catch (e) {
       state = const AuthUnauthenticated();
+    }
+  }
+
+  Future<void> _syncProfileQuietly() async {
+    try {
+      final authApi = AuthApiService();
+      final response = await authApi.getProfile();
+      final userMap = response['user'] as Map<String, dynamic>?;
+      if (userMap != null) {
+        final updatedUser = UserModel.fromJson(userMap);
+        final hive = HiveService();
+        await hive.saveUser(updatedUser);
+        if (mounted && state is AuthAuthenticated) {
+          state = AuthAuthenticated(updatedUser);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to background sync profile: $e');
     }
   }
 

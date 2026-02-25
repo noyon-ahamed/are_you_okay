@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -144,7 +145,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 16),
 
                   // ==================== Header ====================
-                  _buildHeader(userName, isDark),
+                  _buildHeader(
+                      userName,
+                      authState is AuthAuthenticated ? authState.user.profilePicture ?? '' : '',
+                      isDark),
                   const SizedBox(height: 28),
 
                   // ==================== Check-in Button ====================
@@ -184,7 +188,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Header ====================
-  Widget _buildHeader(String name, bool isDark) {
+  Widget _buildHeader(String name, String profilePicture, bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -226,19 +230,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryLight],
-                    ),
+                    color: Colors.white,
+                    image: profilePicture.isNotEmpty
+                        ? DecorationImage(
+                            image: profilePicture.startsWith('data:image')
+                                ? MemoryImage(base64Decode(profilePicture.split(',').last)) as ImageProvider
+                                : NetworkImage(profilePicture),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                     boxShadow: AppDecorations.coloredShadow(
                       AppColors.primary,
                       opacity: 0.2,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+                  child: profilePicture.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: AppColors.primary,
+                          size: 22,
+                        )
+                      : null,
                 ),
               ),
             ),

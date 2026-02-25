@@ -7,18 +7,78 @@ import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 
-// Create a simple FutureProvider for notifications
-final notificationsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final api = NotificationApiService();
-  final data = await api.getNotifications();
-  return data['notifications'] as List<dynamic>;
+// Create a Notifier for notifications for silent refresh
+class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
+  NotificationsNotifier() : super(const AsyncLoading()) {
+    fetch();
+  }
+
+  Future<void> fetch({bool silent = true}) async {
+    if (!silent || !state.hasValue) {
+      state = const AsyncLoading();
+    }
+    try {
+      final api = NotificationApiService();
+      final data = await api.getNotifications();
+      state = AsyncData(data['notifications'] as List<dynamic>);
+    } catch (e, st) {
+      if (!silent || !state.hasValue) {
+        state = AsyncError(e, st);
+      }
+    }
+  }
+
+  Future<void> markAllAsRead() async {
+    try {
+      await NotificationApiService().markAllAsRead();
+      fetch(silent: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> markAsRead(String id) async {
+    try {
+      await NotificationApiService().markAsRead(id);
+      fetch(silent: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
+  
+  Future<void> deleteNotification(String id) async {
+    try {
+      await NotificationApiService().deleteNotification(id);
+      fetch(silent: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
+}
+
+final notificationsProvider = StateNotifierProvider<NotificationsNotifier, AsyncValue<List<dynamic>>>((ref) {
+  return NotificationsNotifier();
 });
 
-class NotificationScreen extends ConsumerWidget {
+class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends ConsumerState<NotificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Silently refresh on open
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationsProvider.notifier).fetch(silent: true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -31,8 +91,7 @@ class NotificationScreen extends ConsumerWidget {
             tooltip: 'সব পড়া হয়েছে',
             onPressed: () async {
               try {
-                await NotificationApiService().markAllAsRead();
-                ref.invalidate(notificationsProvider);
+                await ref.read(notificationsProvider.notifier).markAllAsRead();
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -126,8 +185,7 @@ class NotificationScreen extends ConsumerWidget {
                     onTap: () async {
                       if (!isRead) {
                         try {
-                          await NotificationApiService().markAsRead(notif['_id']);
-                          ref.invalidate(notificationsProvider);
+                          await ref.read(notificationsProvider.notifier).markAsRead(notif['_id']);
                         } catch (e) {
                           // ignore
                         }
@@ -144,8 +202,7 @@ class NotificationScreen extends ConsumerWidget {
                       onSelected: (value) async {
                         if (value == 'delete') {
                           try {
-                            await NotificationApiService().deleteNotification(notif['_id']);
-                            ref.invalidate(notificationsProvider);
+                            await ref.read(notificationsProvider.notifier).deleteNotification(notif['_id']);
                           } catch (e) {
                             // ignore
                           }
@@ -166,7 +223,7 @@ class NotificationScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text('নোটিফিকেশন লোড করতে ত্রুটি হয়েছে', style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
                 TextButton(
-                  onPressed: () => ref.invalidate(notificationsProvider),
+                  onPressed: () => ref.read(notificationsProvider.notifier).fetch(silent: false),
                   child: const Text('আবার চেষ্টা করুন', style: TextStyle(fontFamily: 'HindSiliguri')),
                 )
               ],
