@@ -15,11 +15,11 @@ import '../../../provider/checkin_provider.dart';
 
 final moodApiProvider = Provider((ref) => MoodApiService());
 
-final moodStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+final moodStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return await ref.watch(moodApiProvider).getStats(days: 30);
 });
 
-final moodHistoryProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
+final moodHistoryProvider = FutureProvider<List<dynamic>>((ref) async {
   final result = await ref.watch(moodApiProvider).getHistory(limit: 50);
   debugPrint('Mood History API Response: $result');
   
@@ -41,6 +41,15 @@ class MoodHistoryScreen extends ConsumerStatefulWidget {
 
 class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   int _filterDays = 0; // 0 means 'All Time', 7, 14, etc.
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(moodStatsProvider);
+      ref.invalidate(moodHistoryProvider);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +104,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
     final statsAsyncValue = ref.watch(moodStatsProvider);
 
     return statsAsyncValue.when(
+      skipLoadingOnRefresh: true,
       data: (statsData) {
         final stats = statsData['stats'];
         if (stats == null || stats['totalEntries'] == 0) {
@@ -226,6 +236,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
     final historyAsyncValue = ref.watch(moodHistoryProvider);
 
     return historyAsyncValue.when(
+      skipLoadingOnRefresh: true,
       data: (allHistory) {
         List<dynamic> history = allHistory;
         if (_filterDays > 0) {

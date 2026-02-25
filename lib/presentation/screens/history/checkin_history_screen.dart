@@ -15,7 +15,15 @@ class CheckinHistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
-  int _filterDays = 0; // 0 means 'All Time', 7 means '7 Days', 14 means '14 Days'
+  int _filterDays = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(checkinHistoryFromBackendProvider);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +51,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
         ],
       ),
       body: historyAsync.when(
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Column(

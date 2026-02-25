@@ -10,11 +10,25 @@ import '../../../routes/app_router.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 
-class EmergencyContactsScreen extends ConsumerWidget {
+class EmergencyContactsScreen extends ConsumerStatefulWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmergencyContactsScreen> createState() => _EmergencyContactsScreenState();
+}
+
+class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Silently refresh contacts in background to check for multi-device sync
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(contactProvider.notifier).loadContacts(silent: true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final contactState = ref.watch(contactProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -34,11 +48,11 @@ class EmergencyContactsScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(context, ref, contactState, isDark),
+      body: _buildBody(context, contactState, isDark),
     );
   }
 
-  Widget _buildBody(BuildContext context, WidgetRef ref, ContactState state, bool isDark) {
+  Widget _buildBody(BuildContext context, ContactState state, bool isDark) {
     if (state is ContactLoading) {
       return const ShimmerList(itemCount: 4);
     }
@@ -90,14 +104,14 @@ class EmergencyContactsScreen extends ConsumerWidget {
       },
       itemBuilder: (context, index) {
         final contact = contacts[index];
-        return _buildContactCard(context, ref, contact, index, isDark);
+        return _buildContactCard(context, contact, index, isDark);
       },
     );
   }
 
 
 
-  Widget _buildContactCard(BuildContext context, WidgetRef ref,
+  Widget _buildContactCard(BuildContext context,
       EmergencyContactModel contact, int index, bool isDark) {
     final colors = [
       const Color(0xFF6C63FF),

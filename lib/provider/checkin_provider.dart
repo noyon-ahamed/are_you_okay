@@ -229,13 +229,13 @@ final checkinHistoryProvider = Provider<List<CheckInModel>>((ref) {
 });
 
 // Provider for check-in history from BACKEND API
-final checkinHistoryFromBackendProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+final checkinHistoryFromBackendProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repository = ref.watch(checkinRepositoryProvider);
   return await repository.fetchHistory(limit: 100, skip: 0);
 });
 
 // Provider for user stats from backend
-final userStatsFromBackendProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+final userStatsFromBackendProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   try {
     final authApi = AuthApiService();
     final profileData = await authApi.getProfile();

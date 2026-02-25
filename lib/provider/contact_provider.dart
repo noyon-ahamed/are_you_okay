@@ -33,19 +33,23 @@ class ContactNotifier extends StateNotifier<ContactState> {
     loadContacts();
   }
 
-  Future<void> loadContacts() async {
+  Future<void> loadContacts({bool silent = false}) async {
     try {
-      state = const ContactLoading();
+      if (!silent || state is! ContactLoaded) {
+        state = const ContactLoading();
+      }
       // Fetch from backend, which also caches locally
       final contacts = await _repository.loadContactsFromBackend();
       state = ContactLoaded(contacts);
     } catch (e) {
       // Fallback to local Hive data
-      final localContacts = _repository.getAllContacts();
-      if (localContacts.isNotEmpty) {
-        state = ContactLoaded(localContacts);
-      } else {
-        state = ContactError(e.toString());
+      if (!silent || state is! ContactLoaded) {
+        final localContacts = _repository.getAllContacts();
+        if (localContacts.isNotEmpty) {
+          state = ContactLoaded(localContacts);
+        } else {
+          state = ContactError(e.toString());
+        }
       }
     }
   }

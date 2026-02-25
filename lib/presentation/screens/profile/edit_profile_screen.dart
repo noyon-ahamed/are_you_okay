@@ -211,6 +211,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               CustomButton(
                 text: 'তথ্য সংরক্ষণ করুন',
+                isLoading: _isSaving,
                 onPressed: _saveProfile,
               ),
             ],
@@ -260,7 +261,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           );
         }
       } finally {
-        if (mounted) setState(() => _isSaving = false);
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
       }
     }
   }
