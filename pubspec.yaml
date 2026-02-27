@@ -85,6 +85,12 @@ dependencies:
   animations: ^2.0.11
   flutter_animate: ^4.3.0
   
+  # AI
+  google_generative_ai: ^0.4.6
+  
+  # Timezone
+  flutter_timezone: ^4.1.1
+
   # Ads
   google_mobile_ads: ^4.0.0
   audioplayers: ^6.5.1

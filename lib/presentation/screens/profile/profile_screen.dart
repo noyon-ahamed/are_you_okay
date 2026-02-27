@@ -175,7 +175,7 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: 24),
 
                     // Info Card
-                    _buildInfoCard(context, isDark, name, email, phone),
+                    _buildInfoCard(context, isDark, name, email, phone, address, bloodGroup),
                     const SizedBox(height: 16),
 
                     // Quick Settings
@@ -294,6 +294,8 @@ class ProfileScreen extends ConsumerWidget {
     String name,
     String email,
     String phone,
+    String address,
+    String bloodGroup,
   ) {
     return Container(
       decoration: AppDecorations.cardDecoration(context: context),
@@ -319,6 +321,24 @@ class ProfileScreen extends ConsumerWidget {
               Icons.phone_outlined,
               'ফোন',
               phone,
+            ),
+          ],
+          if (address.isNotEmpty) ...[
+            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            _buildInfoRow(
+              context,
+              Icons.location_on_outlined,
+              'ঠিকানা',
+              address,
+            ),
+          ],
+          if (bloodGroup.isNotEmpty) ...[
+            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            _buildInfoRow(
+              context,
+              Icons.bloodtype_outlined,
+              'রক্তের গ্রুপ',
+              bloodGroup,
             ),
           ],
         ],

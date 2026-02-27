@@ -49,14 +49,30 @@ class Routes {
   static const String notifications = '/notifications';
 }
 
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterNotifier(this._ref) {
+    _ref.listen<AuthState>(
+      authProvider,
+      (_, __) => notifyListeners(),
+    );
+    _ref.listen<bool>(
+      splashDisplayCompleteProvider,
+      (_, __) => notifyListeners(),
+    );
+  }
+}
+
+final routerNotifierProvider = Provider((ref) => RouterNotifier(ref));
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-  final isSplashComplete = ref.watch(splashDisplayCompleteProvider);
+  final notifier = ref.watch(routerNotifierProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: Routes.splash,
-    refreshListenable: ValueNotifier(isSplashComplete ? authState : null),
+    refreshListenable: notifier,
     routes: [
       // ==================== Auth Flow ====================
       GoRoute(
@@ -203,6 +219,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     // ==================== Auth Guard ====================
     redirect: (context, state) {
+      final isSplashComplete = ref.read(splashDisplayCompleteProvider);
+      final authState = ref.read(authProvider);
+
        // Wait for 2 second splash animation
       if (!isSplashComplete) {
         return Routes.splash;

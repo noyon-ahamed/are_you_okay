@@ -52,7 +52,6 @@ class BackgroundService {
     if (kIsWeb) return; // Prevent Web crashes
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: kIsWeb ? false : kDebugMode,
     );
     print("Workmanager initialized");
   }
@@ -64,7 +63,7 @@ class BackgroundService {
       backgroundTaskKey,
       frequency: const Duration(minutes: 15),
       constraints: Constraints(
-        networkType: NetworkType.connected, // changed from not_required to connected or similar
+        networkType: NetworkType.notRequired,
       ),
       existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );

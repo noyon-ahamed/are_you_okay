@@ -82,6 +82,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await _authRepository.login(email: email, password: password);
       state = AuthAuthenticated(user);
       _socketService.init(); // Connect socket
+      _syncProfileQuietly(); // Fetch extended profile fields from DB since login payload is basic
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -103,6 +104,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       state = AuthAuthenticated(user);
       _socketService.init(); // Connect socket
+      _syncProfileQuietly();
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -137,21 +139,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
         bloodGroup: bloodGroup,
       );
 
-      // Update local user model
-      final currentState = state;
-      if (currentState is AuthAuthenticated) {
-        final updatedUser = currentState.user.copyWith(
-          name: name ?? currentState.user.name,
-          phone: phone ?? currentState.user.phone,
-          profilePicture: profilePicture ?? currentState.user.profilePicture,
-          address: address ?? currentState.user.address,
-          bloodGroup: bloodGroup ?? currentState.user.bloodGroup,
-          updatedAt: DateTime.now(),
-        );
+      // Parse the returned user from the backend response
+      final userMap = result['user'] as Map<String, dynamic>?;
+      if (userMap != null) {
+        final updatedUser = UserModel.fromJson(userMap);
+        
         // Save to Hive
         final hive = HiveService();
         await hive.saveUser(updatedUser);
-        state = AuthAuthenticated(updatedUser);
+        
+        if (mounted && state is AuthAuthenticated) {
+          state = AuthAuthenticated(updatedUser);
+        }
+      } else {
+        // Fallback if backend doesn't return the full user object
+        final currentState = state;
+        if (currentState is AuthAuthenticated) {
+          final updatedUser = currentState.user.copyWith(
+            name: name ?? currentState.user.name,
+            phone: phone ?? currentState.user.phone,
+            profilePicture: profilePicture ?? currentState.user.profilePicture,
+            address: address ?? currentState.user.address,
+            bloodGroup: bloodGroup ?? currentState.user.bloodGroup,
+            updatedAt: DateTime.now(),
+          );
+          final hive = HiveService();
+          await hive.saveUser(updatedUser);
+          state = AuthAuthenticated(updatedUser);
+        }
       }
     } catch (e) {
       debugPrint('Failed to update profile: $e');

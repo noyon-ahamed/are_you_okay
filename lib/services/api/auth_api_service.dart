@@ -167,7 +167,7 @@ class AuthApiService {
     }
   }
 
-  /// Request password reset
+  /// Request password reset (sends OTP via email)
   Future<void> forgotPassword(String email) async {
     try {
       final response = await _dio.post(
@@ -177,6 +177,30 @@ class AuthApiService {
 
       if (response.data['success'] != true) {
         throw Exception(response.data['error'] ?? 'Failed to send reset email');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
+  /// Verify OTP code for password reset
+  Future<String> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$baseUrl/auth/verify-otp',
+        data: {
+          'email': email,
+          'otp': otp,
+        },
+      );
+
+      if (response.data['success'] == true) {
+        return response.data['data']['resetToken'] as String;
+      } else {
+        throw Exception(response.data['error'] ?? 'OTP verification failed');
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['error'] ?? 'Network error');

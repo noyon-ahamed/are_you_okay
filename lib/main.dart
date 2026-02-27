@@ -59,16 +59,18 @@ void main() async {
   final sharedPrefsService = SharedPrefsService();
   await sharedPrefsService.init();
 
-  // Initialize Background Service
-  await BackgroundService.initialize();
-  await BackgroundService.registerPeriodicTask();
+  // Initialize Background Service and Mobile Ads AFTER first frame
+  // to avoid white screen delay before splash
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await BackgroundService.initialize();
+    await BackgroundService.registerPeriodicTask();
 
-  // Initialize Mobile Ads (skip on iOS Simulator - crashes with SIGABRT)
-  final bool isSimulator = Platform.isIOS &&
-      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
-  if (!isSimulator) {
-    await MobileAds.instance.initialize();
-  }
+    final bool isSimulator = Platform.isIOS &&
+        Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
+    if (!isSimulator) {
+      MobileAds.instance.initialize(); // fire-and-forget
+    }
+  });
 
   runApp(
     ProviderScope(
