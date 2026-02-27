@@ -45,13 +45,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (authState is AuthAuthenticated) {
           context.go('/home');
         } else if (authState is AuthError) {
-          _showError(authState.message.replaceAll('Exception: ', ''));
+          _showError(authState.message);
         }
       }
     } catch (e) {
       if (mounted) {
-        String message = e.toString().replaceAll('Exception: ', '');
-        _showError(message);
+        _showError(e.toString());
       }
     } finally {
       if (mounted) {
@@ -60,20 +59,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _showError(String message) {
+  void _showError(String rawMessage) {
+    String message = rawMessage.replaceAll('Exception: ', '');
+    
+    // Map common error messages to user-friendly Bangla
     if (message.contains('SocketException') || 
         message.contains('Failed host lookup') ||
-        message.contains('No Internet')) {
+        message.contains('No Internet') ||
+        message.contains('connection')) {
       message = 'ইন্টারনেট সংযোগ নেই। অনুগ্রহ করে আপনার ইন্টারনেট চেক করুন।';
+    } else if (message.contains('Invalid email or password') ||
+               message.contains('invalid') && message.contains('password')) {
+      message = 'ভুল ইমেইল বা পাসওয়ার্ড। অনুগ্রহ করে আবার চেষ্টা করুন।';
+    } else if (message.contains('Network error')) {
+      message = 'সার্ভারে সংযোগ করতে ব্যর্থ। অনুগ্রহ করে পরে চেষ্টা করুন।';
+    } else if (message.contains('Login failed')) {
+      message = 'লগইন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
     }
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
+        ),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
         action: SnackBarAction(
-          label: 'OK',
+          label: 'ঠিক আছে',
           textColor: Colors.white,
           onPressed: () {},
         ),

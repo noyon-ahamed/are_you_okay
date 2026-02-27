@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -485,28 +486,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                // Clear specific Hive boxes (not user data)
-                final hive = ref.read(hiveServiceProvider);
-                // Clear check-in cache
+                // 1. Clear LOCAL data first (always works, no internet needed)
                 final checkInBox = await Hive.openBox('checkin_box');
                 await checkInBox.clear();
-                // Clear contact cache (will re-fetch from backend)
+                
                 final contactBox = await Hive.openBox('contact_box');
                 await contactBox.clear();
                 
-                // Also clear mood cache just in case
                 final moodBox = await Hive.openBox('mood_box');
                 await moodBox.clear();
 
-                // Invalidate providers to refetch/empty screen
+                final moodPendingBox = await Hive.openBox('mood_pending_box');
+                await moodPendingBox.clear();
+
+                // Clear background service SharedPreferences keys
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('last_checkin_time');
+                await prefs.remove('checkin_interval');
+
+                // Invalidate providers to refresh UI
                 ref.invalidate(checkinHistoryFromBackendProvider);
                 ref.invalidate(checkinStatusProvider);
                 ref.invalidate(contactProvider);
 
+                // 2. Try to clear backend data (optional — skip if offline)
+                try {
+                  final dio = Dio();
+                  final token = await SharedPrefsService.getToken();
+                  if (token != null) {
+                    await dio.delete(
+                      '${AppConstants.apiBaseUrl}/checkin',
+                      options: Options(headers: {'Authorization': 'Bearer $token'}),
+                    ).timeout(const Duration(seconds: 5));
+                    await dio.delete(
+                      '${AppConstants.apiBaseUrl}/mood',
+                      options: Options(headers: {'Authorization': 'Bearer $token'}),
+                    ).timeout(const Duration(seconds: 5));
+                  }
+                } catch (e) {
+                  // Backend clear failed (likely offline) — that's okay
+                  debugPrint('Backend cache clear skipped (offline): $e');
+                }
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে',
+                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
                           style: TextStyle(fontFamily: 'HindSiliguri')),
                       backgroundColor: Colors.green,
                     ),
@@ -654,12 +679,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (response.statusCode == 200) {
         final csvData = response.data.toString();
         
-        // Parse CSV string
-        final lines = csvData.split('\n');
-        final tableData = lines
-            .where((line) => line.trim().isNotEmpty)
-            .map((line) => line.split(','))
-            .toList();
+        // Parse CSV string — handle quoted fields properly
+        final lines = csvData.split('\n').where((line) => line.trim().isNotEmpty).toList();
+        
+        if (lines.isEmpty) {
+          throw Exception('No mood data found');
+        }
+
+        // Parse each CSV line respecting quoted fields
+        List<List<String>> parseCsv(List<String> csvLines) {
+          final result = <List<String>>[];
+          for (final line in csvLines) {
+            final fields = <String>[];
+            String current = '';
+            bool inQuotes = false;
+            for (int i = 0; i < line.length; i++) {
+              final c = line[i];
+              if (c == '"') {
+                inQuotes = !inQuotes;
+              } else if (c == ',' && !inQuotes) {
+                fields.add(current.trim());
+                current = '';
+              } else {
+                current += c;
+              }
+            }
+            fields.add(current.trim());
+            result.add(fields);
+          }
+          return result;
+        }
+
+        final tableData = parseCsv(lines);
+        if (tableData.isEmpty) {
+          throw Exception('No mood data to export');
+        }
+
+        // Separate headers from data
+        final headers = tableData.first;
+        final dataRows = tableData.length > 1 ? tableData.sublist(1) : <List<String>>[];
 
         // Generate PDF
         final pdf = pw.Document();
@@ -671,13 +729,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text('Mood History Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Total entries: ${dataRows.length}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
                   pw.SizedBox(height: 20),
-                  pw.TableHelper.fromTextArray(
-                    context: context,
-                    data: tableData,
-                    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                    cellAlignment: pw.Alignment.centerLeft,
-                  ),
+                  if (dataRows.isEmpty)
+                    pw.Text('No mood data available', style: pw.TextStyle(fontSize: 14))
+                  else
+                    pw.TableHelper.fromTextArray(
+                      context: context,
+                      headers: headers,
+                      data: dataRows,
+                      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+                      cellAlignment: pw.Alignment.centerLeft,
+                      cellPadding: const pw.EdgeInsets.all(6),
+                    ),
                 ],
               );
             },
@@ -701,6 +767,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       } else {
         throw Exception('Export failed');
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('কোনো মুড ডেটা পাওয়া যায়নি। প্রথমে কিছু মুড সেভ করুন।', style: TextStyle(fontFamily: 'HindSiliguri')),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('এক্সপোর্ট ব্যর্থ: ${e.message}', style: TextStyle(fontFamily: 'HindSiliguri')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -17,6 +19,7 @@ import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/api/mood_api_service.dart';
+import '../../../services/mood_local_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -26,7 +29,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _pulseController;
   late AnimationController _ringController;
   late Animation<double> _pulseAnimation;
@@ -35,7 +38,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   int _selectedMood = -1;
   int _bottomNavIndex = 0;
   bool _isSavingMood = false;
+  bool _isCheckingInLocally = false;
   final TextEditingController _moodNoteController = TextEditingController();
+
+  // Profile Image Cache to prevent flickering on 1s tick
+  ImageProvider? _cachedProfileImage;
+  String? _lastProfilePicString;
 
   // Countdown — will be synced from server
   Duration _timeRemaining = const Duration(hours: 24);
@@ -43,6 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Pulse animation for check-in button
     _pulseController = AnimationController(
@@ -78,6 +87,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _startCountdown();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh profile data automatically when app comes to foreground
+      ref.read(authProvider.notifier).refreshProfile();
+    }
+  }
+
   void _startCountdown() {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -95,6 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _ringController.dispose();
     _countdownTimer?.cancel();
@@ -233,9 +251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     color: Colors.white,
                     image: profilePicture.isNotEmpty
                         ? DecorationImage(
-                            image: profilePicture.startsWith('data:image')
-                                ? MemoryImage(base64Decode(profilePicture.split(',').last)) as ImageProvider
-                                : NetworkImage(profilePicture),
+                            image: _getProfileImageProvider(profilePicture)!,
                             fit: BoxFit.cover,
                           )
                         : null,
@@ -280,8 +296,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // ==================== Check-in Button ====================
   Widget _buildCheckinButton(CheckInState state, CheckInStatusData statusData, bool isDark) {
-    final isLoading = state is CheckInLoading;
-    final hasCheckedIn = statusData.hasCheckedInToday;
+    final isLoading = state is CheckInLoading || _isCheckingInLocally;
+    final hasCheckedIn = statusData.hasCheckedInToday || _isCheckingInLocally;
 
     final hours = _timeRemaining.inHours;
     final minutes = _timeRemaining.inMinutes.remainder(60);
@@ -908,6 +924,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return 'শুভ রাত্রি 🌙';
   }
 
+  ImageProvider? _getProfileImageProvider(String? profilePicture) {
+    if (profilePicture == null || profilePicture.isEmpty) return null;
+    if (profilePicture == _lastProfilePicString && _cachedProfileImage != null) {
+      return _cachedProfileImage;
+    }
+    
+    _lastProfilePicString = profilePicture;
+    if (profilePicture.startsWith('data:image')) {
+      _cachedProfileImage = MemoryImage(base64Decode(profilePicture.split(',').last));
+    } else {
+      _cachedProfileImage = NetworkImage(profilePicture);
+    }
+    return _cachedProfileImage;
+  }
+
   void _performCheckin() async {
     String? notes;
     if (_selectedMood != -1 && _selectedMood < AppConstants.moodLabels.length) {
@@ -915,7 +946,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       notes = 'Mood: $moodLabel';
     }
 
+    setState(() {
+      _isCheckingInLocally = true;
+    });
+
     try {
+      // Visual 2-second loading state
+      await Future.delayed(const Duration(seconds: 2));
+
       await ref.read(checkinProvider.notifier).performCheckIn(
         method: 'button',
         notes: notes,
@@ -926,8 +964,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(checkinStatusProvider.notifier).onCheckInComplete();
         ref.invalidate(checkinHistoryProvider); // Refresh local history UI
 
-        // Cancel remaining check-in reminder notifications
-        LocalNotificationService().cancelNotification(1);
+        // Cancel remaining check-in reminder notifications & schedule new ones
+        final notifService = LocalNotificationService();
+        await notifService.cancelCheckinReminders();
+        await notifService.cancelNotification(1);
+
+        // Schedule reminders for next check-in (24h from now)
+        final nextDeadline = DateTime.now().add(const Duration(hours: 24));
+        await notifService.scheduleCheckinReminders(nextDeadline);
+
+        // Save check-in time for background service WorkManager
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_checkin_time', DateTime.now().toIso8601String());
 
         setState(() {
           _selectedMood = -1;
@@ -955,6 +1003,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingInLocally = false;
+        });
+      }
     }
   }
 
@@ -962,7 +1016,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() => _selectedMood = index);
   }
 
-  /// Save mood to backend
+  /// Save mood — tries backend first, falls back to local storage for offline support
   void _saveMood() async {
     if (_selectedMood < 0) return;
     
@@ -971,31 +1025,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (_selectedMood >= moodKeys.length) return;
     
     setState(() => _isSavingMood = true);
+    
+    final moodKey = moodKeys[_selectedMood];
+    final noteText = _moodNoteController.text.trim();
+    final note = noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood];
+    
     try {
-      final noteText = _moodNoteController.text.trim();
-      await MoodApiService().saveMood(
-        mood: moodKeys[_selectedMood],
-        note: noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood],
-      );
+      // Check connectivity first
+      final connectivity = await Connectivity().checkConnectivity();
+      final isOnline = connectivity != ConnectivityResult.none;
+      
+      if (isOnline) {
+        // Try backend
+        await MoodApiService().saveMood(mood: moodKey, note: note);
+      } else {
+        // Save locally for later sync
+        await MoodLocalService().saveMoodLocally(mood: moodKey, note: note);
+      }
+      
       if (mounted) {
         _moodNoteController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'মেজাজ সেভ হয়েছে ✓',
+              isOnline ? 'মেজাজ সেভ হয়েছে ✓' : 'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
               style: TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.success,
             duration: const Duration(seconds: 2),
           ),
         );
-        setState(() => _selectedMood = -1); // Reset selection after saving
+        setState(() => _selectedMood = -1);
       }
     } on Exception catch (e) {
-      debugPrint('Failed to save mood: $e');
-      if (mounted) {
-        final msg = e.toString().toLowerCase();
-        if (msg.contains('403') || msg.contains('once per hour') || msg.contains('cooldown')) {
+      debugPrint('Failed to save mood online: $e');
+      
+      // If backend failed, save locally as fallback
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('403') || msg.contains('once per hour') || msg.contains('cooldown')) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -1006,16 +1074,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               duration: const Duration(seconds: 4),
             ),
           );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'মেজাজ সেভ ব্যর্থ হয়েছে',
-                style: TextStyle(fontFamily: 'HindSiliguri'),
+        }
+      } else {
+        // Network error — save locally
+        try {
+          await MoodLocalService().saveMoodLocally(mood: moodKey, note: note);
+          if (mounted) {
+            _moodNoteController.clear();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
+                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                ),
+                backgroundColor: AppColors.success,
               ),
-              backgroundColor: AppColors.error,
-            ),
-          );
+            );
+            setState(() => _selectedMood = -1);
+          }
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'মেজাজ সেভ ব্যর্থ হয়েছে',
+                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                ),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
         }
       }
     } finally {

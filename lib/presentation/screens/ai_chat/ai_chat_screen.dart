@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/ai_service.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
@@ -19,14 +17,17 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _isTyping = false;
+  late GeminiAIService _aiService;
 
   @override
   void initState() {
     super.initState();
+    _aiService = ref.read(aiServiceProvider);
     // Welcome message
     _messages.add(_ChatMessage(
       text: 'আস্সালামু আলাইকুম! আমি আপনার AI স্বাস্থ্য সহকারী। 🩺\n\n'
-          'আপনার শারীরিক বা মানসিক স্বাস্থ্য সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।',
+          'আপনার শারীরিক বা মানসিক স্বাস্থ্য সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।\n\n'
+          '⚠️ দ্রষ্টব্য: আমি কোনো ডাক্তার নই। গুরুতর সমস্যায় অবশ্যই ডাক্তারের পরামর্শ নিন।',
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -51,13 +52,13 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     });
   }
 
-  Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _sendMessage([String? text]) async {
+    final msgText = text ?? _messageController.text.trim();
+    if (msgText.isEmpty) return;
 
     setState(() {
       _messages.add(_ChatMessage(
-        text: text,
+        text: msgText,
         isUser: true,
         timestamp: DateTime.now(),
       ));
@@ -67,8 +68,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     _scrollToBottom();
 
     try {
-      final aiService = AIService(Dio());
-      final response = await aiService.sendMessage(text);
+      final response = await _aiService.sendMessage(msgText);
 
       setState(() {
         _isTyping = false;
@@ -82,7 +82,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
       setState(() {
         _isTyping = false;
         _messages.add(_ChatMessage(
-          text: 'দুঃখিত, একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+          text: 'দুঃখিত, একটি সমস্যা হয়েছে। ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন।',
           isUser: false,
           timestamp: DateTime.now(),
           isError: true,
@@ -115,7 +115,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AI সহকারী',
+                Text('AI স্বাস্থ্য সহকারী',
                     style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
                 if (_isTyping)
                   Text('টাইপ করছে...',
@@ -131,8 +131,10 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'চ্যাট মুছুন',
             onPressed: _messages.length > 1
                 ? () {
+                    _aiService.resetChat();
                     setState(() {
                       _messages.removeRange(1, _messages.length);
                     });
@@ -143,6 +145,29 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
       ),
       body: Column(
         children: [
+          // Medical disclaimer banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: AppColors.warning.withOpacity(0.1),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: AppColors.warning),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'এটি সাধারণ তথ্যের জন্য। গুরুতর সমস্যায় ডাক্তারের কাছে যান।',
+                    style: TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontSize: 11,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Suggestion chips
           if (_messages.length <= 1) _buildSuggestions(),
 
@@ -170,10 +195,14 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
 
   Widget _buildSuggestions() {
     final suggestions = [
-      'মাথাব্যথা হচ্ছে',
-      'ঘুম হচ্ছে না',
-      'মন খারাপ লাগছে',
-      'জ্বর হলে কী করব?',
+      '🤕 মাথাব্যথা হচ্ছে',
+      '😴 ঘুম হচ্ছে না',
+      '😔 মন খারাপ লাগছে',
+      '🤒 জ্বর হলে কী করব?',
+      '💊 ওষুধ খাওয়ার নিয়ম',
+      '🧘 স্ট্রেস কমানোর উপায়',
+      '🏃 ব্যায়ামের পরামর্শ',
+      '🍎 সুষম খাদ্যতালিকা',
     ];
 
     return Container(
@@ -185,8 +214,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           return ActionChip(
             label: Text(s, style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 13)),
             onPressed: () {
-              _messageController.text = s;
-              _sendMessage();
+              _sendMessage(s);
             },
             backgroundColor: AppColors.primary.withOpacity(0.08),
             side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
@@ -242,7 +270,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                   bottomRight: Radius.circular(message.isUser ? 4 : 18),
                 ),
               ),
-              child: Text(
+              child: SelectableText(
                 message.text,
                 style: TextStyle(
                   color: message.isUser
@@ -365,7 +393,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _isTyping ? null : _sendMessage,
+            onTap: _isTyping ? null : () => _sendMessage(),
             child: Container(
               width: 48,
               height: 48,

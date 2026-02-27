@@ -42,8 +42,35 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       // Try to get current location to filter earthquake data
       try {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
+        if (!serviceEnabled) {
+          debugPrint('Location services disabled');
+        } else {
           LocationPermission permission = await Geolocator.checkPermission();
+          
+          // Request permission if denied
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          
+          // If permanently denied, show dialog to open settings
+          if (permission == LocationPermission.deniedForever) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'লোকেশন পারমিশন প্রয়োজন। অনুগ্রহ করে সেটিংস থেকে অনুমতি দিন।',
+                    style: TextStyle(fontFamily: 'HindSiliguri'),
+                  ),
+                  action: SnackBarAction(
+                    label: 'সেটিংস',
+                    onPressed: () => Geolocator.openAppSettings(),
+                  ),
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          }
+          
           if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
             Position position = await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.low,
@@ -151,8 +178,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     if (dataList == null) return [];
     return dataList.map((e) {
       final coords = e['location']?['coordinates'] as List?;
-      final eqLng = coords != null && coords.isNotEmpty ? (coords[0] as num).toDouble() : 0.0;
-      final eqLat = coords != null && coords.length > 1 ? (coords[1] as num).toDouble() : 0.0;
+      final eqLng = (coords != null && coords.isNotEmpty) ? (coords[0] as num).toDouble() : 0.0;
+      final eqLat = (coords != null && coords.length > 1) ? (coords[1] as num).toDouble() : 0.0;
       final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
       final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
       final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
@@ -214,7 +241,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Text(
-                'আপনার কাছাকাছি (১০০০ কি.মি)',
+                'আপনার কাছাকাছি (৩০০০ কি.মি)',
                 style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
