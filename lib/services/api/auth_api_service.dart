@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 import '../auth/token_storage_service.dart';
@@ -12,11 +14,9 @@ class AuthApiService {
   final Dio _dio = Dio();
 
   AuthApiService() {
-    // Set timeouts
     _dio.options.connectTimeout = const Duration(seconds: 60);
     _dio.options.receiveTimeout = const Duration(seconds: 60);
 
-    // Add token interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -27,12 +27,9 @@ class AuthApiService {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          // Handle 401 Unauthorized - token expired
           if (error.response?.statusCode == 401) {
             await SharedPrefsService().logout();
             await TokenStorageService.clearAll();
-            
-            // Navigate to login screen
             if (rootNavigatorKey.currentContext != null) {
               rootNavigatorKey.currentContext!.go(Routes.login);
             }
@@ -41,6 +38,22 @@ class AuthApiService {
         },
       ),
     );
+  }
+
+  /// Send FCM token to backend
+  Future<void> sendFcmToken() async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) return;
+      debugPrint('FCM Token: $fcmToken');
+      await _dio.post(
+        '$baseUrl/auth/fcm-token',
+        data: {'fcmToken': fcmToken},
+      );
+      debugPrint('FCM token sent to backend');
+    } catch (e) {
+      debugPrint('FCM token send failed: $e');
+    }
   }
 
   /// Register new user
@@ -64,12 +77,14 @@ class AuthApiService {
       if (response.data['success'] == true) {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
-        
+
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
-        
+
+        await sendFcmToken();
+
         return response.data['data'];
       } else {
         throw Exception(response.data['error'] ?? 'Registration failed');
@@ -96,21 +111,23 @@ class AuthApiService {
       if (response.data['success'] == true) {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
-        
+
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
-        
+
+        await sendFcmToken();
+
         return response.data['data'];
       } else {
         throw Exception(response.data['error'] ?? 'Login failed');
       }
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError || 
+      if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout ||
           e.error.toString().contains('SocketException')) {
-         throw Exception('No Internet Connection');
+        throw Exception('No Internet Connection');
       }
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
@@ -126,7 +143,7 @@ class AuthApiService {
   Future<Map<String, dynamic>> getProfile() async {
     try {
       final response = await _dio.get('$baseUrl/auth/profile');
-      
+
       if (response.data['success'] == true) {
         return response.data['data'];
       } else {
@@ -167,7 +184,7 @@ class AuthApiService {
     }
   }
 
-  /// Request password reset (sends OTP via email)
+  /// Request password reset
   Future<void> forgotPassword(String email) async {
     try {
       final response = await _dio.post(
@@ -183,7 +200,7 @@ class AuthApiService {
     }
   }
 
-  /// Verify OTP code for password reset
+  /// Verify OTP
   Future<String> verifyOtp({
     required String email,
     required String otp,
@@ -207,7 +224,7 @@ class AuthApiService {
     }
   }
 
-  /// Reset password with token
+  /// Reset password
   Future<void> resetPassword({
     required String token,
     required String newPassword,
@@ -229,7 +246,7 @@ class AuthApiService {
     }
   }
 
-  /// Verify email with token
+  /// Verify email
   Future<void> verifyEmail(String token) async {
     try {
       final response = await _dio.get('$baseUrl/auth/verify-email/$token');

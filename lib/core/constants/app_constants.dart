@@ -6,6 +6,7 @@ class AppConstants {
   // API Configuration
   // For production (VPS): 'http://76.13.246.186:3000/api'
   static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'http://76.13.246.186:3000/api';
+  static String get socketUrl => 'http://76.13.246.186:3000';
 
   // App Information
   static const String appName = 'Bhalo Achen Ki?';

@@ -485,70 +485,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              try {
-                // 1. Clear LOCAL data first (always works, no internet needed)
-                final checkInBox = await Hive.openBox('checkin_box');
-                await checkInBox.clear();
-                
-                final contactBox = await Hive.openBox('contact_box');
-                await contactBox.clear();
-                
-                final moodBox = await Hive.openBox('mood_box');
-                await moodBox.clear();
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+             try {
+    final checkInBox = await Hive.openBox('checkin_box');
+    await checkInBox.clear();
+    
+    final contactBox = await Hive.openBox('contact_box');
+    await contactBox.clear();
+    
+    final moodBox = await Hive.openBox('mood_box');
+    await moodBox.clear();
 
-                final moodPendingBox = await Hive.openBox('mood_pending_box');
-                await moodPendingBox.clear();
+    final moodPendingBox = await Hive.openBox('mood_pending_box');
+    await moodPendingBox.clear();
 
-                // Clear background service SharedPreferences keys
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('last_checkin_time');
-                await prefs.remove('checkin_interval');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_checkin_time');
+    await prefs.remove('checkin_interval');
 
-                // Invalidate providers to refresh UI
-                ref.invalidate(checkinHistoryFromBackendProvider);
-                ref.invalidate(checkinStatusProvider);
-                ref.invalidate(contactProvider);
+    ref.invalidate(checkinHistoryFromBackendProvider);
+    ref.invalidate(checkinStatusProvider);
+    ref.invalidate(contactProvider);
 
-                // 2. Try to clear backend data (optional — skip if offline)
-                try {
-                  final dio = Dio();
-                  final token = await SharedPrefsService.getToken();
-                  if (token != null) {
-                    await dio.delete(
-                      '${AppConstants.apiBaseUrl}/checkin',
-                      options: Options(headers: {'Authorization': 'Bearer $token'}),
-                    ).timeout(const Duration(seconds: 5));
-                    await dio.delete(
-                      '${AppConstants.apiBaseUrl}/mood',
-                      options: Options(headers: {'Authorization': 'Bearer $token'}),
-                    ).timeout(const Duration(seconds: 5));
-                  }
-                } catch (e) {
-                  // Backend clear failed (likely offline) — that's okay
-                  debugPrint('Backend cache clear skipped (offline): $e');
-                }
+    try {
+      final dio = Dio();
+      final token = await SharedPrefsService.getToken();
+      if (token != null) {
+        await dio.delete(
+          '${AppConstants.apiBaseUrl}/checkin',
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        ).timeout(const Duration(seconds: 5));
+        await dio.delete(
+          '${AppConstants.apiBaseUrl}/mood',
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        ).timeout(const Duration(seconds: 5));
+      }
+    } catch (e) {
+      debugPrint('Backend cache clear skipped (offline): $e');
+    }
 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
-                          style: TextStyle(fontFamily: 'HindSiliguri')),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
-                          style: TextStyle(fontFamily: 'HindSiliguri')),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
+    if (mounted) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
+              style: TextStyle(fontFamily: 'HindSiliguri')),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
+              style: TextStyle(fontFamily: 'HindSiliguri')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+},
             child: Text('পরিষ্কার করুন',
                 style: TextStyle(
                     fontFamily: 'HindSiliguri', color: AppColors.error)),

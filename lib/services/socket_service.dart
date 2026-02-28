@@ -34,7 +34,8 @@ class SocketService {
 
     // Configure socket
     _socket = IO.io(
-      AppConstants.apiBaseUrl,
+      // AppConstants.apiBaseUrl,
+        AppConstants.socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
