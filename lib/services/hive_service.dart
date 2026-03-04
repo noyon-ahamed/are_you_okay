@@ -34,7 +34,7 @@ class HiveService {
   }
 
   // ==================== User Operations ====================
-  
+
   Future<void> saveUser(UserModel user) async {
     await _userBox.put('current_user', jsonEncode(user.toJson()));
   }
@@ -61,7 +61,7 @@ class HiveService {
   }
 
   // ==================== Check-in Operations ====================
-  
+
   Future<void> saveCheckIn(CheckInModel checkIn) async {
     await _checkInBox.put(checkIn.id, jsonEncode(checkIn.toJson()));
   }
@@ -114,7 +114,7 @@ class HiveService {
   }
 
   // ==================== Emergency Contact Operations ====================
-  
+
   Future<void> saveContact(EmergencyContactModel contact) async {
     await _contactBox.put(contact.id, jsonEncode(contact.toJson()));
   }
@@ -131,7 +131,8 @@ class HiveService {
         print('Error parsing contact at index $i: $e');
       }
     }
-    contacts.sort((a, b) => b.priority.compareTo(a.priority)); // Higher priority first (descending)? or ascending? Usually priority 1 is highest.
+    contacts.sort((a, b) => b.priority.compareTo(a
+        .priority)); // Higher priority first (descending)? or ascending? Usually priority 1 is highest.
     // Let's assume 1 is likely highest priority, so sorting ascending by priority value makes sense if 1 < 2.
     // However, if priority is a score, then descending.
     // Looking at the code I replaced: `contacts.sort((a, b) => a.priority.compareTo(b.priority));` (Ascending)
@@ -146,7 +147,7 @@ class HiveService {
       try {
         return EmergencyContactModel.fromJson(jsonDecode(jsonString));
       } catch (e) {
-         print('Error parsing contact $id: $e');
+        print('Error parsing contact $id: $e');
       }
     }
     return null;
@@ -165,25 +166,25 @@ class HiveService {
   }
 
   // ==================== Settings Operations ====================
-  
+
   Future<void> saveSettings(SettingsModel settings) async {
-     // Convert to Map first, because SettingsModel might not have toJson for all fields if I didn't check carefully, 
-     // but looking at previous file view, it didn't have toJson!
-     // Wait, I checked SettingsModel in step 41, it DOES NOT have toJson!
-     // I need to add toJson to SettingsModel or handle it here.
-     // It's cleaner to handle it here if I don't want to modify SettingsModel file unless necessary.
-     // But wait, `CheckInModel` and `UserModel` had `toJson`.
-     // Let me double check `SettingsModel` in step 41.
-     // It has `copyWith` but NO `toJson` or `fromJson`!
-     // So I must implement manual serialization here or add it to the model.
-     // Adding it to the model is better practice.
-     // But significantly, for now I can just do it here to avoid context switching too much if I can.
-     // Actually, I'll just manual serialized it here since I'm already editing this file.
-    
+    // Convert to Map first, because SettingsModel might not have toJson for all fields if I didn't check carefully,
+    // but looking at previous file view, it didn't have toJson!
+    // Wait, I checked SettingsModel in step 41, it DOES NOT have toJson!
+    // I need to add toJson to SettingsModel or handle it here.
+    // It's cleaner to handle it here if I don't want to modify SettingsModel file unless necessary.
+    // But wait, `CheckInModel` and `UserModel` had `toJson`.
+    // Let me double check `SettingsModel` in step 41.
+    // It has `copyWith` but NO `toJson` or `fromJson`!
+    // So I must implement manual serialization here or add it to the model.
+    // Adding it to the model is better practice.
+    // But significantly, for now I can just do it here to avoid context switching too much if I can.
+    // Actually, I'll just manual serialized it here since I'm already editing this file.
+
     final map = {
       'notificationsEnabled': settings.notificationsEnabled,
       'locationEnabled': settings.locationEnabled,
-      'checkinIntervalHours': settings.checkinIntervalHours,
+      'checkinIntervalDays': settings.checkinIntervalDays,
       'language': settings.language,
       'themeIsDark': settings.themeIsDark,
       'biometricEnabled': settings.biometricEnabled,
@@ -200,11 +201,13 @@ class HiveService {
         return SettingsModel(
           notificationsEnabled: map['notificationsEnabled'] ?? true,
           locationEnabled: map['locationEnabled'] ?? true,
-          checkinIntervalHours: map['checkinIntervalHours'] ?? 24,
+          checkinIntervalDays: map['checkinIntervalDays'] ?? 3,
           language: map['language'] ?? 'en',
           themeIsDark: map['themeIsDark'] ?? false,
           biometricEnabled: map['biometricEnabled'] ?? false,
-          updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+          updatedAt: map['updatedAt'] != null
+              ? DateTime.parse(map['updatedAt'])
+              : null,
         );
       } catch (e) {
         print('Error parsing settings: $e');
@@ -219,7 +222,7 @@ class HiveService {
   }
 
   // ==================== Clear All Data ====================
-  
+
   Future<void> clearAllData() async {
     await _userBox.clear();
     await _checkInBox.clear();

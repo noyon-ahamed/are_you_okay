@@ -10,24 +10,35 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/call_event.dart';
-import 'package:go_router/go_router.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'provider/settings_provider.dart';
 import 'services/hive_service.dart';
 import 'services/shared_prefs_service.dart';
-import 'services/offline_sync_service.dart';
 import 'services/background_service.dart';
+import 'services/notification_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
 import 'presentation/screens/fake_call/fake_call_active_screen.dart';
 
-final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier = ValueNotifier(null);
+final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier =
+    ValueNotifier(null);
+
 /// Track handled call IDs to avoid re-showing on app resume
 final Set<String> _handledCallIds = {};
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase First
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase initialization warning: $e');
+  }
 
   // System UI
   SystemChrome.setSystemUIOverlayStyle(
@@ -92,13 +103,24 @@ class AreYouOkayApp extends ConsumerStatefulWidget {
   ConsumerState<AreYouOkayApp> createState() => _AreYouOkayAppState();
 }
 
-class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindingObserver {
+class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _listenToCallKitEvents();
     _checkActiveCalls();
+    _setupFirebaseMessaging();
+  }
+
+  void _setupFirebaseMessaging() {
+    // Listen for foreground FCM messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint(
+          'Foreground message received: \${message.notification?.title}');
+      _handleFirebaseMessage(message);
+    });
   }
 
   @override
@@ -119,7 +141,7 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
     if (calls is List && calls.isNotEmpty) {
       final currentCall = calls.first;
       final callId = currentCall['id'] as String? ?? '';
-      
+
       // Skip if this call was already handled
       if (_handledCallIds.contains(callId)) {
         return;
@@ -187,7 +209,8 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'ভালো আছেন কি?',
+      //title: 'ভালো আছেন কি?',
+      title: 'Are You Okay',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -202,7 +225,7 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
                 valueListenable: globalActiveCallNotifier,
                 builder: (context, activeCall, _) {
                   if (activeCall == null) return const SizedBox.shrink();
-                  // Wrap in Scaffold/Material to ensure no GlobalKey collisions 
+                  // Wrap in Scaffold/Material to ensure no GlobalKey collisions
                   // with the underlying GoRouter scaffold contexts.
                   return Positioned.fill(
                     child: FakeCallActiveScreen(
@@ -217,6 +240,53 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp> with WidgetsBindi
           ),
         );
       },
+    );
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init background warning: $e');
+  }
+  debugPrint("Handling a background message: \${message.messageId}");
+  await _handleFirebaseMessage(message);
+}
+
+Future<void> _handleFirebaseMessage(RemoteMessage message) async {
+  final data = message.data;
+  final title = message.notification?.title ?? 'সতর্কতা';
+  final body = message.notification?.body ?? '';
+
+  // Parse distanceKm to decide if we play the siren
+  final distanceKmStr = data['distanceKm'];
+  bool isSeismicClose = false;
+  if (distanceKmStr != null) {
+    final distance = double.tryParse(distanceKmStr);
+    if (distance != null && distance < 100) {
+      isSeismicClose = true;
+    }
+  }
+
+  final notifService = LocalNotificationService();
+  await notifService.initialize(onNotificationTap: (_) {});
+
+  if (data['isClose'] == '1' || isSeismicClose) {
+    await notifService.showEmergencyAlert(
+      title: title,
+      body: body,
+      payload: 'earthquake_alert',
+      isSeismicClose: true,
+    );
+  } else {
+    // Normal emergency alert logic
+    await notifService.showEmergencyAlert(
+      title: title,
+      body: body,
+      payload: 'emergency_alert',
+      isSeismicClose: false,
     );
   }
 }

@@ -69,7 +69,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       duration: const Duration(seconds: 10),
     )..repeat();
 
-    _ringAnimation = Tween<double>(begin: 0, end: 2 * pi).animate(_ringController);
+    _ringAnimation =
+        Tween<double>(begin: 0, end: 2 * pi).animate(_ringController);
 
     // Initialize Shake Detection
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -162,10 +163,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 children: [
                   const SizedBox(height: 16),
 
+                  // ==================== Offline Banner ====================
+                  _buildOfflineBanner(),
+
                   // ==================== Header ====================
                   _buildHeader(
                       userName,
-                      authState is AuthAuthenticated ? authState.user.profilePicture ?? '' : '',
+                      authState is AuthAuthenticated
+                          ? authState.user.profilePicture ?? ''
+                          : '',
                       isDark),
                   const SizedBox(height: 28),
 
@@ -202,6 +208,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ),
       bottomNavigationBar: _buildBottomNav(isDark),
+    );
+  }
+
+  // ==================== Offline Banner ====================
+  Widget _buildOfflineBanner() {
+    return StreamBuilder<ConnectivityResult>(
+      stream: Connectivity().onConnectivityChanged,
+      builder: (context, snapshot) {
+        final isOffline =
+            snapshot.hasData && snapshot.data == ConnectivityResult.none;
+        if (!isOffline) return const SizedBox.shrink();
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF57C00),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'অফলাইন মোড — ক্যাশ থেকে ডেটা দেখানো হচ্ছে',
+                  style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -295,7 +339,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Check-in Button ====================
-  Widget _buildCheckinButton(CheckInState state, CheckInStatusData statusData, bool isDark) {
+  Widget _buildCheckinButton(
+      CheckInState state, CheckInStatusData statusData, bool isDark) {
     final isLoading = state is CheckInLoading || _isCheckingInLocally;
     final hasCheckedIn = statusData.hasCheckedInToday || _isCheckingInLocally;
 
@@ -313,9 +358,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
         },
         child: GestureDetector(
-          onTap: isLoading 
-              ? null 
-              : hasCheckedIn 
+          onTap: isLoading
+              ? null
+              : hasCheckedIn
                   ? () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -365,7 +410,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: hasCheckedIn
-                          ? [AppColors.success, AppColors.success.withOpacity(0.8)]
+                          ? [
+                              AppColors.success,
+                              AppColors.success.withOpacity(0.8)
+                            ]
                           : [_urgencyColor, _urgencyColor.withOpacity(0.8)],
                     ),
                   ),
@@ -557,7 +605,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
-
           if (_isSavingMood)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -577,7 +624,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 if (_selectedMood >= 0) ...[
                   ElevatedButton.icon(
                     onPressed: _saveMood,
-                    icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                    icon:
+                        const Icon(Icons.check, size: 18, color: Colors.white),
                     label: const Text(
                       'সেভ করুন',
                       style: TextStyle(
@@ -588,7 +636,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -608,7 +657,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -770,7 +820,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _buildStatItem(
                 icon: Icons.shield,
                 value: statusData.lastCheckIn != null
-                    ? DateFormat('dd MMM\nhh:mm a').format(statusData.lastCheckIn!.toLocal())
+                    ? DateFormat('dd MMM\nhh:mm a')
+                        .format(statusData.lastCheckIn!.toLocal())
                     : '---',
                 label: 'শেষ চেক-ইন',
                 color: AppColors.primary,
@@ -862,7 +913,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       onTap: () {
         if (index == 0) return; // Already on home
         setState(() => _bottomNavIndex = index);
-        
+
         String? route;
         switch (index) {
           case 1:
@@ -926,13 +977,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   ImageProvider? _getProfileImageProvider(String? profilePicture) {
     if (profilePicture == null || profilePicture.isEmpty) return null;
-    if (profilePicture == _lastProfilePicString && _cachedProfileImage != null) {
+    if (profilePicture == _lastProfilePicString &&
+        _cachedProfileImage != null) {
       return _cachedProfileImage;
     }
-    
+
     _lastProfilePicString = profilePicture;
     if (profilePicture.startsWith('data:image')) {
-      _cachedProfileImage = MemoryImage(base64Decode(profilePicture.split(',').last));
+      _cachedProfileImage =
+          MemoryImage(base64Decode(profilePicture.split(',').last));
     } else {
       _cachedProfileImage = NetworkImage(profilePicture);
     }
@@ -955,9 +1008,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       await Future.delayed(const Duration(seconds: 2));
 
       await ref.read(checkinProvider.notifier).performCheckIn(
-        method: 'button',
-        notes: notes,
-      );
+            method: 'button',
+            notes: notes,
+          );
 
       // Update status after check-in ONLY if successful
       if (mounted) {
@@ -975,7 +1028,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         // Save check-in time for background service WorkManager
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('last_checkin_time', DateTime.now().toIso8601String());
+        await prefs.setString(
+            'last_checkin_time', DateTime.now().toIso8601String());
 
         setState(() {
           _selectedMood = -1;
@@ -1019,22 +1073,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// Save mood — tries backend first, falls back to local storage for offline support
   void _saveMood() async {
     if (_selectedMood < 0) return;
-    
+
     // Map index to mood string for backend
     final moodKeys = ['happy', 'good', 'neutral', 'sad', 'anxious'];
     if (_selectedMood >= moodKeys.length) return;
-    
+
     setState(() => _isSavingMood = true);
-    
+
     final moodKey = moodKeys[_selectedMood];
     final noteText = _moodNoteController.text.trim();
-    final note = noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood];
-    
+    final note =
+        noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood];
+
     try {
       // Check connectivity first
       final connectivity = await Connectivity().checkConnectivity();
       final isOnline = connectivity != ConnectivityResult.none;
-      
+
       if (isOnline) {
         // Try backend
         await MoodApiService().saveMood(mood: moodKey, note: note);
@@ -1042,13 +1097,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         // Save locally for later sync
         await MoodLocalService().saveMoodLocally(mood: moodKey, note: note);
       }
-      
+
       if (mounted) {
         _moodNoteController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isOnline ? 'মেজাজ সেভ হয়েছে ✓' : 'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
+              isOnline
+                  ? 'মেজাজ সেভ হয়েছে ✓'
+                  : 'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
               style: TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.success,
@@ -1059,10 +1116,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     } on Exception catch (e) {
       debugPrint('Failed to save mood online: $e');
-      
+
       // If backend failed, save locally as fallback
       final msg = e.toString().toLowerCase();
-      if (msg.contains('403') || msg.contains('once per hour') || msg.contains('cooldown')) {
+      if (msg.contains('403') ||
+          msg.contains('once per hour') ||
+          msg.contains('cooldown')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -5,20 +5,21 @@ class AppConstants {
 
   // API Configuration
   // For production (VPS): 'http://76.13.246.186:3000/api'
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'http://76.13.246.186:3000/api';
+  static String get apiBaseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'http://76.13.246.186:3000/api';
   static String get socketUrl => 'http://76.13.246.186:3000';
 
   // App Information
-  static const String appName = 'Bhalo Achen Ki?';
+  static const String appName = 'Are You Okay';
   static const String appNameBangla = 'ভালো আছেন কি?';
   static const String appTagline = 'Apnar safety, amader dayitto';
   static const String appTaglineBangla = 'আপনার নিরাপত্তা, আমাদের দায়িত্ব';
   static const String appVersion = '1.0.0';
 
-  // Timing Constants (in hours)
-  static const int defaultCheckinInterval = 48; // 48 hours
-  static const int minimumCheckinInterval = 12; // 12 hours
-  static const int maximumCheckinInterval = 168; // 7 days
+  // Timing Constants
+  static const int defaultCheckinIntervalDays = 3; // 3 days
+  static const int minimumCheckinIntervalDays = 3; // 3 days
+  static const int maximumCheckinIntervalDays = 7; // 7 days
 
   // Notification Reminder Times (hours before deadline)
   static const List<int> reminderTimes = [6, 2]; // 6h and 2h before
@@ -45,13 +46,13 @@ class AppConstants {
   // Validation
   static const int phoneNumberLength = 11; // 01XXXXXXXXX
   static const String phoneNumberPrefix = '01';
-  
+
   // Storage Keys (Hive box names)
   static const String userBoxName = 'user_box';
   static const String checkinBoxName = 'checkin_box';
   static const String contactsBoxName = 'contacts_box';
   static const String settingsBoxName = 'settings_box';
-  
+
   // SharedPreferences Keys
   static const String keyIsFirstLaunch = 'is_first_launch';
   static const String keyLanguage = 'language';
@@ -59,48 +60,54 @@ class AppConstants {
   static const String keyLastCheckin = 'last_checkin';
   static const String keyCheckinInterval = 'checkin_interval';
   static const String keyNotificationsEnabled = 'notifications_enabled';
-  
+
   // Biometric & Security
   static const bool biometricEnabledByDefault = false;
-  
+
   // Shake Detection
   static const double shakeThreshold = 15.0; // m/s²
   static const int shakeCountToTrigger = 3;
   static const int shakeResetMs = 1000;
-  
+
   // Mood Options
   static const List<String> moodEmojis = ['😊', '🙂', '😐', '😔', '😰'];
-  static const List<String> moodLabels = ['দারুণ', 'ভালো', 'ঠিকঠাক', 'খারাপ', 'চিন্তিত'];
-  
+  static const List<String> moodLabels = [
+    'দারুণ',
+    'ভালো',
+    'ঠিকঠাক',
+    'খারাপ',
+    'চিন্তিত',
+  ];
+
   // Ad Configuration
   static const int bannerAdRefreshInterval = 60; // seconds
   static const int interstitialAdFrequency = 1; // per day
-  
+
   // Animation Durations
   static const Duration shortAnimation = Duration(milliseconds: 200);
   static const Duration mediumAnimation = Duration(milliseconds: 300);
   static const Duration longAnimation = Duration(milliseconds: 500);
-  
+
   // Pagination
   static const int defaultPageSize = 20;
   static const int maxPageSize = 50;
-  
+
   // Offline Sync
   static const Duration syncInterval = Duration(minutes: 15);
   static const int maxRetryAttempts = 3;
-  
+
   // UI Dimensions
   static const double defaultPadding = 16.0;
   static const double largePadding = 24.0;
   static const double smallPadding = 8.0;
-  
+
   static const double defaultRadius = 12.0;
   static const double largeRadius = 20.0;
   static const double smallRadius = 8.0;
-  
+
   static const double checkinButtonSize = 200.0;
   static const double sosButtonSize = 100.0;
-  
+
   // Responsive Breakpoints
   static const double mobileBreakpoint = 600;
   static const double tabletBreakpoint = 900;

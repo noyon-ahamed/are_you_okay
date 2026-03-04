@@ -1,7 +1,7 @@
 class SettingsModel {
   final bool notificationsEnabled;
   final bool locationEnabled;
-  final int checkinIntervalHours;
+  final int checkinIntervalDays;
   final String language;
   final bool themeIsDark;
   final bool biometricEnabled;
@@ -10,7 +10,7 @@ class SettingsModel {
   const SettingsModel({
     this.notificationsEnabled = true,
     this.locationEnabled = true,
-    this.checkinIntervalHours = 24,
+    this.checkinIntervalDays = 3, // default: 3 days
     this.language = 'en',
     this.themeIsDark = false,
     this.biometricEnabled = false,
@@ -20,7 +20,7 @@ class SettingsModel {
   SettingsModel copyWith({
     bool? notificationsEnabled,
     bool? locationEnabled,
-    int? checkinIntervalHours,
+    int? checkinIntervalDays,
     String? language,
     bool? themeIsDark,
     bool? biometricEnabled,
@@ -29,7 +29,7 @@ class SettingsModel {
     return SettingsModel(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       locationEnabled: locationEnabled ?? this.locationEnabled,
-      checkinIntervalHours: checkinIntervalHours ?? this.checkinIntervalHours,
+      checkinIntervalDays: checkinIntervalDays ?? this.checkinIntervalDays,
       language: language ?? this.language,
       themeIsDark: themeIsDark ?? this.themeIsDark,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,

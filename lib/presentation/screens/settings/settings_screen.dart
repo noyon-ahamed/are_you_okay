@@ -87,7 +87,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.timer_rounded,
               iconColor: AppColors.primary,
               title: 'চেক-ইন ইন্টারভাল',
-              subtitle: 'প্রতি ${settings.checkinIntervalHours} ঘণ্টা পর',
+              subtitle: _intervalLabel(settings.checkinIntervalDays),
               onTap: () => _showIntervalDialog(),
             ),
             _buildDivider(),
@@ -479,72 +479,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('বাতিল',
-                style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               final scaffoldMessenger = ScaffoldMessenger.of(context);
-             try {
-    final checkInBox = await Hive.openBox('checkin_box');
-    await checkInBox.clear();
-    
-    final contactBox = await Hive.openBox('contact_box');
-    await contactBox.clear();
-    
-    final moodBox = await Hive.openBox('mood_box');
-    await moodBox.clear();
+              try {
+                final checkInBox = await Hive.openBox('checkin_box');
+                await checkInBox.clear();
 
-    final moodPendingBox = await Hive.openBox('mood_pending_box');
-    await moodPendingBox.clear();
+                final contactBox = await Hive.openBox('contact_box');
+                await contactBox.clear();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('last_checkin_time');
-    await prefs.remove('checkin_interval');
+                final moodBox = await Hive.openBox('mood_box');
+                await moodBox.clear();
 
-    ref.invalidate(checkinHistoryFromBackendProvider);
-    ref.invalidate(checkinStatusProvider);
-    ref.invalidate(contactProvider);
+                final moodPendingBox = await Hive.openBox('mood_pending_box');
+                await moodPendingBox.clear();
 
-    try {
-      final dio = Dio();
-      final token = await SharedPrefsService.getToken();
-      if (token != null) {
-        await dio.delete(
-          '${AppConstants.apiBaseUrl}/checkin',
-          options: Options(headers: {'Authorization': 'Bearer $token'}),
-        ).timeout(const Duration(seconds: 5));
-        await dio.delete(
-          '${AppConstants.apiBaseUrl}/mood',
-          options: Options(headers: {'Authorization': 'Bearer $token'}),
-        ).timeout(const Duration(seconds: 5));
-      }
-    } catch (e) {
-      debugPrint('Backend cache clear skipped (offline): $e');
-    }
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('last_checkin_time');
+                await prefs.remove('checkin_interval');
 
-    if (mounted) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
-              style: TextStyle(fontFamily: 'HindSiliguri')),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  } catch (e) {
-    if (mounted) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
-              style: TextStyle(fontFamily: 'HindSiliguri')),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-},
+                ref.invalidate(checkinHistoryFromBackendProvider);
+                ref.invalidate(checkinStatusProvider);
+                ref.invalidate(contactProvider);
+
+                try {
+                  final dio = Dio();
+                  final token = await SharedPrefsService.getToken();
+                  if (token != null) {
+                    await dio
+                        .delete(
+                          '${AppConstants.apiBaseUrl}/checkin',
+                          options: Options(
+                              headers: {'Authorization': 'Bearer $token'}),
+                        )
+                        .timeout(const Duration(seconds: 5));
+                    await dio
+                        .delete(
+                          '${AppConstants.apiBaseUrl}/mood',
+                          options: Options(
+                              headers: {'Authorization': 'Bearer $token'}),
+                        )
+                        .timeout(const Duration(seconds: 5));
+                  }
+                } catch (e) {
+                  debugPrint('Backend cache clear skipped (offline): $e');
+                }
+
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
+                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
+                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
             child: Text('পরিষ্কার করুন',
                 style: TextStyle(
                     fontFamily: 'HindSiliguri', color: AppColors.error)),
@@ -558,8 +563,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('লগআউট',
-            style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text('লগআউট', style: TextStyle(fontFamily: 'HindSiliguri')),
         content: Text(
           'আপনি কি লগআউট করতে চান?',
           style: TextStyle(fontFamily: 'HindSiliguri'),
@@ -567,8 +571,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('বাতিল',
-                style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
           ),
           TextButton(
             onPressed: () {
@@ -601,10 +604,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 )),
+            const SizedBox(height: 4),
+            Text(
+              'এই সময়ের মধ্যে চেক-ইন না করলে ইমেইল/SMS সতর্কতা পাঠানো হবে',
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 13,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            ),
             const SizedBox(height: 16),
-            _buildIntervalOption('২৪ ঘণ্টা (দৈনিক)', 24, settings.checkinIntervalHours == 24),
-            _buildIntervalOption('৪৮ ঘণ্টা (২ দিন)', 48, settings.checkinIntervalHours == 48),
-            _buildIntervalOption('৭২ ঘণ্টা (৩ দিন)', 72, settings.checkinIntervalHours == 72),
+            // 3 days — default
+            _buildIntervalOption('৩ দিন (3 days) — ডিফল্ট', 3,
+                settings.checkinIntervalDays == 3),
+            _buildIntervalOption(
+                '৫ দিন (5 days)', 5, settings.checkinIntervalDays == 5),
+            _buildIntervalOption(
+                '৭ দিন (7 days)', 7, settings.checkinIntervalDays == 7),
             const SizedBox(height: 16),
           ],
         ),
@@ -625,39 +641,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Convert interval days to a human-readable Bangla label
+  String _intervalLabel(int days) {
+    switch (days) {
+      case 3:
+        return '৩ দিন (ডিফল্ট)';
+      case 5:
+        return '৫ দিন';
+      case 7:
+        return '৭ দিন';
+      default:
+        return '$days দিন';
+    }
+  }
+
   void _updateInterval(int value) async {
     Navigator.pop(context);
+
+    // Always save locally first (this never fails)
+    ref.read(settingsProvider.notifier).setCheckinInterval(value);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ইন্টারভাল আপডেট হয়েছে',
+              style: TextStyle(fontFamily: 'HindSiliguri')),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+
+    // Try to sync with backend silently (don't block UI)
     try {
-      // Sync with local provider
-      ref.read(settingsProvider.notifier).setCheckinInterval(value);
-      // Sync with backend API
       await CheckinApiService().setCheckInInterval(value);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ইন্টারভাল আপডেট হয়েছে ✓', style: TextStyle(fontFamily: 'HindSiliguri')),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
     } catch (e) {
-      debugPrint('Failed to set interval: \$e');
-      if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ইন্টারভাল আপডেট ব্যর্থ হয়েছে', style: TextStyle(fontFamily: 'HindSiliguri')),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      debugPrint('Backend interval sync skipped: $e');
     }
   }
 
   void _exportMoodData() async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('মুড ডেটা এক্সপোর্ট হচ্ছে...', style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text('মুড ডেটা এক্সপোর্ট হচ্ছে...',
+            style: TextStyle(fontFamily: 'HindSiliguri')),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -674,10 +700,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (response.statusCode == 200) {
         final csvData = response.data.toString();
-        
+
         // Parse CSV string — handle quoted fields properly
-        final lines = csvData.split('\n').where((line) => line.trim().isNotEmpty).toList();
-        
+        final lines = csvData
+            .split('\n')
+            .where((line) => line.trim().isNotEmpty)
+            .toList();
+
         if (lines.isEmpty) {
           throw Exception('No mood data found');
         }
@@ -713,7 +742,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         // Separate headers from data
         final headers = tableData.first;
-        final dataRows = tableData.length > 1 ? tableData.sublist(1) : <List<String>>[];
+        final dataRows =
+            tableData.length > 1 ? tableData.sublist(1) : <List<String>>[];
 
         // Generate PDF
         final pdf = pw.Document();
@@ -724,19 +754,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               return pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('Mood History Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Mood History Report',
+                      style: pw.TextStyle(
+                          fontSize: 24, fontWeight: pw.FontWeight.bold)),
                   pw.SizedBox(height: 8),
-                  pw.Text('Total entries: ${dataRows.length}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                  pw.Text('Total entries: ${dataRows.length}',
+                      style:
+                          pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
                   pw.SizedBox(height: 20),
                   if (dataRows.isEmpty)
-                    pw.Text('No mood data available', style: pw.TextStyle(fontSize: 14))
+                    pw.Text('No mood data available',
+                        style: pw.TextStyle(fontSize: 14))
                   else
                     pw.TableHelper.fromTextArray(
                       context: context,
                       headers: headers,
                       data: dataRows,
                       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                      headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+                      headerDecoration:
+                          pw.BoxDecoration(color: PdfColors.grey300),
                       cellAlignment: pw.Alignment.centerLeft,
                       cellPadding: const pw.EdgeInsets.all(6),
                     ),
@@ -754,12 +790,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('মুড ডেটা সফলভাবে এক্সপোর্ট হয়েছে! ✓', style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text('মুড ডেটা সফলভাবে এক্সপোর্ট হয়েছে! ✓',
+                  style: TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: Colors.green,
             ),
           );
           // Share the file
-          await Share.shareXFiles([XFile(file.path)], text: 'Mood History Report');
+          await Share.shareXFiles([XFile(file.path)],
+              text: 'Mood History Report');
         }
       } else {
         throw Exception('Export failed');
@@ -769,7 +807,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('কোনো মুড ডেটা পাওয়া যায়নি। প্রথমে কিছু মুড সেভ করুন।', style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text(
+                  'কোনো মুড ডেটা পাওয়া যায়নি। প্রথমে কিছু মুড সেভ করুন।',
+                  style: TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: AppColors.warning,
             ),
           );
@@ -778,7 +818,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('এক্সপোর্ট ব্যর্থ: ${e.message}', style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text('এক্সপোর্ট ব্যর্থ: ${e.message}',
+                  style: TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: Colors.red,
             ),
           );
@@ -788,7 +829,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('এক্সপোর্ট ব্যর্থ: $e', style: TextStyle(fontFamily: 'HindSiliguri')),
+            content: Text('এক্সপোর্ট ব্যর্থ: $e',
+                style: TextStyle(fontFamily: 'HindSiliguri')),
             backgroundColor: Colors.red,
           ),
         );

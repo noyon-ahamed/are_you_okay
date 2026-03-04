@@ -85,7 +85,8 @@ class CheckInStatusData {
   }) {
     return CheckInStatusData(
       lastCheckIn: lastCheckIn ?? this.lastCheckIn,
-      hoursSinceLastCheckIn: hoursSinceLastCheckIn ?? this.hoursSinceLastCheckIn,
+      hoursSinceLastCheckIn:
+          hoursSinceLastCheckIn ?? this.hoursSinceLastCheckIn,
       needsCheckIn: needsCheckIn ?? this.needsCheckIn,
       canCheckIn: canCheckIn ?? this.canCheckIn,
       nextCheckInTime: nextCheckInTime ?? this.nextCheckInTime,
@@ -160,12 +161,13 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
       }
 
       DateTime? nextCheckInTime;
-      if (status['nextCheckInTime'] != null) {
-        nextCheckInTime = DateTime.tryParse(status['nextCheckInTime'].toString());
+      // Always use 24h from last check-in (check-in window is always 24h)
+      if (lastCheckIn != null) {
+        nextCheckInTime = lastCheckIn.add(const Duration(hours: 24));
       }
 
-      final canCheckIn = status['canCheckIn'] as bool? ?? 
-                          status['needsCheckIn'] as bool? ?? true;
+      final canCheckIn =
+          nextCheckInTime == null || DateTime.now().isAfter(nextCheckInTime);
 
       state = CheckInStatusData(
         lastCheckIn: lastCheckIn,
@@ -229,13 +231,15 @@ final checkinHistoryProvider = Provider<List<CheckInModel>>((ref) {
 });
 
 // Provider for check-in history from BACKEND API
-final checkinHistoryFromBackendProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final checkinHistoryFromBackendProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repository = ref.watch(checkinRepositoryProvider);
   return await repository.fetchHistory(limit: 100, skip: 0);
 });
 
 // Provider for user stats from backend
-final userStatsFromBackendProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final userStatsFromBackendProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
   try {
     final authApi = AuthApiService();
     final profileData = await authApi.getProfile();

@@ -36,8 +36,9 @@ class LocalNotificationService {
       final timeZoneName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timeZoneName));
 
-      // Android initialization settings
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      // Android initialization settings — use monochrome drawable for notification tray icon
+      const androidSettings =
+          AndroidInitializationSettings('@drawable/ic_notification');
 
       // iOS initialization settings
       const iosSettings = DarwinInitializationSettings(
@@ -93,9 +94,8 @@ class LocalNotificationService {
 
   /// Request Android notification permissions (Android 13+)
   Future<void> _requestAndroidPermissions() async {
-    final androidImpl = _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     if (androidImpl != null) {
       await androidImpl.requestNotificationsPermission();
       await androidImpl.requestExactAlarmsPermission();
@@ -126,6 +126,19 @@ class LocalNotificationService {
       enableVibration: true,
     );
 
+    // Seismic Alerts channel (for close earthquakes)
+    const seismicChannel = AndroidNotificationChannel(
+      'seismic_alerts',
+      'ভূমিকম্প সাইরেন',
+      description: 'কাছাকাছি ভূমিকম্পের জন্য সাইরেন সতর্কতা',
+      importance: Importance.max,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound('earthquake_siren'),
+      enableVibration: true,
+      enableLights: true,
+      ledColor: Color(0xFFDC143C),
+    );
+
     // Info channel
     const infoChannel = AndroidNotificationChannel(
       'info_updates',
@@ -135,12 +148,12 @@ class LocalNotificationService {
       playSound: false,
     );
 
-    final androidImpl = _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     await androidImpl?.createNotificationChannel(emergencyChannel);
     await androidImpl?.createNotificationChannel(reminderChannel);
+    await androidImpl?.createNotificationChannel(seismicChannel);
     await androidImpl?.createNotificationChannel(infoChannel);
   }
 
@@ -156,20 +169,27 @@ class LocalNotificationService {
     try {
       final androidDetails = AndroidNotificationDetails(
         channelId,
-        channelId == 'emergency_alerts'
-            ? 'জরুরি সতর্কতা'
-            : channelId == 'checkin_reminders'
-                ? 'চেক-ইন রিমাইন্ডার'
-                : 'তথ্য আপডেট',
+        channelId == 'seismic_alerts'
+            ? 'ভূমিকম্প সাইরেন'
+            : channelId == 'emergency_alerts'
+                ? 'জরুরি সতর্কতা'
+                : channelId == 'checkin_reminders'
+                    ? 'চেক-ইন রিমাইন্ডার'
+                    : 'তথ্য আপডেট',
         channelDescription: '',
-        importance: channelId == 'emergency_alerts'
-            ? Importance.max
-            : Importance.high,
-        priority: channelId == 'emergency_alerts'
-            ? Priority.high
-            : Priority.defaultPriority,
+        importance:
+            (channelId == 'emergency_alerts' || channelId == 'seismic_alerts')
+                ? Importance.max
+                : Importance.high,
+        priority:
+            (channelId == 'emergency_alerts' || channelId == 'seismic_alerts')
+                ? Priority.high
+                : Priority.defaultPriority,
         playSound: true,
         enableVibration: true,
+        sound: channelId == 'seismic_alerts'
+            ? const RawResourceAndroidNotificationSound('earthquake_siren')
+            : null,
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -197,7 +217,7 @@ class LocalNotificationService {
     }
   }
 
-  /// Schedule a notification at a specific time
+  /// Schedule a notification at a specific time (one-shot)
   Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -217,14 +237,13 @@ class LocalNotificationService {
 
       final androidDetails = AndroidNotificationDetails(
         channelId,
-        channelId == 'emergency_alerts'
-            ? 'জরুরি সতর্কতা'
-            : 'চেক-ইন রিমাইন্ডার',
+        channelId == 'emergency_alerts' ? 'জরুরি সতর্কতা' : 'চেক-ইন রিমাইন্ডার',
         channelDescription: 'চেক-ইন রিমাইন্ডার নোটিফিকেশন',
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
         enableVibration: true,
+        color: const Color(0xFFDC143C),
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -242,12 +261,77 @@ class LocalNotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: null,
         payload: payload,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       debugPrint('Notification $id scheduled for $scheduledDate');
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
+    }
+  }
+
+  /// Schedule a daily repeating notification at a fixed time (HH:MM).
+  /// Uses DateTimeComponents.time so it fires every day at that time.
+  Future<void> scheduleDailyNotification({
+    required int id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+    String? payload,
+    String channelId = 'checkin_reminders',
+  }) async {
+    try {
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        hour,
+        minute,
+      );
+      // If the time has already passed today, schedule for tomorrow
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      final androidDetails = AndroidNotificationDetails(
+        channelId,
+        'চেক-ইন রিমাইন্ডার',
+        channelDescription: 'দৈনিক চেক-ইন রিমাইন্ডার',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        color: const Color(0xFFDC143C),
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      await _notifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        // Repeat daily at the same time
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: payload,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+      debugPrint(
+          'Daily notification $id scheduled at $hour:${minute.toString().padLeft(2, '0')}');
+    } catch (e) {
+      debugPrint('Error scheduling daily notification: $e');
     }
   }
 
@@ -272,23 +356,27 @@ class LocalNotificationService {
     await scheduleNotification(
       id: _reminder2hId,
       title: 'চেক-ইন প্রয়োজন ⚠️',
-      body: 'আপনার চেক-ইন করার সময় মাত্র ২ ঘণ্টা বাকি! অনুগ্রহ করে চেক-ইন করুন।',
+      body:
+          'আপনার চেক-ইন করার সময় মাত্র ২ ঘণ্টা বাকি! অনুগ্রহ করে চেক-ইন করুন।',
       scheduledDate: reminder2h,
       payload: 'checkin_reminder_2h',
     );
 
     // Reminder 3: 30 minutes before deadline (critical)
-    final reminder30m = nextCheckInDeadline.subtract(const Duration(minutes: 30));
+    final reminder30m =
+        nextCheckInDeadline.subtract(const Duration(minutes: 30));
     await scheduleNotification(
       id: _reminder30mId,
       title: '🚨 জরুরি চেক-ইন করুন!',
-      body: 'আপনার চেক-ইনের সময় প্রায় শেষ! এখনই চেক-ইন করুন, নাহলে আপনার জরুরি যোগাযোগে সতর্কতা পাঠানো হবে।',
+      body:
+          'আপনার চেক-ইনের সময় প্রায় শেষ! এখনই চেক-ইন করুন, নাহলে আপনার জরুরি যোগাযোগে সতর্কতা পাঠানো হবে।',
       scheduledDate: reminder30m,
       payload: 'checkin_reminder_critical',
       channelId: 'emergency_alerts',
     );
 
-    debugPrint('Scheduled 3 check-in reminders for deadline: $nextCheckInDeadline');
+    debugPrint(
+        'Scheduled 3 check-in reminders for deadline: $nextCheckInDeadline');
   }
 
   /// Cancel all check-in reminders
@@ -299,18 +387,32 @@ class LocalNotificationService {
     debugPrint('Cancelled all check-in reminders');
   }
 
+  // Fixed IDs for the 3 daily reminders
+  static const int _dailyMorningId = 201;
+  static const int _dailyNoonId = 202;
+  static const int _dailyNightId = 203;
+
+  /// Cancel the 3 fixed daily reminders
+  Future<void> cancelDailyReminders() async {
+    await _notifications.cancel(_dailyMorningId);
+    await _notifications.cancel(_dailyNoonId);
+    await _notifications.cancel(_dailyNightId);
+    debugPrint('Cancelled 3 daily reminders');
+  }
+
   /// Show emergency alert
   Future<void> showEmergencyAlert({
     required String title,
     required String body,
     String? payload,
+    bool isSeismicClose = false,
   }) async {
     await showNotification(
       id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title: title,
       body: body,
       payload: payload,
-      channelId: 'emergency_alerts',
+      channelId: isSeismicClose ? 'seismic_alerts' : 'emergency_alerts',
       priority: Priority.max,
     );
   }

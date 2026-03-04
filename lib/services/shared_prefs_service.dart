@@ -23,7 +23,7 @@ class SharedPrefsService {
   }
 
   // ==================== First Launch ====================
-  
+
   bool get isFirstLaunch {
     return _prefs?.getBool(AppConstants.keyIsFirstLaunch) ?? true;
   }
@@ -33,7 +33,7 @@ class SharedPrefsService {
   }
 
   // ==================== Language ====================
-  
+
   String get language {
     return _prefs?.getString(AppConstants.keyLanguage) ?? 'bn';
   }
@@ -43,7 +43,7 @@ class SharedPrefsService {
   }
 
   // ==================== Theme ====================
-  
+
   String get themeMode {
     return _prefs?.getString(AppConstants.keyThemeMode) ?? 'system';
   }
@@ -53,7 +53,7 @@ class SharedPrefsService {
   }
 
   // ==================== Last Check-in ====================
-  
+
   DateTime? get lastCheckIn {
     final timestamp = _prefs?.getInt(AppConstants.keyLastCheckin);
     return timestamp != null
@@ -69,18 +69,18 @@ class SharedPrefsService {
   }
 
   // ==================== Check-in Interval ====================
-  
+
   int get checkinInterval {
     return _prefs?.getInt(AppConstants.keyCheckinInterval) ??
-        AppConstants.defaultCheckinInterval;
+        AppConstants.defaultCheckinIntervalDays;
   }
 
-  Future<void> setCheckinInterval(int hours) async {
-    await _prefs?.setInt(AppConstants.keyCheckinInterval, hours);
+  Future<void> setCheckinInterval(int days) async {
+    await _prefs?.setInt(AppConstants.keyCheckinInterval, days);
   }
 
   // ==================== Notifications ====================
-  
+
   bool get notificationsEnabled {
     return _prefs?.getBool(AppConstants.keyNotificationsEnabled) ?? true;
   }
@@ -90,7 +90,7 @@ class SharedPrefsService {
   }
 
   // ==================== User Session ====================
-  
+
   Future<void> setUserId(String uid) async {
     await _prefs?.setString('user_id', uid);
   }
@@ -112,7 +112,7 @@ class SharedPrefsService {
   }
 
   // ==================== Clear All ====================
-  
+
   Future<void> clearAll() async {
     await _prefs?.clear();
   }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/settings_model.dart';
 import '../services/hive_service.dart';
+import '../services/background_service.dart';
+import '../services/notification_service.dart';
 
 class SettingsNotifier extends StateNotifier<SettingsModel> {
   final HiveService _hiveService;
@@ -29,14 +32,32 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     await _hiveService.saveSettings(state);
   }
 
-  Future<void> setCheckinInterval(int hours) async {
-    state = state.copyWith(checkinIntervalHours: hours);
+  Future<void> setCheckinInterval(int days) async {
+    state = state.copyWith(checkinIntervalDays: days);
     await _hiveService.saveSettings(state);
   }
 
   Future<void> toggleNotifications() async {
-    state = state.copyWith(notificationsEnabled: !state.notificationsEnabled);
+    final newValue = !state.notificationsEnabled;
+    state = state.copyWith(notificationsEnabled: newValue);
     await _hiveService.saveSettings(state);
+
+    // Persist the flag so the background isolate can also read it
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', newValue);
+
+    final notifService = LocalNotificationService();
+    await notifService.initialize(onNotificationTap: (_) {});
+
+    if (newValue) {
+      // Notifications turned ON → re-register background task and reschedule daily reminders
+      await BackgroundService.registerPeriodicTask();
+      await scheduleDailyReminders(notifService);
+    } else {
+      // Notifications turned OFF → cancel all notifications and background task
+      await notifService.cancelAllNotifications();
+      await BackgroundService.cancelAllTasks();
+    }
   }
 
   Future<void> toggleLocation() async {

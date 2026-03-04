@@ -1,4 +1,4 @@
-package com.syntfy.are_you_okay
+package com.areyouokay.app
 
 import io.flutter.embedding.android.FlutterActivity
 

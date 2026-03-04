@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +19,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -36,9 +37,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       await ref.read(authProvider.notifier).login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
 
       if (mounted) {
         final authState = ref.read(authProvider);
@@ -46,6 +47,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           context.go('/home');
         } else if (authState is AuthError) {
           _showError(authState.message);
+        }
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        if (e.response?.statusCode == 401) {
+          _showError('INVALID_CREDENTIALS');
+        } else {
+          _showError(e.message ?? e.toString());
         }
       }
     } catch (e) {
@@ -61,22 +70,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _showError(String rawMessage) {
     String message = rawMessage.replaceAll('Exception: ', '');
-    
+
     // Map common error messages to user-friendly Bangla
-    if (message.contains('SocketException') || 
+    if (message == 'INVALID_CREDENTIALS' ||
+        message.contains('Invalid email or password') ||
+        (message.toLowerCase().contains('invalid') &&
+            message.toLowerCase().contains('password')) ||
+        message.contains('INVALID_CREDENTIALS')) {
+      message = 'আপনার পাসওয়ার্ড ভুল হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
+    } else if (message.contains('SocketException') ||
         message.contains('Failed host lookup') ||
         message.contains('No Internet') ||
         message.contains('connection')) {
       message = 'ইন্টারনেট সংযোগ নেই। অনুগ্রহ করে আপনার ইন্টারনেট চেক করুন।';
-    } else if (message.contains('Invalid email or password') ||
-               message.contains('invalid') && message.contains('password')) {
-      message = 'ভুল ইমেইল বা পাসওয়ার্ড। অনুগ্রহ করে আবার চেষ্টা করুন।';
     } else if (message.contains('Network error')) {
       message = 'সার্ভারে সংযোগ করতে ব্যর্থ। অনুগ্রহ করে পরে চেষ্টা করুন।';
     } else if (message.contains('Login failed')) {
       message = 'লগইন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
     }
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -107,7 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 40),
-                
+
                 // Logo
                 Center(
                   child: Container(
@@ -131,9 +143,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 const Text(
                   'Are You Okay?',
                   style: TextStyle(
@@ -152,9 +164,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Email field
                 CustomTextField(
                   controller: _emailController,
@@ -172,9 +184,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Password field
                 CustomTextField(
                   controller: _passwordController,
@@ -184,7 +196,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -197,9 +211,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Forgot password
                 Align(
                   alignment: Alignment.centerRight,
@@ -208,18 +222,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: const Text('পাসওয়ার্ড ভুলে গেছেন?'),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Login button
                 CustomButton(
                   text: 'লগইন',
-                  onPressed: _isLoading ? null : () { _handleLogin(); },
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          _handleLogin();
+                        },
                   isLoading: _isLoading,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Register link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
