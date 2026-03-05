@@ -1,6 +1,13 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
+import '../../model/emergency_contact_model.dart';
 import '../auth/token_storage_service.dart';
+import '../hive_service.dart';
+
+const String _kPendingContactsKey = 'pending_contacts_to_sync';
 
 /// EmergencyApiService
 /// Handles emergency contacts and SOS API calls
@@ -27,22 +34,42 @@ class EmergencyApiService {
 
   // ==================== Emergency Contacts ====================
 
-  /// Get all emergency contacts
+  /// Get all emergency contacts (with offline Hive cache fallback)
   Future<List<Map<String, dynamic>>> getContacts() async {
     try {
       final response = await _dio.get('$baseUrl/emergency/contacts');
 
       if (response.data['success'] == true) {
-        return List<Map<String, dynamic>>.from(response.data['contacts'] ?? []);
+        final contacts =
+            List<Map<String, dynamic>>.from(response.data['contacts'] ?? []);
+        // Cache fetched contacts to Hive
+        final hive = HiveService();
+        await hive.clearContacts();
+        for (final c in contacts) {
+          try {
+            final model = EmergencyContactModel.fromJson(c);
+            await hive.saveContact(model);
+          } catch (_) {}
+        }
+        debugPrint('Contacts cached to Hive (${contacts.length})');
+        return contacts;
       } else {
         throw Exception(response.data['error'] ?? 'Failed to fetch contacts');
       }
     } on DioException catch (e) {
-      throw Exception(e.response?.data['error'] ?? 'Network error');
+      debugPrint('Failed to load contacts from backend: $e');
+      // Fall back to Hive cache
+      final hive = HiveService();
+      final cached = hive.getAllContacts();
+      if (cached.isNotEmpty) {
+        debugPrint('Returning ${cached.length} contacts from Hive cache');
+        return cached.map((c) => c.toJson()).toList();
+      }
+      throw Exception('Network error');
     }
   }
 
-  /// Add emergency contact
+  /// Add emergency contact (with offline queue fallback)
   Future<Map<String, dynamic>> addContact({
     required String name,
     required String phone,
@@ -63,12 +90,51 @@ class EmergencyApiService {
       );
 
       if (response.data['success'] == true) {
+        // Cache to Hive immediately
+        try {
+          final model =
+              EmergencyContactModel.fromJson(response.data['contact']);
+          await HiveService().saveContact(model);
+        } catch (_) {}
         return response.data['contact'];
       } else {
         throw Exception(response.data['error'] ?? 'Failed to add contact');
       }
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['error'] ?? 'Network error');
+    } on DioException catch (_) {
+      debugPrint('Offline: saving contact locally for sync later');
+      // Save to pending sync queue
+      final id = 'pending_${DateTime.now().millisecondsSinceEpoch}';
+      final contactData = {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'relation': relation,
+        'priority': priority ?? 1,
+        'isPending': true,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      // Save locally to Hive
+      final model = EmergencyContactModel(
+        id: id,
+        userId: '',
+        name: name,
+        phoneNumber: phone,
+        email: email ?? '',
+        relationship: relation,
+        priority: priority ?? 1,
+      );
+      await HiveService().saveContact(model);
+      // Also save to pending queue
+      final prefs = await SharedPreferences.getInstance();
+      final pendingJson = prefs.getString(_kPendingContactsKey);
+      final pending = pendingJson != null
+          ? List<Map<String, dynamic>>.from(jsonDecode(pendingJson))
+          : <Map<String, dynamic>>[];
+      pending.add(contactData);
+      await prefs.setString(_kPendingContactsKey, jsonEncode(pending));
+      debugPrint('Contact saved locally (pending sync): $name');
+      return contactData; // return local data so UI updates immediately
     }
   }
 

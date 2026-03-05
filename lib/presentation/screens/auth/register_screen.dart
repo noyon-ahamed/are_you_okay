@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/api/auth_api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../provider/language_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -22,7 +24,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthApiService();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -47,20 +49,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty 
-            ? _phoneController.text.trim() 
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
             : null,
       );
 
       if (mounted) {
+        final s = ref.read(stringsProvider);
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('নিবন্ধন সফল! আপনার ইমেইল যাচাই করুন।'),
+          SnackBar(
+            content: Text(s.regSuccess),
             backgroundColor: AppColors.success,
           ),
         );
-        
+
         // Navigate to home
         context.go('/home');
       }
@@ -82,9 +85,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('নিবন্ধন'),
+        title: Text(s.regTitle),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -95,64 +99,72 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                
+
                 // Name field
                 CustomTextField(
                   controller: _nameController,
-                  label: 'নাম',
-                  hint: 'আপনার নাম',
+                  label: s.regName,
+                  hint: s.isBangla ? 'আপনার নাম' : 'Your name',
                   prefixIcon: Icons.person_outline,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'নাম দিন';
+                      return s.regName +
+                          ' ' +
+                          (s.isBangla ? 'দিন' : 'required');
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Email field
                 CustomTextField(
                   controller: _emailController,
-                  label: 'ইমেইল',
+                  label: s.regEmail,
                   hint: 'your@email.com',
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: Icons.email_outlined,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'ইমেইল দিন';
+                      return s.regEmail +
+                          ' ' +
+                          (s.isBangla ? 'দিন' : 'required');
                     }
                     if (!value.contains('@')) {
-                      return 'সঠিক ইমেইল দিন';
+                      return s.contactsPhoneInvalid;
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Phone field (optional)
                 CustomTextField(
                   controller: _phoneController,
-                  label: 'ফোন (ঐচ্ছিক)',
+                  label:
+                      s.regPhone + ' (${s.isBangla ? 'ঐচ্ছিক' : 'Optional'})',
                   hint: '+880...',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Password field
                 CustomTextField(
                   controller: _passwordController,
-                  label: 'পাসওয়ার্ড',
-                  hint: 'কমপক্ষে ৬ অক্ষর',
+                  label: s.regPassword,
+                  hint:
+                      s.isBangla ? 'কমপক্ষে ৬ অক্ষর' : 'At least 6 characters',
                   obscureText: _obscurePassword,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -160,67 +172,82 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'পাসওয়ার্ড দিন';
+                      return s.regPassword +
+                          ' ' +
+                          (s.isBangla ? 'দিন' : 'required');
                     }
                     if (value.length < 6) {
-                      return 'কমপক্ষে ৬ অক্ষর দিন';
+                      return s.isBangla
+                          ? 'কমপক্ষে ৬ অক্ষর দিন'
+                          : 'At least 6 characters';
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Confirm password field
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  label: 'পাসওয়ার্ড নিশ্চিত করুন',
+                  label: s.regConfirmPass,
                   hint: '••••••••',
                   obscureText: _obscureConfirmPassword,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () {
-                      setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                      setState(() =>
+                          _obscureConfirmPassword = !_obscureConfirmPassword);
                     },
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'পাসওয়ার্ড নিশ্চিত করুন';
+                      return s.regConfirmPass +
+                          ' ' +
+                          (s.isBangla ? 'দিন' : 'required');
                     }
                     if (value != _passwordController.text) {
-                      return 'পাসওয়ার্ড মিলছে না';
+                      return s.isBangla
+                          ? 'পাসওয়ার্ড মিলছে না'
+                          : 'Passwords do not match';
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Register button
                 CustomButton(
-                  text: 'নিবন্ধন করুন',
-                  onPressed: _isLoading ? null : () { _handleRegister(); },
+                  text: s.regButton,
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          _handleRegister();
+                        },
                   isLoading: _isLoading,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Login link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'ইতিমধ্যে অ্যাকাউন্ট আছে? ',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    Text(
+                      s.regHaveAccount.split('?')[0] + '? ',
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text(
-                        'লগইন করুন',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: Text(
+                        s.loginButton,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

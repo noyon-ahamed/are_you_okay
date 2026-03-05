@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/register_screen.dart';
 import '../../presentation/screens/auth/forgot_password_screen.dart';
@@ -10,11 +9,12 @@ import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/ai_chat/ai_chat_screen.dart';
 import '../../presentation/screens/earthquake/earthquake_screen.dart';
 import '../../presentation/screens/fake_call/fake_call_screen.dart';
-import '../../presentation/screens/fake_call/fake_call_active_screen.dart';
 import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/profile/edit_profile_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
+import '../../presentation/screens/settings/about_app_screen.dart';
+import '../../presentation/screens/settings/privacy_policy_screen.dart';
 import '../../presentation/screens/contacts/emergency_contacts_screen.dart';
 import '../../presentation/screens/contacts/add_contact_screen.dart';
 import '../../presentation/screens/sos/sos_screen.dart';
@@ -41,6 +41,8 @@ class Routes {
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
   static const String settings = '/settings';
+  static const String aboutApp = '/settings/about';
+  static const String privacyPolicy = '/settings/privacy';
   static const String contacts = '/contacts';
   static const String addContact = '/contacts/add';
   static const String sos = '/sos';
@@ -74,7 +76,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: Routes.splash,
     refreshListenable: notifier,
     routes: [
-      // ==================== Auth Flow ====================
       GoRoute(
         path: Routes.splash,
         builder: (context, state) => const SplashScreen(),
@@ -103,7 +104,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               position: Tween<Offset>(
                 begin: const Offset(1, 0),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              ).animate(CurvedAnimation(
+                  parent: animation, curve: Curves.easeOutCubic)),
               child: child,
             );
           },
@@ -119,14 +121,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               position: Tween<Offset>(
                 begin: const Offset(1, 0),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              ).animate(CurvedAnimation(
+                  parent: animation, curve: Curves.easeOutCubic)),
               child: child,
             );
           },
         ),
       ),
-
-      // ==================== Main App ====================
       GoRoute(
         path: Routes.home,
         pageBuilder: (context, state) => CustomTransitionPage(
@@ -147,7 +148,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               position: Tween<Offset>(
                 begin: const Offset(0, 1),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              ).animate(CurvedAnimation(
+                  parent: animation, curve: Curves.easeOutCubic)),
               child: child,
             );
           },
@@ -178,6 +180,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
+        path: Routes.aboutApp,
+        builder: (context, state) => const AboutAppScreen(),
+      ),
+      GoRoute(
+        path: Routes.privacyPolicy,
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
         path: Routes.contacts,
         builder: (context, state) => const EmergencyContactsScreen(),
       ),
@@ -191,7 +201,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               position: Tween<Offset>(
                 begin: const Offset(0, 1),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              ).animate(CurvedAnimation(
+                  parent: animation, curve: Curves.easeOutCubic)),
               child: child,
             );
           },
@@ -216,28 +227,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationScreen(),
       ),
     ],
-
-    // ==================== Auth Guard ====================
     redirect: (context, state) {
       final isSplashComplete = ref.read(splashDisplayCompleteProvider);
       final authState = ref.read(authProvider);
+      final currentPath = state.uri.path;
 
-       // Wait for 2 second splash animation
       if (!isSplashComplete) {
         return Routes.splash;
       }
-      
+
+      // Splash
+
       final isAuthenticated = authState is AuthAuthenticated;
       final isLoading = authState is AuthLoading || authState is AuthInitial;
-      final currentPath = state.uri.path;
 
-      // Allow onboarding regardless of auth state
       if (currentPath == Routes.onboarding) return null;
 
-      // While loading auth state, stay on splash instead of hanging
-      if (isLoading) return Routes.splash;
-
-      // Auth pages list
       final authPages = [
         Routes.login,
         Routes.register,
@@ -245,17 +250,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       ];
       final isAuthPage = authPages.contains(currentPath);
 
-      // If not authenticated and trying to access protected page
+      if (isLoading) {
+        if (isAuthPage) return null;
+        return Routes.login;
+      }
+
       if (!isAuthenticated && !isAuthPage && currentPath != Routes.splash) {
         return Routes.login;
       }
 
-      // If authenticated and trying to access auth page or splash
       if (isAuthenticated && (isAuthPage || currentPath == Routes.splash)) {
         return Routes.home;
       }
-      
-      // If unauthenticated but splash is complete, go to login
+
       if (!isAuthenticated && currentPath == Routes.splash) {
         return Routes.login;
       }

@@ -7,6 +7,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../routes/app_router.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -16,8 +18,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
-    String name = 'ব্যবহারকারী';
+    String name = s.profileDefaultUser;
     String email = '';
     String phone = '';
     String address = '';
@@ -64,15 +67,21 @@ class ProfileScreen extends ConsumerWidget {
                             height: 100,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
+                              // ignore: deprecated_member_use
                               color: Colors.white.withOpacity(0.2),
                               border: Border.all(
+                                // ignore: deprecated_member_use
                                 color: Colors.white.withOpacity(0.4),
                                 width: 3,
                               ),
                               image: profilePicture.isNotEmpty
                                   ? DecorationImage(
-                                      image: profilePicture.startsWith('data:image')
-                                          ? MemoryImage(base64Decode(profilePicture.split(',').last)) as ImageProvider
+                                      image: profilePicture
+                                              .startsWith('data:image')
+                                          ? MemoryImage(base64Decode(
+                                              profilePicture
+                                                  .split(',')
+                                                  .last)) as ImageProvider
                                           : NetworkImage(profilePicture),
                                       fit: BoxFit.cover,
                                     )
@@ -81,7 +90,9 @@ class ProfileScreen extends ConsumerWidget {
                             child: profilePicture.isEmpty
                                 ? Center(
                                     child: Text(
-                                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
                                       style: const TextStyle(
                                         fontSize: 42,
                                         fontWeight: FontWeight.bold,
@@ -108,14 +119,17 @@ class ProfileScreen extends ConsumerWidget {
                           email,
                           style: TextStyle(
                             fontSize: 14,
+                            // ignore: deprecated_member_use
                             color: Colors.white.withOpacity(0.8),
                           ),
                         ),
                         if (address.isNotEmpty || bloodGroup.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
+                              // ignore: deprecated_member_use
                               color: Colors.black.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
@@ -123,25 +137,36 @@ class ProfileScreen extends ConsumerWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (bloodGroup.isNotEmpty) ...[
-                                  const Icon(Icons.bloodtype, color: Colors.redAccent, size: 16),
+                                  const Icon(Icons.bloodtype,
+                                      color: Colors.redAccent, size: 16),
                                   const SizedBox(width: 4),
                                   Text(
                                     bloodGroup,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                   if (address.isNotEmpty) ...[
                                     const SizedBox(width: 8),
-                                    Container(width: 1, height: 12, color: Colors.white30),
+                                    Container(
+                                        width: 1,
+                                        height: 12,
+                                        color: Colors.white30),
                                     const SizedBox(width: 8),
                                   ]
                                 ],
                                 if (address.isNotEmpty) ...[
-                                  const Icon(Icons.location_on, color: Colors.white70, size: 16),
+                                  const Icon(Icons.location_on,
+                                      color: Colors.white70, size: 16),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
                                       address,
-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'HindSiliguri'),
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontFamily: 'HindSiliguri'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -171,15 +196,16 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     // Stats Row
-                    _buildStatsRow(context, isDark, ref),
+                    _buildStatsRow(context, isDark, ref, s),
                     const SizedBox(height: 24),
 
                     // Info Card
-                    _buildInfoCard(context, isDark, name, email, phone, address, bloodGroup),
+                    _buildInfoCard(context, isDark, name, email, phone, address,
+                        bloodGroup, s),
                     const SizedBox(height: 16),
 
                     // Quick Settings
-                    _buildQuickSettings(context, isDark),
+                    _buildQuickSettings(context, isDark, s),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -191,7 +217,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, bool isDark, WidgetRef ref) {
+  Widget _buildStatsRow(
+      BuildContext context, bool isDark, WidgetRef ref, AppStrings s) {
     final status = ref.watch(checkinStatusProvider);
     final historyAsync = ref.watch(checkinHistoryFromBackendProvider);
 
@@ -217,7 +244,7 @@ class ProfileScreen extends ConsumerWidget {
           context: context,
           icon: Icons.check_circle,
           value: totalCheckIns.toString(),
-          label: 'মোট চেক-ইন',
+          label: s.profileTotalCheckins,
           color: AppColors.success,
           isDark: isDark,
         ),
@@ -226,7 +253,7 @@ class ProfileScreen extends ConsumerWidget {
           context: context,
           icon: Icons.local_fire_department,
           value: status.streak.toString(),
-          label: 'স্ট্রিক',
+          label: s.statStreak,
           color: const Color(0xFFFF9800),
           isDark: isDark,
         ),
@@ -235,7 +262,7 @@ class ProfileScreen extends ConsumerWidget {
           context: context,
           icon: Icons.calendar_today,
           value: activeDays.toString(),
-          label: 'সক্রিয় দিন',
+          label: s.profileActiveDays,
           color: AppColors.primary,
           isDark: isDark,
         ),
@@ -296,6 +323,7 @@ class ProfileScreen extends ConsumerWidget {
     String phone,
     String address,
     String bloodGroup,
+    AppStrings s,
   ) {
     return Container(
       decoration: AppDecorations.cardDecoration(context: context),
@@ -304,40 +332,40 @@ class ProfileScreen extends ConsumerWidget {
           _buildInfoRow(
             context,
             Icons.person_outline,
-            'নাম',
+            s.contactsName,
             name,
           ),
-          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
           _buildInfoRow(
             context,
             Icons.email_outlined,
-            'ইমেইল',
+            s.contactsEmail,
             email,
           ),
           if (phone.isNotEmpty) ...[
-            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
             _buildInfoRow(
               context,
               Icons.phone_outlined,
-              'ফোন',
+              s.contactsPhone,
               phone,
             ),
           ],
           if (address.isNotEmpty) ...[
-            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
             _buildInfoRow(
               context,
               Icons.location_on_outlined,
-              'ঠিকানা',
+              s.profileAddress,
               address,
             ),
           ],
           if (bloodGroup.isNotEmpty) ...[
-            Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+            const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
             _buildInfoRow(
               context,
               Icons.bloodtype_outlined,
-              'রক্তের গ্রুপ',
+              s.profileBloodGroup,
               bloodGroup,
             ),
           ],
@@ -356,6 +384,7 @@ class ProfileScreen extends ConsumerWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -376,7 +405,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 Text(
                   value,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 15,
                     fontFamily: 'HindSiliguri',
                     fontWeight: FontWeight.w500,
@@ -390,7 +419,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickSettings(BuildContext context, bool isDark) {
+  Widget _buildQuickSettings(BuildContext context, bool isDark, AppStrings s) {
     return Container(
       decoration: AppDecorations.cardDecoration(context: context),
       child: Column(
@@ -399,23 +428,23 @@ class ProfileScreen extends ConsumerWidget {
             context: context,
             icon: Icons.settings,
             color: const Color(0xFF607D8B),
-            title: 'সেটিংস',
+            title: s.navSettings,
             onTap: () => context.push(Routes.settings),
           ),
-          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
           _buildActionTile(
             context: context,
             icon: Icons.contacts,
             color: const Color(0xFF009688),
-            title: 'জরুরি যোগাযোগ',
+            title: s.contactsTitle,
             onTap: () => context.push(Routes.contacts),
           ),
-          Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
+          const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5),
           _buildActionTile(
             context: context,
             icon: Icons.history,
             color: const Color(0xFFFF9800),
-            title: 'চেক-ইন ইতিহাস',
+            title: s.chHistoryTitle,
             onTap: () => context.push(Routes.history),
           ),
         ],
@@ -441,6 +470,7 @@ class ProfileScreen extends ConsumerWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -450,7 +480,7 @@ class ProfileScreen extends ConsumerWidget {
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'HindSiliguri',
                   fontWeight: FontWeight.w500,
                   fontSize: 15,

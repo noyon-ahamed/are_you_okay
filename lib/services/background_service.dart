@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+// ignore: depend_on_referenced_packages
 import 'package:timezone/timezone.dart' as tz;
+// ignore: depend_on_referenced_packages
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'notification_service.dart';
@@ -79,9 +81,9 @@ Future<void> scheduleDailyReminders(
     await notificationService.cancelDailyReminders();
 
     final reminderTimes = [
-      _TimeSlot(id: 201, hour: 9, minute: 0, label: 'সকাল'),
-      _TimeSlot(id: 202, hour: 14, minute: 0, label: 'দুপুর'),
-      _TimeSlot(id: 203, hour: 21, minute: 0, label: 'রাত'),
+      const _TimeSlot(id: 201, hour: 9, minute: 0, label: 'সকাল'),
+      const _TimeSlot(id: 202, hour: 14, minute: 0, label: 'দুপুর'),
+      const _TimeSlot(id: 203, hour: 21, minute: 0, label: 'রাত'),
     ];
 
     for (final slot in reminderTimes) {

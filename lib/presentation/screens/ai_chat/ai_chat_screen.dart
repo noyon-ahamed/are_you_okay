@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../provider/language_provider.dart';
 import '../../../services/api/ai_service.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
@@ -23,11 +25,10 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   void initState() {
     super.initState();
     _aiService = ref.read(aiServiceProvider);
+    final s = ref.read(stringsProvider);
     // Welcome message
     _messages.add(_ChatMessage(
-      text: 'আস্সালামু আলাইকুম! আমি আপনার AI স্বাস্থ্য সহকারী। 🩺\n\n'
-          'আপনার শারীরিক বা মানসিক স্বাস্থ্য সম্পর্কে যেকোনো প্রশ্ন করতে পারেন।\n\n'
-          '⚠️ দ্রষ্টব্য: আমি কোনো ডাক্তার নই। গুরুতর সমস্যায় অবশ্যই ডাক্তারের পরামর্শ নিন।',
+      text: s.aiChatWelcome,
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -56,6 +57,33 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     final msgText = text ?? _messageController.text.trim();
     if (msgText.isEmpty) return;
 
+    // Check connectivity before sending
+    final s = ref.read(stringsProvider);
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    s.aiChatOffline,
+                    style: const TextStyle(fontFamily: 'HindSiliguri'),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _messages.add(_ChatMessage(
         text: msgText,
@@ -82,7 +110,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
       setState(() {
         _isTyping = false;
         _messages.add(_ChatMessage(
-          text: 'দুঃখিত, একটি সমস্যা হয়েছে। ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন।',
+          text: s.aiChatError,
           isUser: false,
           timestamp: DateTime.now(),
           isError: true,
@@ -95,6 +123,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -103,8 +132,8 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
                   colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
                 ),
                 shape: BoxShape.circle,
@@ -115,11 +144,12 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AI স্বাস্থ্য সহকারী',
-                    style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
+                Text(s.aiChatTitle,
+                    style: const TextStyle(
+                        fontFamily: 'HindSiliguri', fontSize: 16)),
                 if (_isTyping)
-                  Text('টাইপ করছে...',
-                      style: TextStyle(
+                  Text(s.aiChatTyping,
+                      style: const TextStyle(
                         fontFamily: 'HindSiliguri',
                         fontSize: 11,
                         color: AppColors.success,
@@ -149,11 +179,12 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            // ignore: deprecated_member_use
             color: AppColors.warning.withOpacity(0.1),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.info_outline, size: 16, color: AppColors.warning),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'এটি সাধারণ তথ্যের জন্য। গুরুতর সমস্যায় ডাক্তারের কাছে যান।',
@@ -212,11 +243,15 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         runSpacing: 8,
         children: suggestions.map((s) {
           return ActionChip(
-            label: Text(s, style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 13)),
+            label: Text(s,
+                style:
+                    const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13)),
             onPressed: () {
               _sendMessage(s);
             },
+            // ignore: deprecated_member_use
             backgroundColor: AppColors.primary.withOpacity(0.08),
+            // ignore: deprecated_member_use
             side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
           );
         }).toList(),
@@ -239,6 +274,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: message.isError
+                      // ignore: deprecated_member_use
                       ? [AppColors.error, AppColors.error.withOpacity(0.7)]
                       : [const Color(0xFF6C63FF), const Color(0xFF5A52D5)],
                 ),
@@ -259,8 +295,10 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                 color: message.isUser
                     ? AppColors.primary
                     : message.isError
+                        // ignore: deprecated_member_use
                         ? AppColors.error.withOpacity(0.1)
                         : (isDark
+                            // ignore: deprecated_member_use
                             ? Colors.white.withOpacity(0.08)
                             : const Color(0xFFF0F0F0)),
                 borderRadius: BorderRadius.only(
@@ -312,6 +350,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isDark
+                  // ignore: deprecated_member_use
                   ? Colors.white.withOpacity(0.08)
                   : const Color(0xFFF0F0F0),
               borderRadius: const BorderRadius.only(
@@ -334,6 +373,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
+                        // ignore: deprecated_member_use
                         color: AppColors.primary.withOpacity(0.4 + value * 0.4),
                         shape: BoxShape.circle,
                       ),
@@ -360,6 +400,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
             blurRadius: 10,
             offset: const Offset(0, -5),
@@ -377,13 +418,14 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
               onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
                 hintText: 'আপনার প্রশ্ন লিখুন...',
-                hintStyle: TextStyle(fontFamily: 'HindSiliguri'),
+                hintStyle: const TextStyle(fontFamily: 'HindSiliguri'),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: isDark
+                    // ignore: deprecated_member_use
                     ? Colors.white.withOpacity(0.06)
                     : const Color(0xFFF5F5F5),
                 contentPadding:

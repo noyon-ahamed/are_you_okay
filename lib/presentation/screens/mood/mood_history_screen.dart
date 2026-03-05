@@ -7,9 +7,12 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/mood_api_service.dart';
+import '../../../services/mood_local_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
 // --- Providers --- //
 
@@ -22,8 +25,9 @@ final moodStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 final moodHistoryProvider = FutureProvider<List<dynamic>>((ref) async {
   final result = await ref.watch(moodApiProvider).getHistory(limit: 50);
   debugPrint('Mood History API Response: $result');
-  
-  final dynamic historyData = result['moods'] ?? result['history'] ?? result['data'];
+
+  final dynamic historyData =
+      result['moods'] ?? result['history'] ?? result['data'];
   if (historyData != null && historyData is List) {
     return historyData;
   }
@@ -42,6 +46,10 @@ class MoodHistoryScreen extends ConsumerStatefulWidget {
 class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   int _filterDays = 0; // 0 means 'All Time', 7, 14, etc.
 
+  // Local cache for last loaded data
+  List<dynamic>? _cachedHistory;
+  Map<String, dynamic>? _cachedStats;
+
   @override
   void initState() {
     super.initState();
@@ -54,10 +62,11 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('মেজাজের ইতিহাস', style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text(s.moodHistory),
         actions: [
           PopupMenuButton<int>(
             icon: const Icon(Icons.filter_list),
@@ -67,9 +76,9 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 0, child: Text('সব সময়', style: TextStyle(fontFamily: 'HindSiliguri'))),
-              const PopupMenuItem(value: 7, child: Text('গত ৭ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
-              const PopupMenuItem(value: 14, child: Text('গত ১৪ দিন', style: TextStyle(fontFamily: 'HindSiliguri'))),
+              PopupMenuItem(value: 0, child: Text(s.moodFilterAll)),
+              PopupMenuItem(value: 7, child: Text(s.moodFilter7)),
+              PopupMenuItem(value: 14, child: Text(s.moodFilter14)),
             ],
           ),
         ],
@@ -90,7 +99,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             sliver: _buildTimelineSection(ref, isDark, context),
           ),
-          
+
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
@@ -98,100 +107,127 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   }
 
   Widget _buildStatsSection(WidgetRef ref, bool isDark, BuildContext context) {
-    // If filtering is applied, we could theoretically fetch stats for those days,
-    // but the API getStats currently only fetches logic without dynamic days easily unless we modify it.
     final statusData = ref.watch(checkinStatusProvider);
     final statsAsyncValue = ref.watch(moodStatsProvider);
 
     return statsAsyncValue.when(
       skipLoadingOnRefresh: true,
       data: (statsData) {
-        final stats = statsData['stats'];
-        if (stats == null || stats['totalEntries'] == 0) {
-          return const SizedBox.shrink(); // Hide if no data
+        _cachedStats = statsData; // Cache on success
+        final s = ref.watch(stringsProvider);
+        return _buildStatsWidget(statsData, statusData, isDark, context, s);
+      },
+      loading: () {
+        final s = ref.watch(stringsProvider);
+        // Show cached stats while loading
+        if (_cachedStats != null) {
+          return _buildStatsWidget(
+              _cachedStats!, statusData, isDark, context, s);
         }
-
-        final totalEntries = stats['totalEntries'] as int? ?? 0;
-        final distribution = stats['distribution'] as Map<String, dynamic>? ?? {};
-        
-        // Calculate most frequent mood from distribution
-        String? mostFrequentMood;
-        int maxCount = 0;
-        distribution.forEach((key, value) {
-          final count = (value as num).toInt();
-          if (count > maxCount) {
-            maxCount = count;
-            mostFrequentMood = key;
-          }
-        });
-
-        final currentStreak = statusData.streak; // Use global streak
-        
-        // Find the emoji for the most frequent mood using backend keys
-        String freqEmoji = '😶';
-        final backendKeys = ['happy', 'good', 'neutral', 'sad', 'anxious', 'angry'];
-        if (mostFrequentMood != null) {
-          final index = backendKeys.indexOf(mostFrequentMood!);
-          if (index != -1 && index < AppConstants.moodEmojis.length) {
-            freqEmoji = AppConstants.moodEmojis[index];
-          }
+        return const _StatsShimmer();
+      },
+      error: (error, _) {
+        final s = ref.watch(stringsProvider);
+        // Show cached stats on error (offline)
+        if (_cachedStats != null) {
+          return _buildStatsWidget(
+              _cachedStats!, statusData, isDark, context, s);
         }
-
         return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: AppDecorations.primaryGradientBg(borderRadius: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(16),
+          decoration: AppDecorations.cardDecoration(context: context),
+          child: Text(s.moodStatsError,
+              style: const TextStyle(color: AppColors.error)),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsWidget(
+      Map<String, dynamic> statsData,
+      CheckInStatusData statusData,
+      bool isDark,
+      BuildContext context,
+      AppStrings s) {
+    final stats = statsData['stats'];
+    if (stats == null || stats['totalEntries'] == 0) {
+      return const SizedBox.shrink();
+    }
+
+    final totalEntries = stats['totalEntries'] as int? ?? 0;
+    final distribution = stats['distribution'] as Map<String, dynamic>? ?? {};
+
+    String? mostFrequentMood;
+    int maxCount = 0;
+    distribution.forEach((key, value) {
+      final count = (value as num).toInt();
+      if (count > maxCount) {
+        maxCount = count;
+        mostFrequentMood = key;
+      }
+    });
+
+    final currentStreak = statusData.streak;
+
+    String freqEmoji = '😶';
+    final backendKeys = ['happy', 'good', 'neutral', 'sad', 'anxious', 'angry'];
+    if (mostFrequentMood != null) {
+      final index = backendKeys.indexOf(mostFrequentMood!);
+      if (index != -1 && index < AppConstants.moodEmojis.length) {
+        freqEmoji = AppConstants.moodEmojis[index];
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.primaryGradientBg(borderRadius: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.moodStat30Days,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'HindSiliguri',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              const Text(
-                'গত ৩০ দিনের পরিসংখ্যান',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'HindSiliguri',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              _buildStat(
+                icon: null,
+                customIcon:
+                    Text(freqEmoji, style: const TextStyle(fontSize: 28)),
+                label: s.moodStatMain,
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                   _buildStat(
-                    icon: null,
-                    customIcon: Text(freqEmoji, style: const TextStyle(fontSize: 28)),
-                    label: 'প্রধান মেজাজ',
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  _buildStat(
-                    icon: Icons.local_fire_department,
-                    value: '$currentStreak',
-                    label: 'স্ট্রিক 🔥',
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  _buildStat(
-                    icon: Icons.calendar_month,
-                    value: '$totalEntries',
-                    label: 'মোট এন্ট্রি',
-                  ),
-                ],
+              Container(
+                width: 1,
+                height: 40,
+                // ignore: deprecated_member_use
+                color: Colors.white.withOpacity(0.3),
+              ),
+              _buildStat(
+                icon: Icons.local_fire_department,
+                value: '$currentStreak',
+                label: s.chStatStreak,
+              ),
+              Container(
+                width: 1,
+                height: 40,
+                // ignore: deprecated_member_use
+                color: Colors.white.withOpacity(0.3),
+              ),
+              _buildStat(
+                icon: Icons.calendar_month,
+                value: '$totalEntries',
+                label: s.moodStatTotal,
               ),
             ],
           ),
-        );
-      },
-      loading: () => const _StatsShimmer(),
-      error: (error, _) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: AppDecorations.cardDecoration(context: context),
-        child: const Text('পরিসংখ্যান লোড করতে সমস্যা হয়েছে।', style: TextStyle(color: AppColors.error)),
+        ],
       ),
     );
   }
@@ -204,9 +240,10 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   }) {
     return Column(
       children: [
-        if (customIcon != null) customIcon
-        else if (icon != null) Icon(icon, color: Colors.white, size: 28),
-        
+        if (customIcon != null)
+          customIcon
+        else if (icon != null)
+          Icon(icon, color: Colors.white, size: 28),
         if (value != null) ...[
           const SizedBox(height: 4),
           Text(
@@ -223,6 +260,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
         Text(
           label,
           style: TextStyle(
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.9),
             fontSize: 12,
             fontFamily: 'HindSiliguri',
@@ -232,99 +270,147 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
     );
   }
 
-  Widget _buildTimelineSection(WidgetRef ref, bool isDark, BuildContext context) {
+  Widget _buildTimelineSection(
+      WidgetRef ref, bool isDark, BuildContext context) {
     final historyAsyncValue = ref.watch(moodHistoryProvider);
 
     return historyAsyncValue.when(
       skipLoadingOnRefresh: true,
       data: (allHistory) {
-        List<dynamic> history = allHistory;
-        if (_filterDays > 0) {
-          final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
-          history = allHistory.where((item) {
-            if (item['timestamp'] != null) {
-              final date = DateTime.tryParse(item['timestamp'].toString());
-              if (date != null) return date.toLocal().isAfter(cutoff);
-            }
-            return true;
-          }).toList();
+        final s = ref.watch(stringsProvider);
+        _cachedHistory = allHistory; // Cache on success
+        return _buildHistoryList(allHistory, isDark, context, s);
+      },
+      loading: () {
+        final s = ref.watch(stringsProvider);
+        // Show cached history while loading
+        if (_cachedHistory != null) {
+          return _buildHistoryList(_cachedHistory!, isDark, context, s);
+        }
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => const _TimelineShimmer(),
+            childCount: 5,
+          ),
+        );
+      },
+      error: (error, _) {
+        final s = ref.watch(stringsProvider);
+        // Show cached history on error (offline)
+        if (_cachedHistory != null) {
+          return _buildHistoryList(_cachedHistory!, isDark, context, s);
         }
 
-        if (history.isEmpty) {
-          return const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: EmptyState(
-                icon: Icons.sentiment_neutral_rounded,
-                title: 'এখনো কোনো মেজাজ সেভ করা হয়নি',
-                description: 'হোম স্ক্রিন থেকে আজ আপনার মেজাজ কেমন তা সেভ করুন',
-              ),
+        // Fallback to local pending moods
+        final localMoods = ref.read(moodLocalServiceProvider).getPendingMoods();
+        if (localMoods.isNotEmpty) {
+          return SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final s = ref.watch(stringsProvider);
+                final moodData = localMoods[index];
+                return _buildMoodItem(context, moodData, isDark, s);
+              },
+              childCount: localMoods.length,
             ),
           );
         }
 
-        return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final moodData = history[index] as Map<String, dynamic>;
-              return _buildMoodItem(context, moodData, isDark);
-            },
-            childCount: history.length,
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: EmptyState(
+              icon: Icons.wifi_off,
+              title: s.noInternet,
+              description: s.earthquakeOfflineMessage,
+            ),
           ),
         );
       },
-      loading: () => SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => const _TimelineShimmer(),
-          childCount: 5,
-        ),
-      ),
-      error: (error, _) => SliverToBoxAdapter(
+    );
+  }
+
+  Widget _buildHistoryList(List<dynamic> allHistory, bool isDark,
+      BuildContext context, AppStrings s) {
+    List<dynamic> history = allHistory;
+    if (_filterDays > 0) {
+      final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
+      history = allHistory.where((item) {
+        if (item['timestamp'] != null) {
+          final date = DateTime.tryParse(item['timestamp'].toString());
+          if (date != null) return date.toLocal().isAfter(cutoff);
+        }
+        return true;
+      }).toList();
+    }
+
+    if (history.isEmpty) {
+      return SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.only(top: 40),
           child: EmptyState(
-            icon: Icons.error_outline,
-            title: 'ইতিহাস লোড করতে ব্যর্থ',
-            description: error.toString(),
+            icon: Icons.sentiment_neutral_rounded,
+            title: s.moodEmptyHome,
+            description: s.moodEmptyHomeDesc,
           ),
         ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final s = ref.watch(stringsProvider);
+          final moodData = history[index] as Map<String, dynamic>;
+          return _buildMoodItem(context, moodData, isDark, s);
+        },
+        childCount: history.length,
       ),
     );
   }
 
-  Widget _buildMoodItem(BuildContext context, Map<String, dynamic> moodData, bool isDark) {
+  Widget _buildMoodItem(BuildContext context, Map<String, dynamic> moodData,
+      bool isDark, AppStrings s) {
     final mood = moodData['mood'] as String? ?? 'Unknown';
     final note = moodData['note'] as String?;
     final timestampStr = moodData['timestamp'] as String?;
-    
+
     DateTime? timestamp;
     if (timestampStr != null) {
       timestamp = DateTime.tryParse(timestampStr);
     }
-    
+
     // Find the emoji and styling for the mood
     String emoji = '😶';
     Color moodColor = AppColors.primary;
-    
+
     final moodKeys = ['happy', 'good', 'neutral', 'sad', 'anxious'];
     final index = moodKeys.indexOf(mood.toLowerCase());
 
     if (index != -1) {
       emoji = AppConstants.moodEmojis[index];
       // Assign subtle colors based on mood
-      if (index == 0) moodColor = Colors.green; // Happy
-      else if (index == 1) moodColor = Colors.lightGreen; // Good
-      else if (index == 2) moodColor = Colors.blue; // Neutral
-      else if (index == 3) moodColor = Colors.red; // Sad
+      if (index == 0) {
+        moodColor = Colors.green; // Happy
+      } else if (index == 1)
+        // ignore: curly_braces_in_flow_control_structures
+        moodColor = Colors.lightGreen; // Good
+      else if (index == 2)
+        // ignore: curly_braces_in_flow_control_structures
+        moodColor = Colors.blue; // Neutral
+      else if (index == 3)
+        // ignore: curly_braces_in_flow_control_structures
+        moodColor = Colors.red; // Sad
+      // ignore: curly_braces_in_flow_control_structures
       else if (index == 4) moodColor = Colors.orange; // Anxious
     }
-    
+
     // Fallback if the user typed Bengali directly or mapping failed
     if (index == -1) {
-       final labelIndex = AppConstants.moodLabels.indexOf(mood);
-       if (labelIndex != -1) {
-         emoji = AppConstants.moodEmojis[labelIndex];
-       }
+      final labelIndex = AppConstants.moodLabels.indexOf(mood);
+      if (labelIndex != -1) {
+        emoji = AppConstants.moodEmojis[labelIndex];
+      }
     }
 
     return Container(
@@ -338,6 +424,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: moodColor.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
@@ -356,7 +443,11 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      mood,
+                      s.isBangla
+                          ? mood
+                          : (s.lang == 'en'
+                              ? mood
+                              : mood), // Fallback if mood is already translated or in English
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -368,7 +459,9 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                         timeago.format(timestamp),
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                           fontFamily: 'HindSiliguri',
                         ),
                       ),
@@ -377,10 +470,15 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                 if (timestamp != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    DateFormat('d MMMM, yyyy • hh:mm a', 'bn').format(timestamp),
+                    DateFormat('d MMMM, yyyy • hh:mm a', s.lang)
+                        .format(timestamp),
                     style: TextStyle(
                       fontSize: 11,
-                      color: (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary).withOpacity(0.6),
+                      color: (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary)
+                          // ignore: deprecated_member_use
+                          .withOpacity(0.6),
                       fontFamily: 'HindSiliguri',
                     ),
                   ),
@@ -390,10 +488,18 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                      color: isDark
+                          // ignore: deprecated_member_use
+                          ? Colors.white.withOpacity(0.05)
+                          // ignore: deprecated_member_use
+                          : Colors.black.withOpacity(0.03),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                        color: isDark
+                            // ignore: deprecated_member_use
+                            ? Colors.white.withOpacity(0.1)
+                            // ignore: deprecated_member_use
+                            : Colors.black.withOpacity(0.05),
                       ),
                     ),
                     child: Row(
@@ -402,7 +508,9 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                         Icon(
                           Icons.edit_note,
                           size: 16,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -436,7 +544,7 @@ class _StatsShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerLoading(
+    return const ShimmerLoading(
       height: 140,
       borderRadius: 20,
     );

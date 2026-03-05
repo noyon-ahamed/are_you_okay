@@ -17,8 +17,10 @@ dependencies:
   lottie: ^3.0.0
   shimmer: ^3.0.0
   smooth_page_indicator: ^1.1.0
-  cached_network_image: ^3.3.1
-  
+  cached_network_image: ^3.3.1  
+
+  flutter_native_splash: ^2.4.0
+
   # State Management
   flutter_riverpod: ^2.4.9
   go_router: ^13.0.0
@@ -92,14 +94,14 @@ dependencies:
   flutter_timezone: ^4.1.1
 
   # Ads
-  google_mobile_ads: ^4.0.0
+  google_mobile_ads: ^7.0.0
   audioplayers: ^6.5.1
   flutter_callkit_incoming: ^3.0.0
   wakelock_plus: ^1.4.0
   share_plus: ^12.0.1
   pdf: ^3.11.3
-  firebase_messaging: ^14.7.10
-  firebase_core: ^2.24.2
+  firebase_messaging: ^16.1.2
+  firebase_core: ^4.5.0
 
 dev_dependencies:
   flutter_test:
@@ -130,3 +132,29 @@ flutter_launcher_icons:
   image_path: "assets/images/logo.png"
   min_sdk_android: 21
   remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#006A4E"
+  image: assets/images/logo_padded.png
+  android_12:
+    image: assets/images/logo_padded.png
+    color: "#006A4E"
+  android: true
+  ios: false
+  fullscreen: false
+
+# flutter_native_splash:
+#   color: "#006A4E"
+#   image: assets/images/logo.png
+#   color_dark: "#004D38"
+#   image_dark: assets/images/logo.png
+#   android_12:
+#     image: assets/images/logo.png
+#     icon_background_color: "#006A4E"
+#     color: "#006A4E"
+#     image_dark: assets/images/logo.png
+#     icon_background_color_dark: "#004D38"
+#     color_dark: "#004D38"
+#   android: true
+#   ios: true
+#   fullscreen: false

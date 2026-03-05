@@ -3,13 +3,12 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/loading_widget.dart';
 import '../../../provider/auth_provider.dart';
-import 'package:are_you_okay/routes/app_router.dart';
+import '../../../provider/language_provider.dart';
 
 /// Edit Profile Screen
 /// Allows user to update their profile information
@@ -26,10 +25,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _addressController;
   String? _selectedBloodGroup;
-  int _selectedInterval = 24;
 
   final List<String> _bloodGroups = [
-    'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'O+',
+    'O-',
+    'AB+',
+    'AB-'
   ];
   File? _selectedImage;
   String? _existingImageUrl;
@@ -53,7 +58,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _emailController = TextEditingController(text: user?.email ?? '');
     _addressController = TextEditingController(text: user?.address ?? '');
     _selectedBloodGroup = user?.bloodGroup;
-    _selectedInterval = user?.checkinInterval ?? 24;
     _existingImageUrl = user?.profilePicture;
   }
 
@@ -67,9 +71,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('প্রোফাইল সম্পাদন'),
+        title: Text(s.profileEdit),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -87,12 +93,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                       backgroundImage: _selectedImage != null
                           ? FileImage(_selectedImage!)
-                          : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty
-                              ? (_existingImageUrl!.startsWith('data:image') 
-                                  ? MemoryImage(base64Decode(_existingImageUrl!.split(',').last)) as ImageProvider
+                          : (_existingImageUrl != null &&
+                                  _existingImageUrl!.isNotEmpty
+                              ? (_existingImageUrl!.startsWith('data:image')
+                                  ? MemoryImage(base64Decode(
+                                          _existingImageUrl!.split(',').last))
+                                      as ImageProvider
                                   : NetworkImage(_existingImageUrl!))
                               : null),
-                      child: (_selectedImage == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
+                      child: (_selectedImage == null &&
+                              (_existingImageUrl == null ||
+                                  _existingImageUrl!.isEmpty))
                           ? const Icon(
                               Icons.person,
                               size: 50,
@@ -103,7 +114,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     TextButton.icon(
                       onPressed: _pickImage,
                       icon: const Icon(Icons.photo_camera),
-                      label: const Text('ছবি পরিবর্তন করুন'),
+                      label: Text(s.profileChangePic),
                     ),
                   ],
                 ),
@@ -112,12 +123,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               CustomTextField(
                 controller: _nameController,
-                label: 'সম্পূর্ণ নাম',
-                hint: 'আপনার নাম লিখুন',
+                label: s.profileFullName,
+                hint: s.profileNameHint,
                 prefixIcon: Icons.person_outline,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'নাম প্রয়োজন';
+                    return s.profileNameReq;
                   }
                   return null;
                 },
@@ -126,8 +137,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               CustomTextField(
                 controller: _emailController,
-                label: 'ইমেইল (ঐচ্ছিক)',
-                hint: 'আপনার ইমেইল লিখুন',
+                label: s.profileEmailOpt,
+                hint: s.profileEmailHint,
                 prefixIcon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -135,17 +146,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               CustomTextField(
                 controller: _addressController,
-                label: 'ঠিকানা',
-                hint: 'আপনার বর্তমান ঠিকানা লিখুন',
+                label: s.profileAddress,
+                hint: s.profileAddressHint,
                 prefixIcon: Icons.location_on_outlined,
                 maxLines: 2,
               ),
               const SizedBox(height: 16),
 
               // Blood Group
-              const Text(
-                'রক্তের গ্রুপ',
-                style: TextStyle(
+              Text(
+                s.profileBloodGroup,
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -153,14 +164,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedBloodGroup,
+                initialValue: _selectedBloodGroup,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  prefixIcon: const Icon(Icons.bloodtype, color: AppColors.primary),
+                  prefixIcon:
+                      const Icon(Icons.bloodtype, color: AppColors.primary),
                 ),
                 items: _bloodGroups.map((group) {
                   return DropdownMenuItem(
@@ -210,7 +222,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 40),
 
               CustomButton(
-                text: 'তথ্য সংরক্ষণ করুন',
+                text: s.profileSaveInfo,
                 isLoading: _isSaving,
                 onPressed: _saveProfile,
               ),
@@ -224,28 +236,55 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _isSaving = false;
 
   Future<void> _saveProfile() async {
+    final s = ref.read(stringsProvider);
     if (_formKey.currentState!.validate()) {
+      // Check connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      s.profileOfflineWarning,
+                      style: const TextStyle(fontFamily: 'HindSiliguri'),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() => _isSaving = true);
       try {
         String? base64Image;
         if (_selectedImage != null) {
           final bytes = await _selectedImage!.readAsBytes();
-          base64Image = 'data:image/jpeg;base64,' + base64Encode(bytes);
+          base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
         }
 
         // Update profile on backend
         await ref.read(authProvider.notifier).updateProfile(
-          name: _nameController.text.trim(),
-          phone: null, // phone is read-only on this screen
-          address: _addressController.text.trim(),
-          bloodGroup: _selectedBloodGroup,
-          profilePicture: base64Image,
-        );
+              name: _nameController.text.trim(),
+              phone: null, // phone is read-only on this screen
+              address: _addressController.text.trim(),
+              bloodGroup: _selectedBloodGroup,
+              profilePicture: base64Image,
+            );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('আপনার প্রোফাইল সফলভাবে আপডেট করা হয়েছে।'),
+            SnackBar(
+              content: Text(s.profileUpdateSuccess),
               backgroundColor: Colors.green,
             ),
           );
@@ -255,7 +294,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('প্রোফাইল আপডেট ব্যর্থ: $e'),
+              content: Text('${s.profileUpdateFail} $e'),
               backgroundColor: Colors.red,
             ),
           );

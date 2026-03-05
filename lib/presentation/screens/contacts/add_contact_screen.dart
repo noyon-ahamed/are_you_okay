@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../../model/emergency_contact_model.dart';
 import '../../../provider/contact_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import 'package:are_you_okay/routes/app_router.dart';
 
 /// Add Contact Screen
 /// Allows user to add a new emergency contact
@@ -114,10 +111,13 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                       height: 50,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.surface,
+                        color:
+                            isSelected ? AppColors.primary : AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.divider,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.divider,
                         ),
                       ),
                       child: Text(
@@ -125,7 +125,8 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                          color:
+                              isSelected ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -156,14 +157,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                 title: const Text('SMS এর মাধ্যমে জানান'),
                 value: _notifyViaSMS,
                 onChanged: (value) => setState(() => _notifyViaSMS = value),
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
                 title: const Text('অ্যাপ বিজ্ঞপ্তির মাধ্যমে জানান'),
                 value: _notifyViaApp,
                 onChanged: (value) => setState(() => _notifyViaApp = value),
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 40),
@@ -189,7 +190,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
             notifyViaSMS: _notifyViaSMS,
             notifyViaApp: _notifyViaApp,
           );
-      
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

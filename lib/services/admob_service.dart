@@ -9,8 +9,6 @@ class AdMobService {
   factory AdMobService() => _instance;
   AdMobService._internal();
 
-  // Ad Unit IDs
-  // TODO: Replace with actual AdMob unit IDs
   static final String bannerAdUnitId = Platform.isAndroid
       ? 'ca-app-pub-3940256099942544/6300978111' // Test ID
       : 'ca-app-pub-3940256099942544/2934735716'; // Test ID
@@ -26,7 +24,7 @@ class AdMobService {
   // Ad state
   bool _isBannerAdLoaded = false;
   bool _isInterstitialAdLoaded = false;
-  
+
   // Ad frequency control
   DateTime? _lastInterstitialShown;
   static const Duration _interstitialCooldown = Duration(hours: 24);
@@ -36,7 +34,7 @@ class AdMobService {
     try {
       await MobileAds.instance.initialize();
       debugPrint('AdMob initialized');
-      
+
       // Preload interstitial ad
       _loadInterstitialAd();
     } catch (e) {
@@ -100,7 +98,8 @@ class AdMobService {
           _isInterstitialAdLoaded = true;
 
           // Set full screen content callback
-          _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+          _interstitialAd!.fullScreenContentCallback =
+              FullScreenContentCallback(
             onAdShowedFullScreenContent: (ad) {
               debugPrint('Interstitial ad showed full screen content');
             },
@@ -109,7 +108,7 @@ class AdMobService {
               ad.dispose();
               _interstitialAd = null;
               _isInterstitialAdLoaded = false;
-              
+
               // Preload next ad
               _loadInterstitialAd();
             },
@@ -118,7 +117,7 @@ class AdMobService {
               ad.dispose();
               _interstitialAd = null;
               _isInterstitialAdLoaded = false;
-              
+
               // Retry loading
               _loadInterstitialAd();
             },
@@ -128,7 +127,7 @@ class AdMobService {
           debugPrint('Interstitial ad failed to load: $error');
           _interstitialAd = null;
           _isInterstitialAdLoaded = false;
-          
+
           // Retry after delay
           Future.delayed(const Duration(seconds: 30), () {
             _loadInterstitialAd();
@@ -144,7 +143,8 @@ class AdMobService {
   }) async {
     // Check cooldown period
     if (!forceShow && _lastInterstitialShown != null) {
-      final timeSinceLastAd = DateTime.now().difference(_lastInterstitialShown!);
+      final timeSinceLastAd =
+          DateTime.now().difference(_lastInterstitialShown!);
       if (timeSinceLastAd < _interstitialCooldown) {
         debugPrint('Interstitial ad still in cooldown period');
         return false;
@@ -168,7 +168,7 @@ class AdMobService {
   /// Check if can show interstitial (respects cooldown)
   bool get canShowInterstitial {
     if (_lastInterstitialShown == null) return true;
-    
+
     final timeSinceLastAd = DateTime.now().difference(_lastInterstitialShown!);
     return timeSinceLastAd >= _interstitialCooldown;
   }

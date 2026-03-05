@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../services/api/earthquake_service.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
 class EarthquakeScreen extends ConsumerStatefulWidget {
   const EarthquakeScreen({super.key});
@@ -30,6 +33,18 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   }
 
   Future<void> _fetchEarthquakeData() async {
+    // Check connectivity first
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'offline';
+        });
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -46,12 +61,12 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           debugPrint('Location services disabled');
         } else {
           LocationPermission permission = await Geolocator.checkPermission();
-          
+
           // Request permission if denied
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
           }
-          
+
           // If permanently denied, show dialog to open settings
           if (permission == LocationPermission.deniedForever) {
             if (mounted) {
@@ -70,8 +85,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
               );
             }
           }
-          
-          if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+
+          if (permission == LocationPermission.always ||
+              permission == LocationPermission.whileInUse) {
             Position position = await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.low,
             );
@@ -84,12 +100,15 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       }
 
       final earthquakeService = ref.read(earthquakeServiceProvider);
-      final responseData = await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
+      final responseData =
+          await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
 
       if (mounted) {
         setState(() {
-          _localQuakes = _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
-          _globalQuakes = _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
+          _localQuakes =
+              _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
+          _globalQuakes =
+              _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
           _isLoading = false;
         });
 
@@ -114,29 +133,36 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: AppColors.error,
-            title: const Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
-                SizedBox(width: 8),
-                Text(
-                  '⚠️ বিপদ সংকেত!',
-                  style: TextStyle(color: Colors.white, fontFamily: 'HindSiliguri'),
+          builder: (context) {
+            final s = ref.read(stringsProvider);
+            return AlertDialog(
+              backgroundColor: AppColors.error,
+              title: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 28),
+                  const SizedBox(width: 8),
+                  Text(
+                    s.earthquakeAlertTitle,
+                    style: const TextStyle(
+                        color: Colors.white, fontFamily: 'HindSiliguri'),
+                  ),
+                ],
+              ),
+              content: Text(
+                s.earthquakeAlertMessage,
+                style: const TextStyle(
+                    color: Colors.white, fontFamily: 'HindSiliguri'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(s.earthquakeUnderstood,
+                      style: const TextStyle(color: Colors.white)),
                 ),
               ],
-            ),
-            content: const Text(
-              'উচ্চ মাত্রার ভূমিকম্প শনাক্ত হয়েছে! নিরাপদ স্থানে যান!',
-              style: TextStyle(color: Colors.white, fontFamily: 'HindSiliguri'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('বুঝেছি', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
+            );
+          },
         );
       }
     } catch (e) {
@@ -147,12 +173,13 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'ভূমিকম্প সতর্কতা',
-          style: TextStyle(fontFamily: 'HindSiliguri'),
+        title: Text(
+          s.earthquakeTitle,
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
           IconButton(
@@ -166,22 +193,28 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           : _error != null
               ? _buildErrorView()
               : (_localQuakes.isEmpty && _globalQuakes.isEmpty)
-                  ? _buildEmptyView()
+                  ? _buildEmptyView(s)
                   : RefreshIndicator(
                       onRefresh: _fetchEarthquakeData,
-                      child: _buildHistoryList(context, isDark),
+                      child: _buildHistoryList(context, isDark, s),
                     ),
     );
   }
 
-  List<_EarthquakeData> _parseQuakes(List? dataList, double? userLat, double? userLng) {
+  List<_EarthquakeData> _parseQuakes(
+      List? dataList, double? userLat, double? userLng) {
     if (dataList == null) return [];
     return dataList.map((e) {
       final coords = e['location']?['coordinates'] as List?;
-      final eqLng = (coords != null && coords.isNotEmpty) ? (coords[0] as num).toDouble() : 0.0;
-      final eqLat = (coords != null && coords.length > 1) ? (coords[1] as num).toDouble() : 0.0;
+      final eqLng = (coords != null && coords.isNotEmpty)
+          ? (coords[0] as num).toDouble()
+          : 0.0;
+      final eqLat = (coords != null && coords.length > 1)
+          ? (coords[1] as num).toDouble()
+          : 0.0;
       final magnitude = (e['magnitude'] as num?)?.toDouble() ?? 0.0;
-      final timestampStr = e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
+      final timestampStr =
+          e['time']?.toString() ?? e['timestamp']?.toString() ?? '';
       final timestamp = DateTime.tryParse(timestampStr) ?? DateTime.now();
 
       double? displayDistance;
@@ -192,10 +225,15 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         } else if (e['distance'] is String) {
           displayDistance = double.tryParse(e['distance']);
         }
-      } 
+      }
       // Fallback calculation if not present but we have coordinates
-      if (displayDistance == null && userLat != null && userLng != null && eqLat != 0.0 && eqLng != 0.0) {
-        displayDistance = Geolocator.distanceBetween(userLat, userLng, eqLat, eqLng) / 1000;
+      if (displayDistance == null &&
+          userLat != null &&
+          userLng != null &&
+          eqLat != 0.0 &&
+          eqLng != 0.0) {
+        displayDistance =
+            Geolocator.distanceBetween(userLat, userLng, eqLat, eqLng) / 1000;
       }
 
       return _EarthquakeData(
@@ -212,7 +250,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     }).toList();
   }
 
-  Widget _buildHistoryList(BuildContext context, bool isDark) {
+  Widget _buildHistoryList(BuildContext context, bool isDark, AppStrings s) {
     // Highest magnitude calculation (using both sets for stats, or just local. Let's use local for stats to be relevant to user)
     double highestMag = 0.0;
     int highMagnitudeCount = 0;
@@ -231,7 +269,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            child: _buildStatsHeader(context, isDark, highestMag, highMagnitudeCount),
+            child: _buildStatsHeader(
+                context, isDark, highestMag, highMagnitudeCount, s),
           ),
         ),
 
@@ -241,8 +280,11 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Text(
-                'আপনার কাছাকাছি (৩০০০ কি.মি)',
-                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 18, fontWeight: FontWeight.bold),
+                s.earthquakeNearby,
+                style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -265,10 +307,14 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         if (_globalQuakes.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(left: 20, right: 20, top: 24, bottom: 8),
+              padding: const EdgeInsets.only(
+                  left: 20, right: 20, top: 24, bottom: 8),
               child: Text(
-                'বিশ্বের বড় ভূমিকম্প (টপ ৫)',
-                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 18, fontWeight: FontWeight.bold),
+                s.earthquakeGlobal,
+                style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -297,6 +343,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     bool isDark,
     double highestMag,
     int highMagnitudeCount,
+    AppStrings s,
   ) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -310,28 +357,30 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           _buildStat(
             icon: Icons.my_location,
             value: '${_localQuakes.length}',
-            label: 'কাছাকাছি',
+            label: s.earthquakeNearbyStat,
           ),
           Container(
             width: 1,
             height: 40,
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.3),
           ),
           _buildStat(
             icon: Icons.warning_amber_rounded,
             value: highestMag.toStringAsFixed(1),
-            label: 'সর্বোচ্চ মাত্রা',
+            label: s.earthquakeMaxMag,
             color: highestMag >= 6.0 ? AppColors.error : Colors.white,
           ),
           Container(
             width: 1,
             height: 40,
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.3),
           ),
           _buildStat(
             icon: Icons.bolt,
             value: '$highMagnitudeCount',
-            label: '৪.৫+ মাত্রা',
+            label: s.earthquakeMag45,
           ),
         ],
       ),
@@ -360,6 +409,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         Text(
           label,
           style: TextStyle(
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.8),
             fontSize: 12,
             fontFamily: 'HindSiliguri',
@@ -370,7 +420,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   }
 
   Future<void> _launchMap(double lat, double lng) async {
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final uri =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
@@ -378,7 +429,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     }
   }
 
-  Widget _buildQuakeItem(BuildContext context, _EarthquakeData quake, bool isDark) {
+  Widget _buildQuakeItem(
+      BuildContext context, _EarthquakeData quake, bool isDark) {
+    final s = ref.watch(stringsProvider);
     Color magColor;
     if (quake.magnitude >= 6.0) {
       magColor = AppColors.error;
@@ -395,131 +448,113 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         padding: const EdgeInsets.all(14),
         decoration: AppDecorations.cardDecoration(context: context),
         child: Row(
-        children: [
-          // Magnitude Circle
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: magColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: magColor, width: 2),
-            ),
-            child: Center(
-              child: Text(
-                quake.magnitude.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: magColor,
+          children: [
+            // Magnitude Circle
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                // ignore: deprecated_member_use
+                color: magColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: magColor, width: 2),
+              ),
+              child: Center(
+                child: Text(
+                  quake.magnitude.toStringAsFixed(1),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: magColor,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 14),
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  quake.location,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+            const SizedBox(width: 14),
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    quake.location,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          quake.time,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodySmall?.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.layers,
-                          size: 14,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          quake.depth,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodySmall?.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (quake.distanceKm != null)
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.map,
+                            Icons.access_time,
                             size: 14,
                             color: Theme.of(context).textTheme.bodySmall?.color,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${quake.distanceKm!.toStringAsFixed(0)} কি.মি. দূরে',
+                            quake.time,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).textTheme.bodySmall?.color,
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color,
                             ),
                           ),
                         ],
                       ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.error),
-            const SizedBox(height: 12),
-            const Text(
-              'ডেটা লোড করতে ব্যর্থ',
-              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: _fetchEarthquakeData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('আবার চেষ্টা করুন', style: TextStyle(fontFamily: 'HindSiliguri')),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.layers,
+                            size: 14,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            quake.depth,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (quake.distanceKm != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.map,
+                              size: 14,
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${quake.distanceKm!.toStringAsFixed(0)} ${s.earthquakeAway}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -527,18 +562,59 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     );
   }
 
-  Widget _buildEmptyView() {
+  Widget _buildErrorView() {
+    final bool isOffline = _error == 'offline';
+    final s = ref.watch(stringsProvider);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isOffline ? Icons.wifi_off_rounded : Icons.error_outline,
+              size: 64,
+              color: isOffline ? AppColors.warning : AppColors.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isOffline ? s.earthquakeOffline : s.networkError,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isOffline ? s.earthquakeOfflineMessage : s.earthquakeServerError,
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _fetchEarthquakeData,
+              icon: const Icon(Icons.refresh),
+              label: Text(s.retry),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyView(AppStrings s) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, size: 48, color: AppColors.success),
+            const Icon(Icons.check_circle_outline,
+                size: 48, color: AppColors.success),
             const SizedBox(height: 12),
-            const Text(
-              'কোনো সাম্প্রতিক ভূমিকম্প নেই',
-              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+            Text(
+              s.earthquakeEmpty,
+              style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
             ),
           ],
         ),

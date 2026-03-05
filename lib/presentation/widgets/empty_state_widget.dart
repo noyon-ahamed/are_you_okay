@@ -30,6 +30,7 @@ class EmptyStateWidget extends StatelessWidget {
             Icon(
               icon,
               size: 80,
+              // ignore: deprecated_member_use
               color: AppColors.textSecondary.withOpacity(0.5),
             ),
             const SizedBox(height: 16),

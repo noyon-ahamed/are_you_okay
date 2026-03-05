@@ -18,11 +18,14 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding:
+          padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
+        // ignore: deprecated_member_use
         color: _getColor().withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
+          // ignore: deprecated_member_use
           color: _getColor().withOpacity(0.3),
           width: 1,
         ),

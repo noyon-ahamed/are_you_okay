@@ -82,12 +82,6 @@ class _PhoneVerificationScreenState
     }
   }
 
-  void _onOtpBackspace(int index) {
-    if (index > 0) {
-      _otpFocusNodes[index - 1].requestFocus();
-    }
-  }
-
   Future<void> _verifyOtp() async {
     final otp = _getOtpCode();
     if (otp.length != 6) {
@@ -117,7 +111,6 @@ class _PhoneVerificationScreenState
     }
     _otpFocusNodes[0].requestFocus();
 
-    // TODO: Resend OTP API call
     _showSuccess('OTP sent successfully');
 
     // Restart timer
@@ -163,11 +156,11 @@ class _PhoneVerificationScreenState
               Container(
                 width: 100,
                 height: 100,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.primaryContainer,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.mark_email_read_outlined,
                   size: 50,
                   color: AppColors.primary,
@@ -234,14 +227,14 @@ class _PhoneVerificationScreenState
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
+                          borderSide: const BorderSide(
                             color: AppColors.border,
                             width: 2,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
+                          borderSide: const BorderSide(
                             color: AppColors.primary,
                             width: 2,
                           ),

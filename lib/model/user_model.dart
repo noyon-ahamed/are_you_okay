@@ -29,6 +29,17 @@ class UserModel {
     this.checkinInterval = 24,
   });
 
+  factory UserModel.empty() {
+    return UserModel(
+      id: '',
+      email: '',
+      name: '',
+      role: 'user',
+      emailVerified: false,
+      checkinInterval: 24,
+    );
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] ?? json['_id'] ?? '',
@@ -38,14 +49,20 @@ class UserModel {
       profilePicture: json['profilePicture'],
       role: json['role'] ?? 'user',
       emailVerified: json['emailVerified'] ?? false,
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
-      lastCheckIn: json['lastCheckIn'] != null ? DateTime.parse(json['lastCheckIn']) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      createdAt:
+          json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      lastCheckIn: json['lastCheckIn'] != null
+          ? DateTime.parse(json['lastCheckIn'])
+          : null,
+      updatedAt:
+          json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
       address: json['address'],
       bloodGroup: json['bloodGroup'],
       checkinInterval: json['checkinInterval'] ?? 24,
     );
   }
+
+  bool get isEmpty => id.isEmpty && email.isEmpty;
 
   Map<String, dynamic> toJson() {
     return {

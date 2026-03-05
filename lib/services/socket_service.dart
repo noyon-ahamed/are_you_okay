@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// ignore: library_prefixes
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../../core/constants/app_constants.dart';
 import 'shared_prefs_service.dart';
@@ -13,14 +15,18 @@ final socketServiceProvider = Provider<SocketService>((ref) {
 class SocketService {
   IO.Socket? _socket;
   bool _isConnected = false;
-  
+
   // Stream controllers for events
-  final _checkInStreamController = StreamController<Map<String, dynamic>>.broadcast();
-  final _emergencyStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  final _checkInStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _emergencyStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Getters for streams
-  Stream<Map<String, dynamic>> get checkInStream => _checkInStreamController.stream;
-  Stream<Map<String, dynamic>> get emergencyStream => _emergencyStreamController.stream;
+  Stream<Map<String, dynamic>> get checkInStream =>
+      _checkInStreamController.stream;
+  Stream<Map<String, dynamic>> get emergencyStream =>
+      _emergencyStreamController.stream;
   bool get isConnected => _isConnected;
 
   SocketService();
@@ -35,7 +41,7 @@ class SocketService {
     // Configure socket
     _socket = IO.io(
       // AppConstants.apiBaseUrl,
-        AppConstants.socketUrl,
+      AppConstants.socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
@@ -49,16 +55,22 @@ class SocketService {
     // Listeners
     _socket!.onConnect((_) {
       _isConnected = true;
-      print('Socket connected');
+      if (kDebugMode) {
+        print('Socket connected');
+      }
     });
 
     _socket!.onDisconnect((_) {
       _isConnected = false;
-      print('Socket disconnected');
+      if (kDebugMode) {
+        print('Socket disconnected');
+      }
     });
 
     _socket!.onError((data) {
-      print('Socket error: $data');
+      if (kDebugMode) {
+        print('Socket error: $data');
+      }
     });
 
     // Custom Events

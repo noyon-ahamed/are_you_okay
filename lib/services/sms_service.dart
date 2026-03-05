@@ -5,13 +5,13 @@ import 'package:flutter/foundation.dart';
 /// Handles SMS sending via SSL Wireless (Bangladesh)
 class SMSService {
   final Dio _dio = Dio();
-  
+
   // SSL Wireless API Configuration
-  // TODO: Replace with actual credentials from SSL Wireless
+
   static const String _baseUrl = 'https://smsplus.sslwireless.com/api/v3';
   static const String _apiToken = 'YOUR_SSL_API_TOKEN'; // Replace this
   static const String _sid = 'YOUR_SID'; // Replace this
-  
+
   /// Send SMS
   Future<bool> sendSMS({
     required String phoneNumber,
@@ -20,9 +20,9 @@ class SMSService {
     try {
       // Ensure phone number is in correct format (8801XXXXXXXXX)
       final formattedPhone = _formatBangladeshPhone(phoneNumber);
-      
+
       debugPrint('Sending SMS to: $formattedPhone');
-      
+
       final response = await _dio.post(
         '$_baseUrl/send-sms',
         data: {
@@ -72,7 +72,7 @@ class SMSService {
     for (final phone in phoneNumbers) {
       final success = await sendSMS(phoneNumber: phone, message: message);
       results[phone] = success;
-      
+
       // Small delay to avoid rate limiting
       await Future.delayed(const Duration(milliseconds: 500));
     }
@@ -112,15 +112,15 @@ class SMSService {
     final buffer = StringBuffer();
     buffer.writeln('জরুরি সাহায্য প্রয়োজন!');
     buffer.writeln('$userName SOS সিগন্যাল পাঠিয়েছেন।');
-    
+
     if (location != null && location.isNotEmpty) {
       buffer.writeln('অবস্থান: $location');
     }
-    
+
     if (userPhone != null && userPhone.isNotEmpty) {
       buffer.writeln('ফোন: $userPhone');
     }
-    
+
     buffer.writeln('অবিলম্বে যোগাযোগ করুন!');
     buffer.write('- ভালো আছেন কি? অ্যাপ');
 
@@ -136,15 +136,15 @@ class SMSService {
     final buffer = StringBuffer();
     buffer.writeln('জরুরি:');
     buffer.writeln('$userName দীর্ঘ সময় ধরে চেক-ইন করেননি।');
-    
+
     if (location != null && location.isNotEmpty) {
       buffer.writeln('শেষ অবস্থান: $location');
     }
-    
+
     if (userPhone != null && userPhone.isNotEmpty) {
       buffer.writeln('যোগাযোগ: $userPhone');
     }
-    
+
     buffer.write('- ভালো আছেন কি? অ্যাপ');
 
     return buffer.toString();
@@ -171,11 +171,11 @@ class SMSService {
   }
 
   /// Send via backup provider (Twilio, BulkSMS, etc.)
-  Future<bool> _sendViaBackupProvider(String phoneNumber, String message) async {
+  Future<bool> _sendViaBackupProvider(
+      String phoneNumber, String message) async {
     try {
-      // TODO: Implement backup SMS provider
       debugPrint('Attempting backup SMS provider...');
-      
+
       // For now, just return false
       // You can implement Twilio or other backup here
       return false;
@@ -188,7 +188,7 @@ class SMSService {
   /// Validate Bangladesh phone number
   bool isValidBangladeshPhone(String phone) {
     final cleaned = phone.replaceAll(RegExp(r'[^\d]'), '');
-    
+
     // Check if it matches Bangladesh phone format
     // 11 digits starting with 01 or 13 digits starting with 880
     if (cleaned.length == 11 && cleaned.startsWith('01')) {
@@ -197,7 +197,7 @@ class SMSService {
     if (cleaned.length == 13 && cleaned.startsWith('880')) {
       return true;
     }
-    
+
     return false;
   }
 

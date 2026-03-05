@@ -13,8 +13,9 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../routes/app_router.dart';
-import '../../widgets/glass_card.dart';
 import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
@@ -142,8 +143,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final checkinState = ref.watch(checkinProvider);
     final statusData = ref.watch(checkinStatusProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
-    String userName = 'ব্যবহারকারী';
+    String userName = s.profileDefaultUser;
     if (authState is AuthAuthenticated) {
       userName = authState.user.name;
     }
@@ -164,7 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 16),
 
                   // ==================== Offline Banner ====================
-                  _buildOfflineBanner(),
+                  // Offline banner removed per user request
 
                   // ==================== Header ====================
                   _buildHeader(
@@ -176,30 +178,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 28),
 
                   // ==================== Check-in Button ====================
-                  _buildCheckinButton(checkinState, statusData, isDark),
+                  _buildCheckinButton(checkinState, statusData, isDark, s),
                   const SizedBox(height: 12),
 
                   // ==================== Countdown Timer ====================
-                  _buildCountdownTimer(statusData, isDark),
+                  _buildCountdownTimer(statusData, isDark, s),
                   const SizedBox(height: 24),
 
                   // ==================== Mood Selector ====================
-                  _buildMoodSelector(isDark),
+                  _buildMoodSelector(isDark, s),
                   const SizedBox(height: 24),
 
                   // ==================== Quick Actions ====================
                   Text(
-                    'দ্রুত অ্যাকশন',
+                    s.homeQuickActions,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                   ),
                   const SizedBox(height: 12),
-                  _buildQuickActions(isDark),
+                  _buildQuickActions(isDark, s),
                   const SizedBox(height: 24),
 
                   // ==================== Safety Stats ====================
-                  _buildSafetyStats(statusData, isDark),
+                  _buildSafetyStats(statusData, isDark, s),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -207,50 +209,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(isDark),
-    );
-  }
-
-  // ==================== Offline Banner ====================
-  Widget _buildOfflineBanner() {
-    return StreamBuilder<ConnectivityResult>(
-      stream: Connectivity().onConnectivityChanged,
-      builder: (context, snapshot) {
-        final isOffline =
-            snapshot.hasData && snapshot.data == ConnectivityResult.none;
-        if (!isOffline) return const SizedBox.shrink();
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF57C00),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'অফলাইন মোড — ক্যাশ থেকে ডেটা দেখানো হচ্ছে',
-                  style: const TextStyle(
-                    fontFamily: 'HindSiliguri',
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      bottomNavigationBar: _buildBottomNav(isDark, s),
     );
   }
 
   // ==================== Header ====================
   Widget _buildHeader(String name, String profilePicture, bool isDark) {
+    final s = ref.watch(stringsProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -259,7 +224,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _getGreeting(),
+                _getGreeting(s),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -330,6 +295,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           shape: BoxShape.circle,
           color: Theme.of(context).colorScheme.surface,
           border: Border.all(
+            // ignore: deprecated_member_use
             color: Theme.of(context).dividerColor.withOpacity(0.1),
           ),
         ),
@@ -339,8 +305,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Check-in Button ====================
-  Widget _buildCheckinButton(
-      CheckInState state, CheckInStatusData statusData, bool isDark) {
+  Widget _buildCheckinButton(CheckInState state, CheckInStatusData statusData,
+      bool isDark, AppStrings s) {
     final isLoading = state is CheckInLoading || _isCheckingInLocally;
     final hasCheckedIn = statusData.hasCheckedInToday || _isCheckingInLocally;
 
@@ -365,7 +331,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'পরবর্তী চেক-ইন সম্ভব: $hours ঘণ্টা $minutes মিনিট পর',
+                            '${s.homeWaitCheckin} $hours ${s.homeHoursLeft} $minutes ${s.homeWaitAfter}',
                             style: const TextStyle(fontFamily: 'HindSiliguri'),
                           ),
                           backgroundColor: AppColors.warning,
@@ -412,8 +378,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       colors: hasCheckedIn
                           ? [
                               AppColors.success,
+                              // ignore: deprecated_member_use
                               AppColors.success.withOpacity(0.8)
                             ]
+                          // ignore: deprecated_member_use
                           : [_urgencyColor, _urgencyColor.withOpacity(0.8)],
                     ),
                   ),
@@ -439,9 +407,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'চেক-ইন সম্পন্ন ✓\n${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                                  '${s.homeCheckinDone} ✓\n${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -460,8 +428,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'চেক-ইন',
-                                  style: TextStyle(
+                                  s.homeCheckinBtn,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -480,11 +448,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Countdown Timer ====================
-  Widget _buildCountdownTimer(CheckInStatusData statusData, bool isDark) {
+  Widget _buildCountdownTimer(
+      CheckInStatusData statusData, bool isDark, AppStrings s) {
     final hasCheckedIn = statusData.hasCheckedInToday;
     final hours = _timeRemaining.inHours;
     final minutes = _timeRemaining.inMinutes.remainder(60);
     final seconds = _timeRemaining.inSeconds.remainder(60);
+    final s = ref.watch(stringsProvider);
 
     return Center(
       child: Column(
@@ -498,12 +468,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? StatusType.warning
                         : StatusType.danger,
             label: hasCheckedIn
-                ? 'আজকের চেক-ইন সম্পন্ন ✓'
+                ? '${s.homeCheckinDone} ✓'
                 : _urgencyPercent < 0.5
-                    ? 'নিরাপদ'
+                    ? s.statusSafe
                     : _urgencyPercent < 0.75
-                        ? 'চেক-ইন প্রয়োজন'
-                        : 'জরুরি চেক-ইন',
+                        ? s.statusNeedCheckin
+                        : s.statusEmergency,
           ),
           const SizedBox(height: 12),
           if (!hasCheckedIn) ...[
@@ -514,19 +484,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 fontWeight: FontWeight.w300,
                 letterSpacing: 4,
                 color: _urgencyColor,
-                fontFamily: 'HindSiliguri',
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              'পরবর্তী চেক-ইনের বাকি সময়',
+              s.homeCheckinRemaining,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ] else ...[
             if (statusData.streak > 0)
               Text(
-                '🔥 ${statusData.streak} দিনের স্ট্রিক!',
-                style: TextStyle(
+                '🔥 ${statusData.streak} ${s.homeStreakX}',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,
@@ -540,7 +509,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Mood Selector ====================
-  Widget _buildMoodSelector(bool isDark) {
+  Widget _buildMoodSelector(bool isDark, AppStrings s) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppDecorations.cardDecoration(context: context),
@@ -548,7 +517,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'আজ আপনার মেজাজ কেমন?',
+            s.moodHowAreYou,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -565,6 +534,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: _selectedMood == index
+                        // ignore: deprecated_member_use
                         ? AppColors.primary.withOpacity(0.12)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
@@ -626,9 +596,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     onPressed: _saveMood,
                     icon:
                         const Icon(Icons.check, size: 18, color: Colors.white),
-                    label: const Text(
-                      'সেভ করুন',
-                      style: TextStyle(
+                    label: Text(
+                      s.homeMoodSave,
+                      style: const TextStyle(
                         fontFamily: 'HindSiliguri',
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -648,9 +618,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 TextButton.icon(
                   onPressed: () => context.push(Routes.moodHistory),
                   icon: const Icon(Icons.history, size: 18),
-                  label: const Text(
-                    'ইতিহাস',
-                    style: TextStyle(
+                  label: Text(
+                    s.homeMoodHistory,
+                    style: const TextStyle(
                       fontFamily: 'HindSiliguri',
                       fontWeight: FontWeight.w600,
                     ),
@@ -673,11 +643,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Quick Actions ====================
-  Widget _buildQuickActions(bool isDark) {
+  Widget _buildQuickActions(bool isDark, AppStrings s) {
     final actions = [
       _QuickAction(
         icon: Icons.sos,
-        label: 'জরুরি SOS',
+        label: s.actionSOS,
         color: const Color(0xFFF44336),
         gradient: [const Color(0xFFF44336), const Color(0xFFE53935)],
         route: Routes.sos,
@@ -685,35 +655,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
       _QuickAction(
         icon: Icons.smart_toy_outlined,
-        label: 'AI চ্যাট',
+        label: s.actionAIChat,
         color: const Color(0xFF6C63FF),
         gradient: [const Color(0xFF6C63FF), const Color(0xFF5A52D5)],
         route: Routes.aiChat,
       ),
       _QuickAction(
         icon: Icons.contacts_outlined,
-        label: 'যোগাযোগ',
+        label: s.actionContacts,
         color: const Color(0xFF00BCD4),
         gradient: [const Color(0xFF00BCD4), const Color(0xFF0097A7)],
         route: Routes.contacts,
       ),
       _QuickAction(
         icon: Icons.phone_callback_outlined,
-        label: 'ফেক কল',
+        label: s.actionFakeCall,
         color: const Color(0xFFFF9800),
         gradient: [const Color(0xFFFF9800), const Color(0xFFF57C00)],
         route: Routes.fakeCall,
       ),
       _QuickAction(
         icon: Icons.public,
-        label: 'ভূমিকম্প',
+        label: s.actionEarthquake,
         color: const Color(0xFF795548),
         gradient: [const Color(0xFF795548), const Color(0xFF5D4037)],
         route: Routes.earthquake,
       ),
       _QuickAction(
         icon: Icons.history,
-        label: 'ইতিহাস',
+        label: s.actionHistory,
         color: const Color(0xFF009688),
         gradient: [const Color(0xFF009688), const Color(0xFF00796B)],
         route: Routes.history,
@@ -771,7 +741,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const SizedBox(height: 10),
                 Text(
                   action.label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'HindSiliguri',
@@ -787,7 +757,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Safety Stats ====================
-  Widget _buildSafetyStats(CheckInStatusData statusData, bool isDark) {
+  Widget _buildSafetyStats(
+      CheckInStatusData statusData, bool isDark, AppStrings s) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.cardDecoration(context: context),
@@ -795,7 +766,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'নিরাপত্তা পরিসংখ্যান',
+            s.homeSafetyStats,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -806,7 +777,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _buildStatItem(
                 icon: Icons.check_circle,
                 value: statusData.hasCheckedInToday ? '✓' : '✗',
-                label: 'আজকের চেক-ইন',
+                label: s.statTodayCheckin,
                 color: statusData.hasCheckedInToday
                     ? AppColors.success
                     : AppColors.error,
@@ -814,7 +785,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _buildStatItem(
                 icon: Icons.local_fire_department,
                 value: '${statusData.streak}',
-                label: 'স্ট্রিক',
+                label: s.statStreak,
                 color: const Color(0xFFFF9800),
               ),
               _buildStatItem(
@@ -823,7 +794,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ? DateFormat('dd MMM\nhh:mm a')
                         .format(statusData.lastCheckIn!.toLocal())
                     : '---',
-                label: 'শেষ চেক-ইন',
+                label: s.statLastCheckin,
                 color: AppColors.primary,
                 valueFontSize: 14,
               ),
@@ -847,6 +818,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
@@ -878,12 +850,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Bottom Navigation ====================
-  Widget _buildBottomNav(bool isDark) {
+  Widget _buildBottomNav(bool isDark, AppStrings s) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, -5),
@@ -896,10 +869,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.home_rounded, 'হোম'),
-              _buildNavItem(1, Icons.history_rounded, 'ইতিহাস'),
-              _buildNavItem(2, Icons.contacts_rounded, 'যোগাযোগ'),
-              _buildNavItem(3, Icons.settings_rounded, 'সেটিংস'),
+              _buildNavItem(0, Icons.home_rounded, s.navHome),
+              _buildNavItem(1, Icons.history_rounded, s.navHistory),
+              _buildNavItem(2, Icons.contacts_rounded, s.navContacts),
+              _buildNavItem(3, Icons.settings_rounded, s.navSettings),
             ],
           ),
         ),
@@ -938,6 +911,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
+              // ignore: deprecated_member_use
               ? AppColors.primary.withOpacity(0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
@@ -967,12 +941,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   // ==================== Helpers ====================
-  String _getGreeting() {
+  String _getGreeting(AppStrings s) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'সুপ্রভাত 🌅';
-    if (hour < 17) return 'শুভ দুপুর ☀️';
-    if (hour < 20) return 'শুভ সন্ধ্যা 🌆';
-    return 'শুভ রাত্রি 🌙';
+    if (hour < 12) return s.goodMorning;
+    if (hour < 17) return s.goodAfternoon;
+    if (hour < 20) return s.goodEvening;
+    return s.goodNight;
   }
 
   ImageProvider? _getProfileImageProvider(String? profilePicture) {
@@ -993,6 +967,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _performCheckin() async {
+    final s = ref.read(stringsProvider);
     String? notes;
     if (_selectedMood != -1 && _selectedMood < AppConstants.moodLabels.length) {
       final moodLabel = AppConstants.moodLabels[_selectedMood];
@@ -1035,11 +1010,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           _selectedMood = -1;
         });
 
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'চেক-ইন সফল হয়েছে! ✓',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              s.toastCheckinSuccess,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.success,
           ),
@@ -1050,8 +1026,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'চেক-ইন ব্যর্থ হয়েছে: $e',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              '${s.toastCheckinFail} $e',
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.error,
           ),
@@ -1073,6 +1049,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// Save mood — tries backend first, falls back to local storage for offline support
   void _saveMood() async {
     if (_selectedMood < 0) return;
+    final s = ref.read(stringsProvider);
 
     // Map index to mood string for backend
     final moodKeys = ['happy', 'good', 'neutral', 'sad', 'anxious'];
@@ -1103,10 +1080,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isOnline
-                  ? 'মেজাজ সেভ হয়েছে ✓'
-                  : 'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              isOnline ? s.toastMoodSaved : s.toastMoodSavedOffline,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.success,
             duration: const Duration(seconds: 2),
@@ -1126,8 +1101,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '⏳ প্রতি ঘণ্টায় একবার মেজাজ সেভ করতে পারবেন। আবার চেষ্টা করুন।',
-                style: TextStyle(fontFamily: 'HindSiliguri'),
+                s.toastMoodWait,
+                style: const TextStyle(fontFamily: 'HindSiliguri'),
               ),
               backgroundColor: AppColors.warning,
               duration: const Duration(seconds: 4),
@@ -1143,8 +1118,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'মেজাজ স্থানীয়ভাবে সেভ হয়েছে (ইন্টারনেট পেলে সিঙ্ক হবে) ✓',
-                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                  s.toastMoodSavedOffline,
+                  style: const TextStyle(fontFamily: 'HindSiliguri'),
                 ),
                 backgroundColor: AppColors.success,
               ),
@@ -1156,8 +1131,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'মেজাজ সেভ ব্যর্থ হয়েছে',
-                  style: TextStyle(fontFamily: 'HindSiliguri'),
+                  s.toastMoodFail,
+                  style: const TextStyle(fontFamily: 'HindSiliguri'),
                 ),
                 backgroundColor: AppColors.error,
               ),
@@ -1212,6 +1187,7 @@ class _SafetyRingPainter extends CustomPainter {
 
     // Background ring
     final bgPaint = Paint()
+      // ignore: deprecated_member_use
       ..color = color.withOpacity(0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6

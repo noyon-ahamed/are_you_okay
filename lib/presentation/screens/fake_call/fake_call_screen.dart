@@ -2,33 +2,55 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_decorations.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
-class FakeCallScreen extends StatefulWidget {
+class FakeCallScreen extends ConsumerStatefulWidget {
   const FakeCallScreen({super.key});
 
   @override
-  State<FakeCallScreen> createState() => _FakeCallScreenState();
+  ConsumerState<FakeCallScreen> createState() => _FakeCallScreenState();
 }
 
-class _FakeCallScreenState extends State<FakeCallScreen> {
+class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
   // Call state
   _CallState _callState = _CallState.setup;
 
   // Caller presets
   int _selectedPreset = 0;
-  final List<_CallerPreset> _presets = [
-    _CallerPreset(name: 'বন্ধু', number: '+880 1611-564875', icon: Icons.group, color: Color(0xFF4CAF50)),
-    _CallerPreset(name: 'মা', number: '+880 1711-564875', icon: Icons.favorite, color: Color(0xFFE91E63)),
-    _CallerPreset(name: 'বাবা', number: '+880 1811-564875', icon: Icons.person, color: Color(0xFF2196F3)),
-    _CallerPreset(name: 'বস', number: '+880 1911-564875', icon: Icons.work, color: Color(0xFF795548)),
-    _CallerPreset(name: 'পুলিশ', number: '৯৯৯', icon: Icons.local_police, color: Color(0xFF607D8B)),
-  ];
+  List<_CallerPreset> _getPresets(AppStrings s) => [
+        _CallerPreset(
+            name: s.fcCallerFriend,
+            number: '+880 1611-564875',
+            icon: Icons.group,
+            color: const Color(0xFF4CAF50)),
+        _CallerPreset(
+            name: s.fcCallerMom,
+            number: '+880 1711-564875',
+            icon: Icons.favorite,
+            color: const Color(0xFFE91E63)),
+        _CallerPreset(
+            name: s.fcCallerDad,
+            number: '+880 1811-564875',
+            icon: Icons.person,
+            color: const Color(0xFF2196F3)),
+        _CallerPreset(
+            name: s.fcCallerBoss,
+            number: '+880 1911-564875',
+            icon: Icons.work,
+            color: const Color(0xFF795548)),
+        _CallerPreset(
+            name: s.fcCallerPolice,
+            number: '999',
+            icon: Icons.local_police,
+            color: const Color(0xFF607D8B)),
+      ];
 
   // Custom name controller
   final TextEditingController _nameController = TextEditingController();
@@ -47,8 +69,10 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController.text = _presets[_selectedPreset].name;
-    _numberController.text = _presets[_selectedPreset].number;
+    final s = ref.read(stringsProvider);
+    final presets = _getPresets(s);
+    _nameController.text = presets[_selectedPreset].name;
+    _numberController.text = presets[_selectedPreset].number;
     _listenToCallKitEvents();
   }
 
@@ -88,8 +112,10 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
   Future<void> _startFakeCall() async {
     // Request notification permissions for CallKit (Required for Android 13+)
     await FlutterCallkitIncoming.requestNotificationPermission({
-      "rationaleMessagePermission": "Notification permission is required to show the call screen.",
-      "postNotificationMessageRequired": "Please allow notification permission from settings to receive fake calls."
+      "rationaleMessagePermission":
+          "Notification permission is required to show the call screen.",
+      "postNotificationMessageRequired":
+          "Please allow notification permission from settings to receive fake calls."
     });
 
     if (!mounted) return;
@@ -117,29 +143,31 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
 
   Future<void> _showIncomingCall() async {
     _currentCallId = _uuid.v4();
+    final s = ref.read(stringsProvider);
 
     // Append the number to the name to force Android to display the number
     // beneath the caller's name in the native notification view.
-    final String compoundName = "$_currentCallerName\n$_currentCallerNumber";
+    final String compoundName =
+        "${_currentCallerName(s)}\n${_currentCallerNumber(s)}";
 
     final params = CallKitParams(
       id: _currentCallId,
       nameCaller: compoundName,
       appName: 'Are You Okay',
-      avatar: '', 
-      handle: _currentCallerNumber,
-      type: 0, 
-      duration: 30000, 
-      textAccept: 'গ্রহণ',
-      textDecline: 'হটান',
+      avatar: '',
+      handle: _currentCallerNumber(s),
+      type: 0,
+      duration: 30000,
+      textAccept: s.fcAccept,
+      textDecline: s.fcDecline,
       missedCallNotification: NotificationParams(
         showNotification: true,
         isShowCallback: false,
-        subtitle: 'মিসড কল',
-        callbackText: 'কল ব্যাক',
+        subtitle: s.fcMissedCall,
+        callbackText: s.fcCallBack,
       ),
       extra: <String, dynamic>{'userId': '1a2b3c4d'},
-      android: AndroidParams(
+      android: const AndroidParams(
         isCustomNotification: true,
         isShowLogo: false,
         ringtonePath: 'system_ringtone_default',
@@ -148,7 +176,7 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
         actionColor: '#4CAF50',
         textColor: '#ffffff',
       ),
-      ios: IOSParams(
+      ios: const IOSParams(
         iconName: 'AppIcon',
         handleType: 'generic',
         supportsVideo: false,
@@ -167,7 +195,7 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
     );
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
-    
+
     // Pop the fake call setup screen, as CallKit is now handling the foreground overlay
     if (mounted) {
       context.pop();
@@ -182,20 +210,20 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
     });
   }
 
-  String get _currentCallerName {
+  String _currentCallerName(AppStrings s) {
     if (_nameController.text.isNotEmpty) return _nameController.text;
-    return _presets[_selectedPreset].name;
+    return _getPresets(s)[_selectedPreset].name;
   }
 
-  String get _currentCallerNumber {
+  String _currentCallerNumber(AppStrings s) {
     if (_numberController.text.isNotEmpty) return _numberController.text;
-    return _presets[_selectedPreset].number;
+    return _getPresets(s)[_selectedPreset].number;
   }
 
   @override
   Widget build(BuildContext context) {
     if (_callState == _CallState.waiting) {
-       return _buildWaitingScreen();
+      return _buildWaitingScreen();
     }
     return _buildSetupScreen();
   }
@@ -203,9 +231,11 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
   // ==================== Setup Screen ====================
   Widget _buildSetupScreen() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
+    final presets = _getPresets(s);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ফেক কল')),
+      appBar: AppBar(title: Text(s.fcTitle)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         physics: const BouncingScrollPhysics(),
@@ -213,23 +243,23 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Preset selection
-            const Text('কলার নির্বাচন',
-                style: TextStyle(
+            Text(s.fcCallerSelection,
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Row(
-              children: List.generate(_presets.length, (i) {
-                final preset = _presets[i];
+              children: List.generate(presets.length, (i) {
+                final preset = presets[i];
                 final isSelected = _selectedPreset == i;
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
                       setState(() {
                         _selectedPreset = i;
-                        _nameController.text = _presets[i].name;
-                        _numberController.text = _presets[i].number;
+                        _nameController.text = presets[i].name;
+                        _numberController.text = presets[i].number;
                       });
                     },
                     child: AnimatedContainer(
@@ -238,15 +268,16 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: isSelected
+                            // ignore: deprecated_member_use
                             ? preset.color.withOpacity(0.15)
                             : (isDark
+                                // ignore: deprecated_member_use
                                 ? Colors.white.withOpacity(0.05)
+                                // ignore: deprecated_member_use
                                 : Colors.grey.withOpacity(0.05)),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected
-                              ? preset.color
-                              : Colors.transparent,
+                          color: isSelected ? preset.color : Colors.transparent,
                           width: 2,
                         ),
                       ),
@@ -276,39 +307,39 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
             const SizedBox(height: 24),
 
             // Custom fields
-            const Text('অথবা কাস্টম',
-                style: TextStyle(
+            Text(s.fcCustomCaller,
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'কলারের নাম',
-                prefixIcon: Icon(Icons.person_outline),
+              decoration: InputDecoration(
+                labelText: s.fcCallerName,
+                prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _numberController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'কলারের নম্বর',
-                prefixIcon: Icon(Icons.phone_outlined),
+              decoration: InputDecoration(
+                labelText: s.fcCallerNumber,
+                prefixIcon: const Icon(Icons.phone_outlined),
               ),
             ),
 
             const SizedBox(height: 24),
 
             // Delay slider
-            const Text('বিলম্ব',
-                style: TextStyle(
+            Text(s.fcDelay,
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 16,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('$_delaySeconds সেকেন্ড পরে কল আসবে',
+            Text('$_delaySeconds ${s.fcSecondsLater}',
                 style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 13,
@@ -319,9 +350,8 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
               max: 60,
               divisions: 57,
               activeColor: AppColors.primary,
-              label: '$_delaySeconds সেকেন্ড',
-              onChanged: (val) =>
-                  setState(() => _delaySeconds = val.round()),
+              label: '$_delaySeconds ${s.fcSecondsLiteral}',
+              onChanged: (val) => setState(() => _delaySeconds = val.round()),
             ),
 
             const SizedBox(height: 32),
@@ -332,8 +362,8 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
               child: ElevatedButton.icon(
                 onPressed: _startFakeCall,
                 icon: const Icon(Icons.phone),
-                label: const Text('ফেক কল শুরু',
-                    style: TextStyle(fontFamily: 'HindSiliguri')),
+                label: Text(s.fcStartCall,
+                    style: const TextStyle(fontFamily: 'HindSiliguri')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -347,6 +377,7 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
 
   // ==================== Waiting Screen ====================
   Widget _buildWaitingScreen() {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       body: SafeArea(
@@ -366,9 +397,9 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'সেকেন্ড পরে কল আসবে...',
-                style: TextStyle(
+              Text(
+                s.fcCallIncoming,
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.white54,
                   fontFamily: 'HindSiliguri',
@@ -377,8 +408,8 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
               const SizedBox(height: 40),
               TextButton(
                 onPressed: _cancelTimer,
-                child: const Text('বাতিল',
-                    style: TextStyle(
+                child: Text(s.cancel,
+                    style: const TextStyle(
                         color: Colors.white54, fontFamily: 'HindSiliguri')),
               ),
             ],

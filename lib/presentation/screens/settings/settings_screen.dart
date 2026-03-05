@@ -19,8 +19,9 @@ import '../../../provider/checkin_provider.dart';
 import '../../../provider/contact_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
-import '../../../services/hive_service.dart';
 import '../../../services/shared_prefs_service.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -35,25 +36,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Watch for theme changes but not rebuild entire widget from top-down watcher
     final settings = ref.watch(settingsProvider);
     final isDark = settings.themeIsDark;
-    final statusData = ref.watch(checkinStatusProvider);
+    ref.watch(checkinStatusProvider);
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('সেটিংস'),
+        title: Text(s.settingsTitle),
       ),
       body: ListView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         children: [
           // ==================== Appearance ====================
-          _buildSectionHeader('ডিজাইন'),
+          _buildSectionHeader(s.settingsSecDesign),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
             _buildSwitchTile(
               icon: Icons.dark_mode_rounded,
               iconColor: const Color(0xFF6C63FF),
-              title: 'ডার্ক মোড',
-              subtitle: 'অন্ধকার থিম সক্রিয় করুন',
+              title: s.settingsDarkMode,
+              subtitle: s.settingsDarkModeDesc,
               value: settings.themeIsDark,
               onChanged: (val) {
                 ref.read(settingsProvider.notifier).setDarkMode(val);
@@ -63,8 +65,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildListTile(
               icon: Icons.language_rounded,
               iconColor: const Color(0xFF00BCD4),
-              title: 'ভাষা',
-              subtitle: settings.language == 'bn' ? 'বাংলা' : 'English',
+              title: s.settingsSecLanguage,
+              subtitle: s.isBangla
+                  ? s.settingsLanguageBangla
+                  : s.settingsLanguageEnglish,
               onTap: () => _showLanguageDialog(),
             ),
           ]),
@@ -72,30 +76,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ==================== Safety ====================
-          _buildSectionHeader('নিরাপত্তা'),
+          _buildSectionHeader(s.settingsSecSafety),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
-            // _buildListTile(
-            //   icon: Icons.local_fire_department,
-            //   iconColor: Colors.deepOrange,
-            //   title: 'বর্তমান স্ট্রিক',
-            //   subtitle: '${statusData.streak} দিন',
-            //   onTap: () {},
-            // ),
-            // _buildDivider(),
             _buildListTile(
               icon: Icons.timer_rounded,
               iconColor: AppColors.primary,
-              title: 'চেক-ইন ইন্টারভাল',
-              subtitle: _intervalLabel(settings.checkinIntervalDays),
+              title: s.settingsCheckinInterval,
+              subtitle: _intervalLabel(settings.checkinIntervalDays, s),
               onTap: () => _showIntervalDialog(),
             ),
             _buildDivider(),
             _buildSwitchTile(
               icon: Icons.notifications_active_rounded,
               iconColor: const Color(0xFFFF9800),
-              title: 'নোটিফিকেশন',
-              subtitle: 'চেক-ইন রিমাইন্ডার পাঠান',
+              title: s.settingsNotifications,
+              subtitle: s.settingsNotifDesc,
               value: settings.notificationsEnabled,
               onChanged: (_) {
                 ref.read(settingsProvider.notifier).toggleNotifications();
@@ -105,8 +101,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSwitchTile(
               icon: Icons.location_on_rounded,
               iconColor: const Color(0xFF4CAF50),
-              title: 'লোকেশন',
-              subtitle: 'চেক-ইনে লোকেশন সংযুক্ত করুন',
+              title: s.settingsLocation,
+              subtitle: s.settingsLocationDesc,
               value: settings.locationEnabled,
               onChanged: (_) {
                 ref.read(settingsProvider.notifier).toggleLocation();
@@ -125,25 +121,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // ),
           ]),
 
-          const SizedBox(height: 24),
-
           // ==================== Account ====================
-          _buildSectionHeader('অ্যাকাউন্ট'),
+          _buildSectionHeader(s.settingsSecAccount),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
             _buildListTile(
               icon: Icons.person_rounded,
               iconColor: const Color(0xFF2196F3),
-              title: 'প্রোফাইল',
-              subtitle: 'প্রোফাইল তথ্য সম্পাদনা',
+              title: s.settingsProfile,
+              subtitle: s.settingsProfileDesc,
               onTap: () => context.push(Routes.profile),
             ),
             _buildDivider(),
             _buildListTile(
               icon: Icons.contacts_rounded,
               iconColor: const Color(0xFF009688),
-              title: 'জরুরি যোগাযোগ',
-              subtitle: 'যোগাযোগ পরিচালনা',
+              title: s.contactsTitle,
+              subtitle: s.settingsEmContactsDesc,
               onTap: () => context.push(Routes.contacts),
             ),
           ]),
@@ -151,22 +145,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ==================== Data ====================
-          _buildSectionHeader('ডেটা'),
+          _buildSectionHeader(s.settingsSecData),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
             _buildListTile(
               icon: Icons.download_rounded,
               iconColor: const Color(0xFF795548),
-              title: 'ডেটা এক্সপোর্ট',
-              subtitle: 'মুড ইতিহাস CSV ডাউনলোড',
+              title: s.settingsDataExport,
+              subtitle: s.settingsDataExportDesc,
               onTap: () => _exportMoodData(),
             ),
             _buildDivider(),
             _buildListTile(
               icon: Icons.delete_forever_rounded,
               iconColor: AppColors.error,
-              title: 'ক্যাশ পরিষ্কার',
-              subtitle: 'স্থানীয় ডেটা পরিষ্কার করুন',
+              title: s.settingsClearCache,
+              subtitle: s.settingsClearCacheDesc,
               onTap: () => _showClearDataDialog(),
             ),
           ]),
@@ -174,36 +168,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ==================== About ====================
-          _buildSectionHeader('সম্পর্কে'),
+          _buildSectionHeader(s.settingsSecAbout),
           const SizedBox(height: 8),
           _buildSettingsCard(isDark, [
             _buildListTile(
               icon: Icons.info_outline_rounded,
               iconColor: const Color(0xFF607D8B),
-              title: 'অ্যাপ সম্পর্কে',
-              subtitle: 'ভার্সন 2.0.0',
-              onTap: () {},
+              title: s.settingsAboutApp,
+              subtitle: 'Version ${AppConstants.appVersion}',
+              onTap: () => context.push(Routes.aboutApp),
             ),
             _buildDivider(),
             _buildListTile(
               icon: Icons.privacy_tip_outlined,
               iconColor: const Color(0xFF78909C),
-              title: 'গোপনীয়তা নীতি',
-              onTap: () {},
+              title: s.settingsPrivacy,
+              onTap: () => context.push(Routes.privacyPolicy),
             ),
           ]),
 
           const SizedBox(height: 24),
 
           // ==================== Logout ====================
-          Container(
+          SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () => _showLogoutDialog(),
               icon: const Icon(Icons.logout, color: AppColors.error),
               label: Text(
-                'লগআউট',
-                style: TextStyle(
+                s.settingsLogout,
+                style: const TextStyle(
                   color: AppColors.error,
                   fontFamily: 'HindSiliguri',
                   fontWeight: FontWeight.w600,
@@ -228,7 +222,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontFamily: 'HindSiliguri',
           fontSize: 14,
           fontWeight: FontWeight.w600,
@@ -246,7 +240,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5);
+    return const Divider(height: 1, indent: 56, endIndent: 16, thickness: 0.5);
   }
 
   Widget _buildSwitchTile({
@@ -265,6 +259,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: iconColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -276,7 +271,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'HindSiliguri',
                       fontWeight: FontWeight.w500,
                       fontSize: 15,
@@ -294,6 +289,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
+            // ignore: deprecated_member_use
             activeColor: AppColors.primary,
           ),
         ],
@@ -319,6 +315,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: iconColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -330,7 +327,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'HindSiliguri',
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
@@ -356,130 +353,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSliderTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required double value,
-    required double min,
-    required double max,
-    int? divisions,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: TextStyle(
-                          fontFamily: 'HindSiliguri',
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        )),
-                    Text(subtitle,
-                        style: TextStyle(
-                          fontFamily: 'HindSiliguri',
-                          fontSize: 12,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        )),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Slider.adaptive(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            activeColor: AppColors.primary,
-            label: '${value.round()} ঘণ্টা',
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
   // ==================== Dialogs ====================
 
-  void _showLanguageDialog() {
-    final settings = ref.read(settingsProvider);
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ভাষা নির্বাচন',
-                style: TextStyle(
-                  fontFamily: 'HindSiliguri',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                )),
-            const SizedBox(height: 16),
-            _buildLanguageOption('বাংলা', 'bn', settings.language == 'bn'),
-            _buildLanguageOption('English', 'en', settings.language == 'en'),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(String label, String code, bool isSelected) {
-    return ListTile(
-      title: Text(label, style: TextStyle(fontFamily: 'HindSiliguri')),
-      leading: Radio<String>(
-        value: code,
-        groupValue: isSelected ? code : null,
-        onChanged: (val) {
-          ref.read(settingsProvider.notifier).setLanguage(code);
-          Navigator.pop(context);
-        },
-        activeColor: AppColors.primary,
-      ),
-      onTap: () {
-        ref.read(settingsProvider.notifier).setLanguage(code);
-        Navigator.pop(context);
-      },
-    );
-  }
-
   void _showClearDataDialog() {
+    final s = ref.read(stringsProvider);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('ক্যাশ পরিষ্কার',
-            style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text(s.settingsClearCache,
+            style: const TextStyle(fontFamily: 'HindSiliguri')),
         content: Text(
-          'চেক-ইন, মুড এবং কন্টাক্ট ক্যাশ মুছে যাবে। আপনার অ্যাকাউন্ট এবং লগইন ডেটা নিরাপদ থাকবে।',
-          style: TextStyle(fontFamily: 'HindSiliguri'),
+          s.settingsClearDataConfirm,
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text(s.dialogCancel,
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
           ),
           TextButton(
             onPressed: () async {
@@ -501,11 +392,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('last_checkin_time');
                 await prefs.remove('checkin_interval');
+                await prefs.remove('mood_history_cache');
+                await prefs.remove('mood_stats_cache');
 
                 ref.invalidate(checkinHistoryFromBackendProvider);
                 ref.invalidate(checkinStatusProvider);
                 ref.invalidate(contactProvider);
 
+                bool serverCleared = false;
                 try {
                   final dio = Dio();
                   final token = await SharedPrefsService.getToken();
@@ -524,6 +418,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               headers: {'Authorization': 'Bearer $token'}),
                         )
                         .timeout(const Duration(seconds: 5));
+                    serverCleared = true;
                   }
                 } catch (e) {
                   debugPrint('Backend cache clear skipped (offline): $e');
@@ -532,9 +427,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (mounted) {
                   scaffoldMessenger.showSnackBar(
                     SnackBar(
-                      content: Text('ক্যাশ সফলভাবে পরিষ্কার হয়েছে ✓',
-                          style: TextStyle(fontFamily: 'HindSiliguri')),
-                      backgroundColor: Colors.green,
+                      content: Text(
+                        serverCleared
+                            ? '${s.settingsClearDataSuccess} ✓'
+                            : '${s.settingsClearDataSuccess} ✓ (${s.settingsClearDataOfflineNote})',
+                        style: const TextStyle(fontFamily: 'HindSiliguri'),
+                      ),
+                      backgroundColor:
+                          serverCleared ? Colors.green : Colors.orange,
+                      duration: const Duration(seconds: 4),
                     ),
                   );
                 }
@@ -542,16 +443,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (mounted) {
                   scaffoldMessenger.showSnackBar(
                     SnackBar(
-                      content: Text('ক্যাশ পরিষ্কার ব্যর্থ: $e',
-                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                      content: Text('${s.settingsClearCache} Error: $e',
+                          style: const TextStyle(fontFamily: 'HindSiliguri')),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
               }
             },
-            child: Text('পরিষ্কার করুন',
-                style: TextStyle(
+            child: Text(s.dialogClear,
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri', color: AppColors.error)),
           ),
         ],
@@ -559,19 +460,79 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  void _showLanguageDialog() {
+    final currentLang = ref.read(languageProvider);
+    final s = ref.read(stringsProvider);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              s.settingsSelectLanguage,
+              style: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildLangOption('English', 'en', currentLang),
+            const Divider(),
+            _buildLangOption('বাংলা (Bangla)', 'bn', currentLang),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLangOption(String label, String code, String currentLang) {
+    return ListTile(
+      title: Text(label, style: const TextStyle(fontFamily: 'HindSiliguri')),
+      trailing: currentLang == code
+          ? const Icon(Icons.check_circle, color: Colors.green)
+          : null,
+      onTap: () {
+        ref.read(languageProvider.notifier).setLanguage(code);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              code == 'bn'
+                  ? 'ভাষা বাংলায় পরিবর্তিত হয়েছে'
+                  : 'Language changed to English',
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
+  }
+
   void _showLogoutDialog() {
+    final s = ref.read(stringsProvider);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('লগআউট', style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text(s.settingsLogout,
+            style: const TextStyle(fontFamily: 'HindSiliguri')),
         content: Text(
-          'আপনি কি লগআউট করতে চান?',
-          style: TextStyle(fontFamily: 'HindSiliguri'),
+          s.settingsLogoutConfirm,
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text(s.dialogCancel,
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
           ),
           TextButton(
             onPressed: () {
@@ -579,8 +540,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ref.read(authProvider.notifier).logout();
               context.go(Routes.login);
             },
-            child: Text('লগআউট',
-                style: TextStyle(
+            child: Text(s.settingsLogout,
+                style: const TextStyle(
                     fontFamily: 'HindSiliguri', color: AppColors.error)),
           ),
         ],
@@ -590,6 +551,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showIntervalDialog() {
     final settings = ref.read(settingsProvider);
+    final s = ref.read(stringsProvider);
     showModalBottomSheet(
       context: context,
       builder: (context) => Padding(
@@ -598,15 +560,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('চেক-ইন সময়সীমা',
-                style: TextStyle(
+            Text(s.settingsCheckinInterval,
+                style: const TextStyle(
                   fontFamily: 'HindSiliguri',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 )),
             const SizedBox(height: 4),
             Text(
-              'এই সময়ের মধ্যে চেক-ইন না করলে ইমেইল/SMS সতর্কতা পাঠানো হবে',
+              s.settingsCheckinIntervalDesc,
               style: TextStyle(
                 fontFamily: 'HindSiliguri',
                 fontSize: 13,
@@ -615,12 +577,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             // 3 days — default
-            _buildIntervalOption('৩ দিন (3 days) — ডিফল্ট', 3,
-                settings.checkinIntervalDays == 3),
             _buildIntervalOption(
-                '৫ দিন (5 days)', 5, settings.checkinIntervalDays == 5),
+                s.settingsInterval3Days, 3, settings.checkinIntervalDays == 3),
             _buildIntervalOption(
-                '৭ দিন (7 days)', 7, settings.checkinIntervalDays == 7),
+                s.settingsInterval5Days, 5, settings.checkinIntervalDays == 5),
+            _buildIntervalOption(
+                s.settingsInterval7Days, 7, settings.checkinIntervalDays == 7),
             const SizedBox(height: 16),
           ],
         ),
@@ -630,10 +592,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildIntervalOption(String label, int value, bool isSelected) {
     return ListTile(
-      title: Text(label, style: TextStyle(fontFamily: 'HindSiliguri')),
+      title: Text(label, style: const TextStyle(fontFamily: 'HindSiliguri')),
       leading: Radio<int>(
         value: value,
+        // ignore: deprecated_member_use
         groupValue: isSelected ? value : null,
+        // ignore: deprecated_member_use
         onChanged: (val) => _updateInterval(value),
         activeColor: AppColors.primary,
       ),
@@ -642,16 +606,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   /// Convert interval days to a human-readable Bangla label
-  String _intervalLabel(int days) {
+  String _intervalLabel(int days, AppStrings s) {
     switch (days) {
       case 3:
-        return '৩ দিন (ডিফল্ট)';
+        return s.settingsInterval3Days;
       case 5:
-        return '৫ দিন';
+        return s.settingsInterval5Days;
       case 7:
-        return '৭ দিন';
+        return s.settingsInterval7Days;
       default:
-        return '$days দিন';
+        return '$days ${s.isBangla ? 'দিন' : 'days'}';
     }
   }
 
@@ -662,10 +626,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.read(settingsProvider.notifier).setCheckinInterval(value);
 
     if (mounted) {
+      final s = ref.read(stringsProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ইন্টারভাল আপডেট হয়েছে',
-              style: TextStyle(fontFamily: 'HindSiliguri')),
+          content: Text(s.settingsIntervalUpdated,
+              style: const TextStyle(fontFamily: 'HindSiliguri')),
           backgroundColor: AppColors.success,
         ),
       );
@@ -680,10 +645,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _exportMoodData() async {
+    final s = ref.read(stringsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('মুড ডেটা এক্সপোর্ট হচ্ছে...',
-            style: TextStyle(fontFamily: 'HindSiliguri')),
+        content: Text(s.settingsExporting,
+            style: const TextStyle(fontFamily: 'HindSiliguri')),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -759,12 +725,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           fontSize: 24, fontWeight: pw.FontWeight.bold)),
                   pw.SizedBox(height: 8),
                   pw.Text('Total entries: ${dataRows.length}',
-                      style:
-                          pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                      style: const pw.TextStyle(
+                          fontSize: 12, color: PdfColors.grey600)),
                   pw.SizedBox(height: 20),
                   if (dataRows.isEmpty)
                     pw.Text('No mood data available',
-                        style: pw.TextStyle(fontSize: 14))
+                        style: const pw.TextStyle(fontSize: 14))
                   else
                     pw.TableHelper.fromTextArray(
                       context: context,
@@ -772,7 +738,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       data: dataRows,
                       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                       headerDecoration:
-                          pw.BoxDecoration(color: PdfColors.grey300),
+                          const pw.BoxDecoration(color: PdfColors.grey300),
                       cellAlignment: pw.Alignment.centerLeft,
                       cellPadding: const pw.EdgeInsets.all(6),
                     ),
@@ -790,12 +756,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('মুড ডেটা সফলভাবে এক্সপোর্ট হয়েছে! ✓',
-                  style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text('${s.settingsExportSuccess} ✓',
+                  style: const TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: Colors.green,
             ),
           );
           // Share the file
+          // ignore: deprecated_member_use
           await Share.shareXFiles([XFile(file.path)],
               text: 'Mood History Report');
         }
@@ -807,9 +774,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  'কোনো মুড ডেটা পাওয়া যায়নি। প্রথমে কিছু মুড সেভ করুন।',
-                  style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text(s.moodEmpty,
+                  style: const TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: AppColors.warning,
             ),
           );
@@ -818,8 +784,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('এক্সপোর্ট ব্যর্থ: ${e.message}',
-                  style: TextStyle(fontFamily: 'HindSiliguri')),
+              content: Text('${s.moodHistoryError}: ${e.message}',
+                  style: const TextStyle(fontFamily: 'HindSiliguri')),
               backgroundColor: Colors.red,
             ),
           );
@@ -829,8 +795,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('এক্সপোর্ট ব্যর্থ: $e',
-                style: TextStyle(fontFamily: 'HindSiliguri')),
+            content: Text('${s.moodHistoryError}: $e',
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
             backgroundColor: Colors.red,
           ),
         );

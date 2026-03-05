@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../model/emergency_contact_model.dart';
 import '../../../provider/contact_provider.dart';
-import '../../../routes/app_router.dart';
+import '../../../provider/language_provider.dart';
+import '../../../core/localization/app_strings.dart';
+
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 
@@ -14,10 +15,12 @@ class EmergencyContactsScreen extends ConsumerStatefulWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
-  ConsumerState<EmergencyContactsScreen> createState() => _EmergencyContactsScreenState();
+  ConsumerState<EmergencyContactsScreen> createState() =>
+      _EmergencyContactsScreenState();
 }
 
-class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScreen> {
+class _EmergencyContactsScreenState
+    extends ConsumerState<EmergencyContactsScreen> {
   @override
   void initState() {
     super.initState();
@@ -31,28 +34,30 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
   Widget build(BuildContext context) {
     final contactState = ref.watch(contactProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('জরুরি যোগাযোগ'),
+        title: Text(s.contactsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
-            onPressed: () => _showInfoDialog(context),
+            onPressed: () => _showInfoDialog(context, s),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddContactSheet(context, ref),
+        onPressed: () => _showAddContactSheet(context, ref, s),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(context, contactState, isDark),
+      body: _buildBody(context, contactState, isDark, s),
     );
   }
 
-  Widget _buildBody(BuildContext context, ContactState state, bool isDark) {
+  Widget _buildBody(
+      BuildContext context, ContactState state, bool isDark, AppStrings s) {
     if (state is ContactLoading) {
       return const ShimmerList(itemCount: 4);
     }
@@ -62,16 +67,14 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.error),
+            const Icon(Icons.error_outline, size: 48, color: AppColors.error),
             const SizedBox(height: 12),
-            Text('ত্রুটি হয়েছে',
-                style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 16)),
+            Text(s.error, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () =>
                   ref.read(contactProvider.notifier).loadContacts(),
-              child: Text('আবার চেষ্টা',
-                  style: TextStyle(fontFamily: 'HindSiliguri')),
+              child: Text(s.retry),
             ),
           ],
         ),
@@ -81,10 +84,12 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
     if (state is ContactLoaded && state.contacts.isEmpty) {
       return EmptyState(
         icon: Icons.contacts_outlined,
-        title: 'কোনো জরুরি যোগাযোগ নেই',
-        description: 'আপনার প্রিয়জনদের জরুরি যোগাযোগ\nহিসেবে যোগ করুন',
-        buttonText: 'যোগ করুন',
-        onButtonPressed: () => _showAddContactSheet(context, ref),
+        title: s.contactsEmpty,
+        description: s.isBangla
+            ? 'আপনার প্রিয়জনদের জরুরি যোগাযোগ\nহিসেবে যোগ করুন'
+            : 'Add loved ones as emergency contacts',
+        buttonText: s.contactsAdd,
+        onButtonPressed: () => _showAddContactSheet(context, ref, s),
       );
     }
 
@@ -96,23 +101,20 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
       itemCount: contacts.length,
       onReorder: (oldIndex, newIndex) {
         if (newIndex > oldIndex) newIndex--;
-        final ids =
-            contacts.map((c) => c.id).toList();
+        final ids = contacts.map((c) => c.id).toList();
         final movedId = ids.removeAt(oldIndex);
         ids.insert(newIndex, movedId);
         ref.read(contactProvider.notifier).reorderContacts(ids);
       },
       itemBuilder: (context, index) {
         final contact = contacts[index];
-        return _buildContactCard(context, contact, index, isDark);
+        return _buildContactCard(context, contact, index, isDark, s);
       },
     );
   }
 
-
-
-  Widget _buildContactCard(BuildContext context,
-      EmergencyContactModel contact, int index, bool isDark) {
+  Widget _buildContactCard(BuildContext context, EmergencyContactModel contact,
+      int index, bool isDark, AppStrings s) {
     final colors = [
       const Color(0xFF6C63FF),
       const Color(0xFF00BCD4),
@@ -135,7 +137,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
         alignment: Alignment.centerRight,
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      confirmDismiss: (_) => _showDeleteConfirm(context),
+      confirmDismiss: (_) => _showDeleteConfirm(context, s),
       onDismissed: (_) {
         ref.read(contactProvider.notifier).deleteContact(contact.id);
       },
@@ -153,6 +155,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
                 height: 48,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
+                    // ignore: deprecated_member_use
                     colors: [color, color.withOpacity(0.7)],
                   ),
                   shape: BoxShape.circle,
@@ -178,7 +181,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
                   children: [
                     Text(
                       contact.name,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'HindSiliguri',
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
@@ -200,6 +203,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
+                          // ignore: deprecated_member_use
                           color: color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -222,6 +226,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
+                  // ignore: deprecated_member_use
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
@@ -252,32 +257,29 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
     );
   }
 
-  Future<bool?> _showDeleteConfirm(BuildContext context) {
+  Future<bool?> _showDeleteConfirm(BuildContext context, AppStrings s) {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title:
-            Text('মুছে ফেলুন', style: TextStyle(fontFamily: 'HindSiliguri')),
-        content: Text('এই যোগাযোগ মুছে ফেলতে চান?',
-            style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text(s.isBangla ? 'মুছে ফেলুন' : 'Delete'),
+        content: Text(
+            s.isBangla ? 'এই যোগাযোগ মুছে ফেলতে চান?' : 'Delete this contact?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child:
-                Text('বাতিল', style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text(s.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('মুছুন',
-                style: TextStyle(
-                    fontFamily: 'HindSiliguri', color: AppColors.error)),
+            child: Text(s.isBangla ? 'মুছুন' : 'Delete',
+                style: const TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
   }
 
-  void _showAddContactSheet(BuildContext context, WidgetRef ref) {
+  void _showAddContactSheet(BuildContext context, WidgetRef ref, AppStrings s) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final relationController = TextEditingController();
@@ -298,8 +300,8 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'নতুন যোগাযোগ',
-              style: TextStyle(
+              s.contactsAdd,
+              style: const TextStyle(
                 fontFamily: 'HindSiliguri',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -309,7 +311,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
             TextField(
               controller: nameController,
               decoration: InputDecoration(
-                labelText: 'নাম',
+                labelText: s.contactsName,
                 prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
@@ -318,7 +320,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
               controller: phoneController,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
-                labelText: 'ফোন নম্বর',
+                labelText: s.contactsPhone,
                 prefixIcon: const Icon(Icons.phone_outlined),
               ),
             ),
@@ -326,7 +328,7 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
             TextField(
               controller: relationController,
               decoration: InputDecoration(
-                labelText: 'সম্পর্ক (যেমন: মা, বাবা, বন্ধু)',
+                labelText: s.contactsRelation,
                 prefixIcon: const Icon(Icons.family_restroom_outlined),
               ),
             ),
@@ -335,7 +337,9 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                labelText: 'ইমেইল অ্যাড্রেস (ঐচ্ছিক)',
+                labelText: s.isBangla
+                    ? 'ইমেইল অ্যাড্রেস (ঐচ্ছিক)'
+                    : 'Email Address (Optional)',
                 prefixIcon: const Icon(Icons.email_outlined),
               ),
             ),
@@ -349,14 +353,16 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
                     ref.read(contactProvider.notifier).addContact(
                           name: nameController.text.trim(),
                           phoneNumber: phoneController.text.trim(),
-                          email: emailController.text.trim().isNotEmpty ? emailController.text.trim() : null,
+                          email: emailController.text.trim().isNotEmpty
+                              ? emailController.text.trim()
+                              : null,
                           relationship: relationController.text.trim(),
                         );
                     Navigator.pop(context);
                   }
                 },
-                child: Text('যোগ করুন',
-                    style: TextStyle(fontFamily: 'HindSiliguri')),
+                child: Text(s.save,
+                    style: const TextStyle(fontFamily: 'HindSiliguri')),
               ),
             ),
           ],
@@ -365,23 +371,20 @@ class _EmergencyContactsScreenState extends ConsumerState<EmergencyContactsScree
     );
   }
 
-  void _showInfoDialog(BuildContext context) {
+  void _showInfoDialog(BuildContext context, AppStrings s) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('জরুরি যোগাযোগ',
-            style: TextStyle(fontFamily: 'HindSiliguri')),
+        title: Text(s.contactsTitle),
         content: Text(
-          'জরুরি সময়ে এই যোগাযোগকারীদের SMS ও নোটিফিকেশন পাঠানো হবে। '
-          'ড্র্যাগ করে অগ্রাধিকার পরিবর্তন করুন।\n\n'
-          'বামে সোয়াইপ করে মুছুন।',
-          style: TextStyle(fontFamily: 'HindSiliguri'),
+          s.isBangla
+              ? 'জরুরি সময়ে এই যোগাযোগকারীদের SMS ও নোটিফিকেশন পাঠানো হবে। ড্র্যাগ করে অগ্রাধিকার পরিবর্তন করুন।'
+              : 'These contacts will receive SMS and notifications in an emergency. Drag to reorder priority.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                Text('বুঝেছি', style: TextStyle(fontFamily: 'HindSiliguri')),
+            child: Text(s.ok),
           ),
         ],
       ),

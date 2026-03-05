@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,12 +6,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/api/auth_api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../provider/language_provider.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
@@ -22,7 +24,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthApiService();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -49,7 +51,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       await _authService.forgotPassword(_emailController.text.trim());
 
       if (mounted) {
-        _showSuccess('আপনার ইমেইলে ৬ সংখ্যার OTP কোড পাঠানো হয়েছে');
+        final s = ref.read(stringsProvider);
+        _showSuccess(s.isBangla
+            ? 'আপনার ইমেইলে ৬ সংখ্যার OTP কোড পাঠানো হয়েছে'
+            : 'A 6-digit OTP code has been sent to your email');
         setState(() => _currentStep = 1);
       }
     } catch (e) {
@@ -65,7 +70,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   Future<void> _verifyOtp() async {
     if (_otpController.text.trim().length != 6) {
-      _showError('অনুগ্রহ করে ৬ সংখ্যার OTP কোড দিন');
+      final s = ref.read(stringsProvider);
+      _showError(s.isBangla
+          ? 'অনুগ্রহ করে ৬ সংখ্যার OTP কোড দিন'
+          : 'Please enter 6-digit OTP code');
       return;
     }
 
@@ -78,7 +86,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       );
 
       if (mounted) {
-        _showSuccess('OTP সঠিক! এখন নতুন পাসওয়ার্ড দিন।');
+        final s = ref.read(stringsProvider);
+        _showSuccess(s.isBangla
+            ? 'OTP সঠিক! এখন নতুন পাসওয়ার্ড দিন।'
+            : 'OTP verified! Now enter your new password.');
         setState(() {
           _resetToken = token;
           _currentStep = 2;
@@ -86,9 +97,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final s = ref.read(stringsProvider);
         String msg = e.toString().replaceAll('Exception: ', '');
         if (msg.contains('Invalid') || msg.contains('expired')) {
-          msg = 'ভুল বা মেয়াদোত্তীর্ণ OTP কোড। আবার চেষ্টা করুন।';
+          msg = s.isBangla
+              ? 'ভুল বা মেয়াদোত্তীর্ণ OTP কোড। আবার চেষ্টা করুন।'
+              : 'Invalid or expired OTP code. Please try again.';
         }
         _showError(msg);
       }
@@ -102,7 +116,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
     if (_resetToken == null) {
-      _showError('OTP ভেরিফিকেশন প্রয়োজন');
+      final s = ref.read(stringsProvider);
+      _showError(
+          s.isBangla ? 'OTP ভেরিফিকেশন প্রয়োজন' : 'OTP verification required');
       return;
     }
 
@@ -115,17 +131,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       );
 
       if (mounted) {
+        final s = ref.read(stringsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'পাসওয়ার্ড সফলভাবে রিসেট হয়েছে! এখন লগইন করুন।',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              s.forgotResetSuccess,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.success,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
-        
+
         // Go back to login
         context.go('/login');
       }
@@ -143,7 +160,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontFamily: 'HindSiliguri')),
+        content:
+            Text(message, style: const TextStyle(fontFamily: 'HindSiliguri')),
         backgroundColor: AppColors.danger,
       ),
     );
@@ -152,7 +170,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontFamily: 'HindSiliguri')),
+        content:
+            Text(message, style: const TextStyle(fontFamily: 'HindSiliguri')),
         backgroundColor: AppColors.success,
       ),
     );
@@ -160,9 +179,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('পাসওয়ার্ড রিসেট'),
+        title: Text(s.forgotTitle),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -173,21 +193,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                
+
                 const Icon(
                   Icons.lock_reset,
                   size: 80,
                   color: AppColors.primary,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 Text(
                   _currentStep == 0
-                      ? 'পাসওয়ার্ড রিসেট'
+                      ? s.forgotTitle
                       : _currentStep == 1
-                          ? 'OTP যাচাই'
-                          : 'নতুন পাসওয়ার্ড',
+                          ? s.forgotVerifyOTP
+                          : (s.isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password'),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -195,15 +215,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 Text(
                   _currentStep == 0
-                      ? 'আপনার ইমেইল দিন। আমরা আপনাকে OTP কোড পাঠাব।'
+                      ? s.forgotSubtitle
                       : _currentStep == 1
-                          ? 'আপনার ইমেইলে পাঠানো ৬ সংখ্যার কোড দিন।'
-                          : 'আপনার নতুন পাসওয়ার্ড দিন।',
+                          ? s.forgotOTPSubtitle
+                          : s.forgotNewPassSubtitle,
                   style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -211,7 +231,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 12),
 
                 // Step indicator
@@ -225,37 +245,44 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       decoration: BoxDecoration(
                         color: index <= _currentStep
                             ? AppColors.primary
+                            // ignore: deprecated_member_use
                             : AppColors.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
                   }),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Step 0: Email
                 if (_currentStep == 0) ...[
                   CustomTextField(
                     controller: _emailController,
-                    label: 'ইমেইল',
+                    label: s.regEmail,
                     hint: 'your@email.com',
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: Icons.email_outlined,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'ইমেইল দিন';
+                        return s.regEmail +
+                            ' ' +
+                            (s.isBangla ? 'দিন' : 'required');
                       }
                       if (!value.contains('@')) {
-                        return 'সঠিক ইমেইল দিন';
+                        return s.contactsPhoneInvalid;
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 32),
                   CustomButton(
-                    text: 'OTP পাঠান',
-                    onPressed: _isLoading ? null : () { _sendOtp(); },
+                    text: s.forgotSendOTP,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _sendOtp();
+                          },
                     isLoading: _isLoading,
                   ),
                 ],
@@ -274,27 +301,33 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _otpController,
-                    label: 'OTP কোড',
-                    hint: '৬ সংখ্যার কোড',
+                    label: 'OTP ' + (s.isBangla ? 'কোড' : 'Code'),
+                    hint: s.isBangla ? '৬ সংখ্যার কোড' : '6-digit code',
                     keyboardType: TextInputType.number,
                     prefixIcon: Icons.pin,
                     maxLines: 1,
                   ),
                   const SizedBox(height: 32),
                   CustomButton(
-                    text: 'OTP যাচাই করুন',
-                    onPressed: _isLoading ? null : () { _verifyOtp(); },
+                    text: s.forgotVerifyOTP,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _verifyOtp();
+                          },
                     isLoading: _isLoading,
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: _isLoading ? null : () {
-                      _otpController.clear();
-                      _sendOtp();
-                    },
-                    child: const Text(
-                      'আবার OTP পাঠান',
-                      style: TextStyle(fontFamily: 'HindSiliguri'),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _otpController.clear();
+                            _sendOtp();
+                          },
+                    child: Text(
+                      s.isBangla ? 'আবার OTP পাঠান' : 'Resend OTP',
+                      style: const TextStyle(fontFamily: 'HindSiliguri'),
                     ),
                   ),
                 ],
@@ -303,20 +336,29 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 if (_currentStep == 2) ...[
                   CustomTextField(
                     controller: _newPasswordController,
-                    label: 'নতুন পাসওয়ার্ড',
+                    label: s.isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password',
                     hint: '••••••••',
                     obscureText: _obscurePassword,
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'নতুন পাসওয়ার্ড দিন';
+                        return (s.isBangla
+                                ? 'নতুন পাসওয়ার্ড'
+                                : 'New Password') +
+                            ' ' +
+                            (s.isBangla ? 'দিন' : 'required');
                       }
                       if (value.length < 6) {
-                        return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে';
+                        return s.isBangla
+                            ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে'
+                            : 'Password must be at least 6 characters';
                       }
                       return null;
                     },
@@ -324,44 +366,54 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _confirmPasswordController,
-                    label: 'পাসওয়ার্ড নিশ্চিত করুন',
+                    label: s.regConfirmPass,
                     hint: '••••••••',
                     obscureText: _obscureConfirm,
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      icon: Icon(_obscureConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                     validator: (value) {
                       if (value != _newPasswordController.text) {
-                        return 'পাসওয়ার্ড মিলছে না';
+                        return s.isBangla
+                            ? 'পাসওয়ার্ড মিলছে না'
+                            : 'Passwords do not match';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 32),
                   CustomButton(
-                    text: 'পাসওয়ার্ড রিসেট করুন',
-                    onPressed: _isLoading ? null : () { _resetPassword(); },
+                    text:
+                        s.isBangla ? 'পাসওয়ার্ড রিসেট করুন' : 'Reset Password',
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _resetPassword();
+                          },
                     isLoading: _isLoading,
                   ),
                 ],
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Back to login link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'মনে পড়েছে? ',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    Text(
+                      (s.isBangla ? 'মনে পড়েছে? ' : 'Remembered? '),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text(
-                        'লগইন করুন',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: Text(
+                        s.loginButton,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

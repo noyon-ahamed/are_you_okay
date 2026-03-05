@@ -6,7 +6,6 @@ import '../services/api/auth_api_service.dart';
 import '../services/socket_service.dart';
 import '../services/hive_service.dart';
 
-// Auth State
 abstract class AuthState {
   const AuthState();
 }
@@ -33,23 +32,25 @@ class AuthError extends AuthState {
   const AuthError(this.message);
 }
 
-// Auth State Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final SocketService _socketService;
 
-  AuthNotifier(this._authRepository, this._socketService) : super(const AuthInitial()) {
+  AuthNotifier(this._authRepository, this._socketService)
+      : super(const AuthInitial()) {
     checkAuthStatus();
   }
 
   Future<void> checkAuthStatus() async {
-    state = const AuthLoading();
     try {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
         state = AuthAuthenticated(user);
-        _socketService.init(); // Connect socket
-        _syncProfileQuietly();
+        _socketService.init();
+        // empty user হলে background এ full profile fetch করো
+        if (user.isEmpty) {
+          _syncProfileQuietly();
+        }
       } else {
         state = const AuthUnauthenticated();
       }
@@ -79,10 +80,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> login({required String email, required String password}) async {
     state = const AuthLoading();
     try {
-      final user = await _authRepository.login(email: email, password: password);
+      final user =
+          await _authRepository.login(email: email, password: password);
       state = AuthAuthenticated(user);
-      _socketService.init(); // Connect socket
-      _syncProfileQuietly(); // Fetch extended profile fields from DB since login payload is basic
+      _socketService.init();
+      _syncProfileQuietly();
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -103,7 +105,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         phone: phone,
       );
       state = AuthAuthenticated(user);
-      _socketService.init(); // Connect socket
+      _socketService.init();
       _syncProfileQuietly();
     } catch (e) {
       state = AuthError(e.toString());
@@ -114,14 +116,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     try {
       await _authRepository.logout();
-      _socketService.disconnect(); // Disconnect socket
+      _socketService.disconnect();
       state = const AuthUnauthenticated();
     } catch (e) {
       state = AuthError(e.toString());
     }
   }
 
-  /// Update profile on backend and locally
   Future<void> updateProfile({
     String? name,
     String? phone,
@@ -139,20 +140,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         bloodGroup: bloodGroup,
       );
 
-      // Parse the returned user from the backend response
       final userMap = result['user'] as Map<String, dynamic>?;
       if (userMap != null) {
         final updatedUser = UserModel.fromJson(userMap);
-        
-        // Save to Hive
         final hive = HiveService();
         await hive.saveUser(updatedUser);
-        
         if (mounted && state is AuthAuthenticated) {
           state = AuthAuthenticated(updatedUser);
         }
       } else {
-        // Fallback if backend doesn't return the full user object
         final currentState = state;
         if (currentState is AuthAuthenticated) {
           final updatedUser = currentState.user.copyWith(
@@ -174,7 +170,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Refresh profile from backend
   Future<void> refreshProfile() async {
     try {
       final api = AuthApiService();
@@ -192,7 +187,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-// Provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     ref.watch(authRepositoryProvider),
@@ -200,7 +194,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   );
 });
 
-// Current User Provider
 final currentUserProvider = Provider<UserModel?>((ref) {
   final state = ref.watch(authProvider);
   if (state is AuthAuthenticated) {

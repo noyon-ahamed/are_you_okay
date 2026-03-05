@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -11,6 +13,7 @@ import '../../../model/emergency_contact_model.dart';
 import '../../../services/location_service.dart';
 import '../../../services/socket_service.dart';
 import '../../../services/api/emergency_api_service.dart';
+import '../../../provider/language_provider.dart';
 
 class SOSScreen extends ConsumerStatefulWidget {
   const SOSScreen({super.key});
@@ -24,7 +27,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   late AnimationController _pulseController;
   late AnimationController _countdownController;
   late Animation<double> _pulseAnim;
-  
+
   bool _isActivating = false;
   bool _isActivated = false;
   int _countdown = 5;
@@ -34,7 +37,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   String? _activeAlertId;
   final _emergencyApi = EmergencyApiService();
 
-  bool _needPolice = true;
+  bool _needPolice = false;
   bool _needFire = false;
   bool _needAmbulance = false;
 
@@ -90,8 +93,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     _locationSubscription?.cancel();
     setState(() {
       _isActivating = false;
-      _isActivated = false; // Also reset activated state if needed? 
-      // User might want to stop active SOS. 
+      _isActivated = false; // Also reset activated state if needed?
+      // User might want to stop active SOS.
       // The button "I am Safe" does separate logic.
       _countdown = 5;
     });
@@ -120,22 +123,21 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
 
     // Get real contacts
     final contacts = ref.read(contactListProvider);
-    
+
     // Start sharing location via Socket
     final locationService = ref.read(locationServiceProvider);
     final socketService = ref.read(socketServiceProvider);
-    
+
     // Initial location emission
     if (_currentPosition != null) {
       socketService.emitLocationUpdate(
-        _currentPosition!.latitude, 
-        _currentPosition!.longitude
-      );
+          _currentPosition!.latitude, _currentPosition!.longitude);
     }
-    
+
     // Stream updates
     _locationSubscription?.cancel();
-    _locationSubscription = locationService.getLocationStream().listen((position) {
+    _locationSubscription =
+        locationService.getLocationStream().listen((position) {
       if (mounted) {
         setState(() => _currentPosition = position);
       }
@@ -149,39 +151,84 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     if (_needAmbulance) selectedServices.add('ambulance');
     if (selectedServices.isEmpty) selectedServices.add('general');
 
-    // === Call backend SOS endpoint to send SMS+Email alerts ===
-    try {
-      final result = await _emergencyApi.triggerSOS(
-        latitude: _currentPosition?.latitude ?? 23.8103,
-        longitude: _currentPosition?.longitude ?? 90.4125,
-        serviceTypes: selectedServices,
-      );
-      _activeAlertId = result['alert']?['_id']?.toString();
-      
+    // === Check connectivity and call backend or use SMS fallback ===
+    final connectivity = await Connectivity().checkConnectivity();
+    final isOffline = connectivity == ConnectivityResult.none;
+
+    if (isOffline) {
+      // Offline fallback: open native SMS app to all contacts
+      await _sendOfflineSMS(contacts);
+    } else {
+      try {
+        final result = await _emergencyApi.triggerSOS(
+          latitude: _currentPosition?.latitude ?? 23.8103,
+          longitude: _currentPosition?.longitude ?? 90.4125,
+          serviceTypes: selectedServices,
+        );
+        _activeAlertId = result['alert']?['_id']?.toString();
+
+        if (mounted) {
+          final s = ref.read(stringsProvider);
+          final notifiedCount = result['contactsNotified'] ?? 0;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${s.sosActiveStatus} $notifiedCount ${s.sosContactsNotified}',
+                style: const TextStyle(fontFamily: 'HindSiliguri'),
+              ),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Backend SOS error, trying SMS fallback: $e');
+        await _sendOfflineSMS(contacts);
+      }
+    }
+  }
+
+  /// Open native SMS app pre-filled with emergency contacts and location
+  Future<void> _sendOfflineSMS(List<EmergencyContactModel> contacts) async {
+    final s = ref.read(stringsProvider);
+    if (contacts.isEmpty) {
       if (mounted) {
-        final notifiedCount = result['contactsNotified'] ?? 0;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'SOS সক্রিয়! $notifiedCount জন যোগাযোগকারীকে সতর্ক করা হয়েছে',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              s.sosNoContacts,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 4),
+            backgroundColor: AppColors.warning,
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Backend SOS error: $e');
+      return;
+    }
+
+    final lat = _currentPosition?.latitude ?? 0;
+    final lng = _currentPosition?.longitude ?? 0;
+    final locationText = lat != 0
+        ? '${s.sosCurrentLocation} https://maps.google.com/?q=$lat,$lng'
+        : s.sosLocationNotFound;
+    final body = Uri.encodeComponent(
+        '🆘 ${s.sosSmsBody} $locationText ${s.sosPleaseHelp}');
+
+    // Build phone list (up to 5 contacts)
+    final phones = contacts.take(5).map((c) => c.phoneNumber).join(',');
+    final smsUri = Uri.parse('sms:$phones?body=$body');
+
+    if (await canLaunchUrl(smsUri)) {
+      await launchUrl(smsUri);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'জরুরি সতর্কতা পাঠানো হচ্ছে (অফলাইন মোড)',
-              style: TextStyle(fontFamily: 'HindSiliguri'),
+              s.sosSmsAppOpened,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
             ),
             backgroundColor: AppColors.warning,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -192,13 +239,14 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   Widget build(BuildContext context) {
     final contacts = ref.watch(contactListProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       backgroundColor: _isActivated
           ? const Color(0xFFD32F2F)
           : (isDark ? AppColors.backgroundDark : AppColors.background),
       appBar: AppBar(
-        title: const Text('জরুরি SOS'),
+        title: Text(s.sosTitle),
         backgroundColor: Colors.transparent,
         foregroundColor: _isActivated ? Colors.white : null,
       ),
@@ -216,8 +264,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
             ),
 
             // Service Selection
-            if (!_isActivating && !_isActivated)
-              _buildServiceSelection(isDark),
+            if (!_isActivating && !_isActivated) _buildServiceSelection(isDark),
 
             // Emergency contacts
             if (!_isActivating && !_isActivated) ...[
@@ -234,17 +281,14 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   Widget _buildSOSButton() {
+    final s = ref.watch(stringsProvider);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'জরুরি সাহায্যের জন্য\nদীর্ঘক্ষণ চাপুন',
+          s.sosPressHold,
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 16,
-            color: AppColors.textSecondary,
-            fontFamily: 'HindSiliguri',
-          ),
+          style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 32),
         AnimatedBuilder(
@@ -271,11 +315,13 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                   ),
                   boxShadow: [
                     BoxShadow(
+                      // ignore: deprecated_member_use
                       color: const Color(0xFFF44336).withOpacity(0.4),
                       blurRadius: 30,
                       offset: const Offset(0, 10),
                     ),
                     BoxShadow(
+                      // ignore: deprecated_member_use
                       color: const Color(0xFFF44336).withOpacity(0.2),
                       blurRadius: 60,
                       offset: const Offset(0, 5),
@@ -288,8 +334,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                     const Icon(Icons.sos, color: Colors.white, size: 56),
                     const SizedBox(height: 8),
                     Text(
-                      'SOS',
-                      style: TextStyle(
+                      s.sosTitle,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -309,14 +355,15 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   Widget _buildServiceSelection(bool isDark) {
+    final s = ref.watch(stringsProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'প্রয়োজনীয় পরিষেবা নির্বাচন করুন:',
-            style: TextStyle(
+            s.sosSelectService,
+            style: const TextStyle(
               fontFamily: 'HindSiliguri',
               fontWeight: FontWeight.w600,
               fontSize: 14,
@@ -325,9 +372,12 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              _buildCheckbox('পুলিশ', _needPolice, (v) => setState(() => _needPolice = v!)),
-              _buildCheckbox('ফায়ার সার্ভিস', _needFire, (v) => setState(() => _needFire = v!)),
-              _buildCheckbox('অ্যাম্বুলেন্স', _needAmbulance, (v) => setState(() => _needAmbulance = v!)),
+              _buildCheckbox(s.sosPolice, _needPolice,
+                  (v) => setState(() => _needPolice = v!)),
+              _buildCheckbox(
+                  s.sosFire, _needFire, (v) => setState(() => _needFire = v!)),
+              _buildCheckbox(s.sosAmbulance, _needAmbulance,
+                  (v) => setState(() => _needAmbulance = v!)),
             ],
           ),
         ],
@@ -335,7 +385,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     );
   }
 
-  Widget _buildCheckbox(String label, bool value, ValueChanged<bool?> onChanged) {
+  Widget _buildCheckbox(
+      String label, bool value, ValueChanged<bool?> onChanged) {
     return Expanded(
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -362,12 +413,13 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   Widget _buildCountdownView() {
+    final s = ref.watch(stringsProvider);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'SOS সক্রিয় হচ্ছে...',
-          style: TextStyle(
+          '${s.sosActivating}...',
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
             fontFamily: 'HindSiliguri',
@@ -379,13 +431,14 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           height: 160,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
+            // ignore: deprecated_member_use
             color: AppColors.error.withOpacity(0.1),
             border: Border.all(color: AppColors.error, width: 4),
           ),
           child: Center(
             child: Text(
               '$_countdown',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 72,
                 fontWeight: FontWeight.bold,
                 color: AppColors.error,
@@ -398,9 +451,9 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         TextButton.icon(
           onPressed: _cancelSOS,
           icon: const Icon(Icons.close, color: AppColors.error),
-          label: const Text(
-            'বাতিল করুন',
-            style: TextStyle(
+          label: Text(
+            s.cancel,
+            style: const TextStyle(
               fontSize: 18,
               fontFamily: 'HindSiliguri',
               color: AppColors.error,
@@ -412,6 +465,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   Widget _buildActivatedView() {
+    final s = ref.watch(stringsProvider);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -422,8 +476,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         ),
         const SizedBox(height: 20),
         Text(
-          'SOS সক্রিয় হয়েছে!',
-          style: TextStyle(
+          s.sosActivated,
+          style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -432,10 +486,11 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         ),
         const SizedBox(height: 12),
         Text(
-          'আপনার জরুরি যোগাযোগকারীদের\nসতর্কতা পাঠানো হয়েছে',
+          s.sosAlertSent,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.8),
             fontFamily: 'HindSiliguri',
           ),
@@ -445,6 +500,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -454,8 +510,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                 const Icon(Icons.location_on, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'লোকেশন শেয়ার করা হয়েছে',
-                  style: TextStyle(
+                  s.sosLocationShared,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontFamily: 'HindSiliguri',
                   ),
@@ -482,9 +538,9 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
             });
           },
           icon: const Icon(Icons.check),
-          label: const Text(
-            'আমি নিরাপদ',
-            style: TextStyle(fontFamily: 'HindSiliguri'),
+          label: Text(
+            s.sosSafeBtn,
+            style: const TextStyle(fontFamily: 'HindSiliguri'),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -496,7 +552,9 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     );
   }
 
-  Widget _buildContactsSection(List<EmergencyContactModel> contacts, bool isDark) {
+  Widget _buildContactsSection(
+      List<EmergencyContactModel> contacts, bool isDark) {
+    final s = ref.watch(stringsProvider);
     if (contacts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -505,12 +563,12 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           decoration: AppDecorations.cardDecoration(context: context),
           child: Row(
             children: [
-              Icon(Icons.info_outline, color: AppColors.warning),
+              const Icon(Icons.info_outline, color: AppColors.warning),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'জরুরি যোগাযোগ যোগ করুন',
-                  style: TextStyle(
+                  s.sosAddContacts,
+                  style: const TextStyle(
                     fontFamily: 'HindSiliguri',
                     color: AppColors.warning,
                   ),
@@ -528,8 +586,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'জরুরি যোগাযোগ (${contacts.length})',
-            style: TextStyle(
+            '${s.sosEmergencyContacts} (${contacts.length})',
+            style: const TextStyle(
               fontFamily: 'HindSiliguri',
               fontWeight: FontWeight.w600,
               fontSize: 14,
@@ -546,13 +604,14 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
+                        // ignore: deprecated_member_use
                         color: AppColors.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Text(
                           c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
@@ -567,7 +626,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                         children: [
                           Text(
                             c.name,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontFamily: 'HindSiliguri',
                             ),
@@ -584,7 +643,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                         ],
                       ),
                     ),
-                    Icon(
+                    const Icon(
                       Icons.check_circle,
                       color: AppColors.success,
                       size: 20,
@@ -598,10 +657,11 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   Widget _buildEmergencyNumbers(bool isDark) {
+    final s = ref.watch(stringsProvider);
     final numbers = [
-      {'name': '৯৯৯ (জাতীয় জরুরি)', 'number': '999'},
-      {'name': 'ফায়ার সার্ভিস', 'number': '199'},
-      {'name': 'অ্যাম্বুলেন্স', 'number': '199'},
+      {'name': s.sosNumberNational, 'number': '999'},
+      {'name': s.sosNumberFire, 'number': '199'},
+      {'name': s.sosNumberAmbulance, 'number': '199'},
     ];
 
     return Padding(
@@ -610,8 +670,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'জরুরি নম্বর',
-            style: TextStyle(
+            s.sosEmergencyNumbers,
+            style: const TextStyle(
               fontFamily: 'HindSiliguri',
               fontWeight: FontWeight.w600,
               fontSize: 14,
@@ -619,34 +679,37 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           ),
           const SizedBox(height: 8),
           Row(
-            children: numbers.map((n) => Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: AppDecorations.cardDecoration(context: context),
-                child: Column(
-                  children: [
-                    Text(
-                      n['number']!,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
+            children: numbers
+                .map((n) => Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration:
+                            AppDecorations.cardDecoration(context: context),
+                        child: Column(
+                          children: [
+                            Text(
+                              n['number']!,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.error,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              n['name']!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'HindSiliguri',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      n['name']!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontFamily: 'HindSiliguri',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )).toList(),
+                    ))
+                .toList(),
           ),
         ],
       ),

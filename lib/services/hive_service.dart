@@ -13,24 +13,27 @@ class HiveService {
   factory HiveService() => _instance;
   HiveService._internal();
 
-  // Box names
   static const String _userBoxName = 'user_box';
   static const String _settingsBoxName = 'settings_box';
   static const String _checkInBoxName = 'checkin_box';
   static const String _contactBoxName = 'contact_box';
 
-  // Boxes
   late Box _userBox;
   late Box _settingsBox;
   late Box _checkInBox;
   late Box _contactBox;
 
-  /// Initialize
   Future<void> init() async {
-    _userBox = await Hive.openBox(_userBoxName);
-    _settingsBox = await Hive.openBox(_settingsBoxName);
-    _checkInBox = await Hive.openBox(_checkInBoxName);
-    _contactBox = await Hive.openBox(_contactBoxName);
+    final results = await Future.wait([
+      Hive.openBox(_userBoxName),
+      Hive.openBox(_settingsBoxName),
+      Hive.openBox(_checkInBoxName),
+      Hive.openBox(_contactBoxName),
+    ]);
+    _userBox = results[0];
+    _settingsBox = results[1];
+    _checkInBox = results[2];
+    _contactBox = results[3];
   }
 
   // ==================== User Operations ====================
@@ -45,7 +48,6 @@ class HiveService {
       try {
         return UserModel.fromJson(jsonDecode(userJson));
       } catch (e) {
-        print('Error parsing user data: $e');
         return null;
       }
     }
@@ -75,7 +77,7 @@ class HiveService {
           checkIns.add(CheckInModel.fromJson(jsonDecode(jsonString)));
         }
       } catch (e) {
-        print('Error parsing checkin at index $i: $e');
+        // skip
       }
     }
     return checkIns;
@@ -108,7 +110,7 @@ class HiveService {
         final updated = checkIn.copyWith(isSynced: true);
         await saveCheckIn(updated);
       } catch (e) {
-        print('Error marking checkin as synced: $e');
+        // skip
       }
     }
   }
@@ -128,15 +130,9 @@ class HiveService {
           contacts.add(EmergencyContactModel.fromJson(jsonDecode(jsonString)));
         }
       } catch (e) {
-        print('Error parsing contact at index $i: $e');
+        // skip
       }
     }
-    contacts.sort((a, b) => b.priority.compareTo(a
-        .priority)); // Higher priority first (descending)? or ascending? Usually priority 1 is highest.
-    // Let's assume 1 is likely highest priority, so sorting ascending by priority value makes sense if 1 < 2.
-    // However, if priority is a score, then descending.
-    // Looking at the code I replaced: `contacts.sort((a, b) => a.priority.compareTo(b.priority));` (Ascending)
-    // So I will keep ascending.
     contacts.sort((a, b) => a.priority.compareTo(b.priority));
     return contacts;
   }
@@ -147,7 +143,7 @@ class HiveService {
       try {
         return EmergencyContactModel.fromJson(jsonDecode(jsonString));
       } catch (e) {
-        print('Error parsing contact $id: $e');
+        // skip
       }
     }
     return null;
@@ -161,6 +157,10 @@ class HiveService {
     await _contactBox.delete(id);
   }
 
+  Future<void> clearContacts() async {
+    await _contactBox.clear();
+  }
+
   int getContactCount() {
     return _contactBox.length;
   }
@@ -168,19 +168,6 @@ class HiveService {
   // ==================== Settings Operations ====================
 
   Future<void> saveSettings(SettingsModel settings) async {
-    // Convert to Map first, because SettingsModel might not have toJson for all fields if I didn't check carefully,
-    // but looking at previous file view, it didn't have toJson!
-    // Wait, I checked SettingsModel in step 41, it DOES NOT have toJson!
-    // I need to add toJson to SettingsModel or handle it here.
-    // It's cleaner to handle it here if I don't want to modify SettingsModel file unless necessary.
-    // But wait, `CheckInModel` and `UserModel` had `toJson`.
-    // Let me double check `SettingsModel` in step 41.
-    // It has `copyWith` but NO `toJson` or `fromJson`!
-    // So I must implement manual serialization here or add it to the model.
-    // Adding it to the model is better practice.
-    // But significantly, for now I can just do it here to avoid context switching too much if I can.
-    // Actually, I'll just manual serialized it here since I'm already editing this file.
-
     final map = {
       'notificationsEnabled': settings.notificationsEnabled,
       'locationEnabled': settings.locationEnabled,
@@ -210,7 +197,6 @@ class HiveService {
               : null,
         );
       } catch (e) {
-        print('Error parsing settings: $e');
         return const SettingsModel();
       }
     }

@@ -1,9 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:local_auth/error_codes.dart' as auth_error;
-
-import '../provider/settings_provider.dart';
 
 final biometricServiceProvider = Provider<BiometricService>((ref) {
   return BiometricService();
@@ -21,7 +19,9 @@ class BiometricService {
           canAuthenticateWithBiometrics || await _auth.isDeviceSupported();
       return canAuthenticate;
     } on PlatformException catch (e) {
-      print('Biometric availability check failed: $e');
+      if (kDebugMode) {
+        print('Biometric availability check failed: $e');
+      }
       return false;
     }
   }
@@ -31,7 +31,7 @@ class BiometricService {
     String reason = 'Please authenticate to access the app',
   }) async {
     if (_isAuthenticating) return false;
-    
+
     try {
       _isAuthenticating = true;
       final bool didAuthenticate = await _auth.authenticate(
@@ -45,7 +45,9 @@ class BiometricService {
       return didAuthenticate;
     } on PlatformException catch (e) {
       _isAuthenticating = false;
-      print('Authentication fail: $e');
+      if (kDebugMode) {
+        print('Authentication fail: $e');
+      }
       return false;
     }
   }

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 /// App-wide reusable decorations
@@ -6,7 +5,7 @@ class AppDecorations {
   AppDecorations._();
 
   // ==================== Glassmorphism ====================
-  
+
   /// Glass card decoration with blur effect
   static BoxDecoration glassCard({
     Color? color,
@@ -15,9 +14,11 @@ class AppDecorations {
     double borderOpacity = 0.2,
   }) {
     return BoxDecoration(
+      // ignore: deprecated_member_use
       color: (color ?? Colors.white).withOpacity(opacity),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
+        // ignore: deprecated_member_use
         color: Colors.white.withOpacity(borderOpacity),
         width: 1.5,
       ),
@@ -30,9 +31,11 @@ class AppDecorations {
     double opacity = 0.15,
   }) {
     return BoxDecoration(
+      // ignore: deprecated_member_use
       color: Colors.black.withOpacity(opacity),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
+        // ignore: deprecated_member_use
         color: Colors.white.withOpacity(0.1),
         width: 1,
       ),
@@ -40,11 +43,12 @@ class AppDecorations {
   }
 
   // ==================== Gradient Containers ====================
-  
+
   /// Primary gradient background
   static BoxDecoration primaryGradientBg({double borderRadius = 0}) {
     return BoxDecoration(
-      borderRadius: borderRadius > 0 ? BorderRadius.circular(borderRadius) : null,
+      borderRadius:
+          borderRadius > 0 ? BorderRadius.circular(borderRadius) : null,
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -56,7 +60,8 @@ class AppDecorations {
   /// Danger gradient for SOS
   static BoxDecoration dangerGradientBg({double borderRadius = 0}) {
     return BoxDecoration(
-      borderRadius: borderRadius > 0 ? BorderRadius.circular(borderRadius) : null,
+      borderRadius:
+          borderRadius > 0 ? BorderRadius.circular(borderRadius) : null,
       gradient: const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -90,41 +95,45 @@ class AppDecorations {
   }
 
   // ==================== Shadows ====================
-  
+
   static List<BoxShadow> get softShadow => [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.06),
-      blurRadius: 12,
-      offset: const Offset(0, 4),
-    ),
-  ];
+        BoxShadow(
+          // ignore: deprecated_member_use
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ];
 
   static List<BoxShadow> get mediumShadow => [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.1),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-    ),
-  ];
+        BoxShadow(
+          // ignore: deprecated_member_use
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+      ];
 
   static List<BoxShadow> get heavyShadow => [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.15),
-      blurRadius: 30,
-      offset: const Offset(0, 15),
-    ),
-  ];
+        BoxShadow(
+          // ignore: deprecated_member_use
+          color: Colors.black.withOpacity(0.15),
+          blurRadius: 30,
+          offset: const Offset(0, 15),
+        ),
+      ];
 
   static List<BoxShadow> coloredShadow(Color color, {double opacity = 0.3}) => [
-    BoxShadow(
-      color: color.withOpacity(opacity),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-    ),
-  ];
+        BoxShadow(
+          // ignore: deprecated_member_use
+          color: color.withOpacity(opacity),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+      ];
 
   // ==================== Card Decoration ====================
-  
+
   static BoxDecoration cardDecoration({
     required BuildContext context,
     double borderRadius = 16,
@@ -134,7 +143,11 @@ class AppDecorations {
       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
-        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+        color: isDark
+            // ignore: deprecated_member_use
+            ? Colors.white.withOpacity(0.08)
+            // ignore: deprecated_member_use
+            : Colors.black.withOpacity(0.05),
       ),
       boxShadow: isDark ? [] : softShadow,
     );
@@ -150,15 +163,22 @@ class AppDecorations {
       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
-        color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+        color: isDark
+            // ignore: deprecated_member_use
+            ? Colors.white.withOpacity(0.08)
+            // ignore: deprecated_member_use
+            : Colors.black.withOpacity(0.05),
       ),
-      boxShadow: isDark ? [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.3),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ] : mediumShadow,
+      boxShadow: isDark
+          ? [
+              BoxShadow(
+                // ignore: deprecated_member_use
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ]
+          : mediumShadow,
     );
   }
 }

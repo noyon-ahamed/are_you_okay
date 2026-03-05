@@ -29,7 +29,10 @@ class ShakeDetectorService {
     _onPhoneShake = onPhoneShake;
     if (_accelerometerSubscription != null) return;
 
-    _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
+    // ignore: deprecated_member_use
+    _accelerometerSubscription =
+        // ignore: deprecated_member_use
+        accelerometerEvents.listen((AccelerometerEvent event) {
       final double gX = event.x / 9.8;
       final double gY = event.y / 9.8;
       final double gZ = event.z / 9.8;
@@ -39,7 +42,7 @@ class ShakeDetectorService {
 
       if (gForce > _shakeThresholdGravity) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        
+
         // Ignore shakes that are too close together
         if (_lastShakeTimestamp + _minTimeBetweenShakesMs > now) {
           return;

@@ -1,47 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_decorations.dart';
 import '../../../routes/app_router.dart';
 import '../../widgets/custom_button.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../provider/language_provider.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<_OnboardingItem> _items = [
-    _OnboardingItem(
-      title: 'সর্বদা আপনার পাশে',
-      description: 'যেকোনো বিপদে আমরা আছি আপনার সাথে। শুধু একটি ট্যাপেই পাবেন নিরাপত্তা।',
-      image: 'assets/images/onboarding_1.png', // Placeholder
-      icon: Icons.shield_moon_rounded,
-    ),
-    _OnboardingItem(
-      title: 'লাইভ ট্র্যাকিং',
-      description: 'আপনার অবস্থান শেয়ার করুন প্রিয়জনদের সাথে, যাতে তারা নিশ্চিন্ত থাকতে পারে।',
-      image: 'assets/images/onboarding_2.png',
-      icon: Icons.location_on_rounded,
-    ),
-    _OnboardingItem(
-      title: 'জরুরি সেবা',
-      description: 'জরুরি মুহূর্তে পুলিশ, ফায়ার সার্ভিস বা অ্যাম্বুলেন্স ডাকুন নিমিষেই।',
-      image: 'assets/images/onboarding_3.png',
-      icon: Icons.emergency_rounded,
-    ),
-  ];
+  List<_OnboardingItem> _getItems(AppStrings s) {
+    return [
+      _OnboardingItem(
+        title: s.onbTitle1,
+        description: s.onbDesc1,
+        image: 'assets/images/onboarding_1.png', // Placeholder
+        icon: Icons.shield_moon_rounded,
+      ),
+      _OnboardingItem(
+        title: s.onbTitle2,
+        description: s.onbDesc2,
+        image: 'assets/images/onboarding_2.png',
+        icon: Icons.location_on_rounded,
+      ),
+      _OnboardingItem(
+        title: s.onbTitle3,
+        description: s.onbDesc3,
+        image: 'assets/images/onboarding_3.png',
+        icon: Icons.emergency_rounded,
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final items = _getItems(s);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -57,9 +69,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                // ignore: deprecated_member_use
                 color: AppColors.primary.withOpacity(0.1),
                 boxShadow: [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: AppColors.primary.withOpacity(0.2),
                     blurRadius: 100,
                     spreadRadius: 50,
@@ -80,8 +94,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: TextButton(
                       onPressed: _completeOnboarding,
                       child: Text(
-                        'এড়িয়ে যান',
-                        style: TextStyle(
+                        s.isBangla ? 'এড়িয়ে যান' : 'Skip',
+                        style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontFamily: 'HindSiliguri',
                           fontWeight: FontWeight.w600,
@@ -95,12 +109,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
-                    itemCount: _items.length,
+                    itemCount: items.length,
                     onPageChanged: (index) {
                       setState(() => _currentPage = index);
                     },
                     itemBuilder: (context, index) {
-                      return _buildPageItem(_items[index]);
+                      return _buildPageItem(items[index]);
                     },
                   ),
                 ),
@@ -113,9 +127,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       // Indicators
                       SmoothPageIndicator(
                         controller: _pageController,
-                        count: _items.length,
+                        count: items.length,
                         effect: ExpandingDotsEffect(
                           activeDotColor: AppColors.primary,
+                          // ignore: deprecated_member_use
                           dotColor: AppColors.primary.withOpacity(0.2),
                           dotHeight: 8,
                           dotWidth: 8,
@@ -126,11 +141,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                       // Next / Start Button
                       CustomButton(
-                        text: _currentPage == _items.length - 1
-                            ? 'শুরু করুন'
-                            : 'পরবর্তী',
+                        text: _currentPage == items.length - 1
+                            ? s.onbGetStarted
+                            : s.onbNext,
                         onPressed: () {
-                          if (_currentPage < _items.length - 1) {
+                          if (_currentPage < items.length - 1) {
                             _pageController.nextPage(
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeInOut,
@@ -139,7 +154,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             _completeOnboarding();
                           }
                         },
-                        // width: double.infinity,
                       ),
                     ],
                   ),
@@ -163,6 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 200,
             height: 200,
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: AppColors.primary.withOpacity(0.05),
               shape: BoxShape.circle,
             ),
@@ -173,7 +188,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 48),
-          
+
           Text(
             item.title,
             textAlign: TextAlign.center,
@@ -185,7 +200,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Text(
             item.description,
             textAlign: TextAlign.center,
@@ -203,7 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _completeOnboarding() async {
     // Request permissions
-    Map<Permission, PermissionStatus> statuses = await [
+    await [
       Permission.location,
       Permission.notification,
       Permission.microphone,

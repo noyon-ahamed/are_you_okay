@@ -10,38 +10,29 @@ class AppTheme {
   static ThemeData get lightTheme => ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        
+
         // Color Scheme
         colorScheme: const ColorScheme.light(
           primary: AppColors.primary,
           onPrimary: Colors.white,
           primaryContainer: AppColors.primaryContainer,
           onPrimaryContainer: AppColors.primaryDark,
-          
           secondary: AppColors.secondary,
           onSecondary: Colors.white,
           secondaryContainer: AppColors.secondaryContainer,
           onSecondaryContainer: AppColors.secondaryDark,
-          
           tertiary: AppColors.accent,
           onTertiary: Colors.white,
-          
           error: AppColors.error,
           onError: Colors.white,
           errorContainer: AppColors.errorLight,
           onErrorContainer: AppColors.errorDark,
-          
-          background: AppColors.background,
-          onBackground: AppColors.textPrimary,
-          
           surface: AppColors.surface,
           onSurface: AppColors.textPrimary,
-          surfaceVariant: AppColors.surfaceVariant,
+          surfaceContainerHighest: AppColors.surfaceVariant,
           onSurfaceVariant: AppColors.textSecondary,
-          
           outline: AppColors.border,
           outlineVariant: AppColors.divider,
-          
           shadow: Colors.black26,
           scrim: AppColors.scrim,
         ),
@@ -51,19 +42,15 @@ class AppTheme {
           displayLarge: AppTextStyles.displayLarge(),
           displayMedium: AppTextStyles.displayMedium(),
           displaySmall: AppTextStyles.displaySmall(),
-          
           headlineLarge: AppTextStyles.headlineLarge(),
           headlineMedium: AppTextStyles.headlineMedium(),
           headlineSmall: AppTextStyles.headlineSmall(),
-          
           titleLarge: AppTextStyles.titleLarge(),
           titleMedium: AppTextStyles.titleMedium(),
           titleSmall: AppTextStyles.titleSmall(),
-          
           bodyLarge: AppTextStyles.bodyLarge(),
           bodyMedium: AppTextStyles.bodyMedium(),
           bodySmall: AppTextStyles.bodySmall(),
-          
           labelLarge: AppTextStyles.labelLarge(),
           labelMedium: AppTextStyles.labelMedium(),
           labelSmall: AppTextStyles.labelSmall(),
@@ -245,14 +232,15 @@ class AppTheme {
 
         // Switch Theme
         switchTheme: SwitchThemeData(
-          thumbColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return AppColors.primary;
             }
             return AppColors.textSecondary;
           }),
-          trackColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              // ignore: deprecated_member_use
               return AppColors.primaryLight.withOpacity(0.5);
             }
             return AppColors.border;
@@ -273,41 +261,30 @@ class AppTheme {
   static ThemeData get darkTheme => ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primaryLight,
           onPrimary: Colors.black,
           primaryContainer: AppColors.primaryDark,
           onPrimaryContainer: AppColors.primaryLight,
-          
           secondary: AppColors.secondaryLight,
           onSecondary: Colors.black,
           secondaryContainer: AppColors.secondaryDark,
           onSecondaryContainer: AppColors.secondaryLight,
-          
           tertiary: AppColors.accentLight,
           onTertiary: Colors.black,
-          
           error: AppColors.errorLight,
           onError: Colors.black,
           errorContainer: AppColors.errorDark,
           onErrorContainer: AppColors.errorLight,
-          
-          background: AppColors.backgroundDark,
-          onBackground: AppColors.textPrimaryDark,
-          
           surface: AppColors.surfaceDark,
           onSurface: AppColors.textPrimaryDark,
-          surfaceVariant: AppColors.surfaceVariantDark,
+          surfaceContainerHighest: AppColors.surfaceVariantDark,
           onSurfaceVariant: AppColors.textSecondaryDark,
-          
           outline: AppColors.borderDark,
           outlineVariant: AppColors.dividerDark,
-          
           shadow: Colors.black54,
           scrim: AppColors.scrim,
         ),
-
         textTheme: TextTheme(
           displayLarge: AppTextStyles.displayLargeDark(),
           displayMedium: AppTextStyles.displayMedium(
@@ -351,7 +328,6 @@ class AppTheme {
             color: AppColors.textSecondaryDark,
           ),
         ),
-
         appBarTheme: AppBarTheme(
           elevation: 0,
           centerTitle: false,
@@ -368,7 +344,6 @@ class AppTheme {
           ),
           systemOverlayStyle: SystemUiOverlayStyle.light,
         ),
-
         cardTheme: CardThemeData(
           elevation: 2,
           color: AppColors.surfaceDark,
@@ -378,7 +353,6 @@ class AppTheme {
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
-
         scaffoldBackgroundColor: AppColors.backgroundDark,
       );
 }

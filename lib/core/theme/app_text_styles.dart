@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTextStyles {
@@ -7,7 +6,7 @@ class AppTextStyles {
 
   // Font Family for Bangla
   static const String banglaPrimary = 'HindSiliguri';
-  
+
   // Base text style with Bangla support
   static TextStyle get _baseStyle => const TextStyle(
         fontFamily: banglaPrimary,

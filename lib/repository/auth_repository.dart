@@ -17,7 +17,8 @@ class AuthRepository {
 
   AuthRepository(this._hiveService, this._apiService);
 
-  Future<UserModel> login({required String email, required String password}) async {
+  Future<UserModel> login(
+      {required String email, required String password}) async {
     final response = await _apiService.login(email: email, password: password);
     final user = UserModel.fromJson(response['user']);
     await _hiveService.saveUser(user);
@@ -48,31 +49,20 @@ class AuthRepository {
 
   Future<UserModel?> getCurrentUser() async {
     try {
-      // First check in-memory
-      var user = _hiveService.getCurrentUser();
+      // Hive cache থেকে check করো — কোনো network call নেই
+      final user = _hiveService.getCurrentUser();
       if (user != null) return user;
 
-      // If not in memory but we have token, fetch from API
+      // Hive এ নেই, token আছে কিনা check করো (local storage — fast)
       final hasToken = await TokenStorageService.isLoggedIn()
-          .timeout(const Duration(seconds: 2), onTimeout: () => false);
+          .timeout(const Duration(seconds: 1), onTimeout: () => false);
 
-      if (hasToken) {
-        // Fetch profile with a 5-second timeout to prevent splash screen hang
-        final response = await _apiService.getProfile().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => throw Exception('Timeout fetching profile'),
-        );
-        
-        user = UserModel.fromJson(response['user']);
-        await _hiveService.saveUser(user); // Cache it
-        return user;
-      }
+      // Token থাকলে authenticated হিসেবে treat করো
+      // Profile sync auth_provider এর _syncProfileQuietly() করবে background এ
+      if (hasToken) return UserModel.empty();
+
       return null;
     } catch (e) {
-      // If we couldn't fetch the user but we have a token and userId, we could construct a basic user
-      // or we can force them to login again. For security, if token exists but offline, 
-      // they should theoretically just use the cached user. But if cached user is null and offline?
-      // They must log in.
       return null;
     }
   }
@@ -91,7 +81,7 @@ class AuthRepository {
     await _hiveService.saveUser(user);
     return user;
   }
-  
+
   Future<void> forgotPassword(String email) async {
     await _apiService.forgotPassword(email);
   }
