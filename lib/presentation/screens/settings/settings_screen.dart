@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +17,6 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../provider/checkin_provider.dart';
-import '../../../provider/contact_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
 import '../../../services/shared_prefs_service.dart';
@@ -375,81 +375,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              try {
-                final checkInBox = await Hive.openBox('checkin_box');
-                await checkInBox.clear();
-
-                final contactBox = await Hive.openBox('contact_box');
-                await contactBox.clear();
-
-                final moodBox = await Hive.openBox('mood_box');
-                await moodBox.clear();
-
-                final moodPendingBox = await Hive.openBox('mood_pending_box');
-                await moodPendingBox.clear();
-
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('last_checkin_time');
-                await prefs.remove('checkin_interval');
-                await prefs.remove('mood_history_cache');
-                await prefs.remove('mood_stats_cache');
-
-                ref.invalidate(checkinHistoryFromBackendProvider);
-                ref.invalidate(checkinStatusProvider);
-                ref.invalidate(contactProvider);
-
-                bool serverCleared = false;
-                try {
-                  final dio = Dio();
-                  final token = await SharedPrefsService.getToken();
-                  if (token != null) {
-                    await dio
-                        .delete(
-                          '${AppConstants.apiBaseUrl}/checkin',
-                          options: Options(
-                              headers: {'Authorization': 'Bearer $token'}),
-                        )
-                        .timeout(const Duration(seconds: 5));
-                    await dio
-                        .delete(
-                          '${AppConstants.apiBaseUrl}/mood',
-                          options: Options(
-                              headers: {'Authorization': 'Bearer $token'}),
-                        )
-                        .timeout(const Duration(seconds: 5));
-                    serverCleared = true;
-                  }
-                } catch (e) {
-                  debugPrint('Backend cache clear skipped (offline): $e');
-                }
-
-                if (mounted) {
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        serverCleared
-                            ? '${s.settingsClearDataSuccess} ✓'
-                            : '${s.settingsClearDataSuccess} ✓ (${s.settingsClearDataOfflineNote})',
-                        style: const TextStyle(fontFamily: 'HindSiliguri'),
-                      ),
-                      backgroundColor:
-                          serverCleared ? Colors.green : Colors.orange,
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text('${s.settingsClearCache} Error: $e',
-                          style: const TextStyle(fontFamily: 'HindSiliguri')),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+              await _performClearData();
             },
             child: Text(s.dialogClear,
                 style: const TextStyle(
@@ -458,6 +384,237 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _performClearData() async {
+    final s = ref.read(stringsProvider);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Check connectivity first
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    final isOnline = result != ConnectivityResult.none;
+
+    if (!isOnline) {
+      // Offline — show 2nd dialog with offline option
+      if (!mounted) return;
+      _showOfflineClearDialog(s, scaffoldMessenger);
+      return;
+    }
+
+    // Online — clear local + server
+    await _doClearData(
+      clearServer: true,
+      scaffoldMessenger: scaffoldMessenger,
+      s: s,
+    );
+  }
+
+  void _showOfflineClearDialog(
+      AppStrings s, ScaffoldMessengerState scaffoldMessenger) {
+    final isDark = ref.read(settingsProvider).themeIsDark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  color: Colors.orange, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                s.isBangla ? 'ইন্টারনেট নেই' : 'No Internet',
+                style: const TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          s.isBangla
+              ? 'Server-এর ডেটা মুছতে ইন্টারনেট দরকার।\n\nআপনি চাইলে এখন শুধু ডিভাইসের ডেটা মুছুন — ইন্টারনেট চালু হলে server থেকেও স্বয়ংক্রিয়ভাবে মোছা হবে।'
+              : 'Internet is required to clear server data.\n\nYou can clear device data now — server data will be automatically cleared when internet is restored.',
+          style: TextStyle(
+            fontFamily: 'HindSiliguri',
+            fontSize: 14,
+            color: isDark ? Colors.white70 : Colors.black87,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(s.dialogCancel,
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _doClearData(
+                clearServer: false,
+                scaffoldMessenger: scaffoldMessenger,
+                s: s,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              s.isBangla ? 'ডিভাইসে মুছুন' : 'Clear on Device',
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _doClearData({
+    required bool clearServer,
+    required ScaffoldMessengerState scaffoldMessenger,
+    required AppStrings s,
+  }) async {
+    try {
+      // 1. Always clear local Hive data
+      final checkInBox = await Hive.openBox('checkin_box');
+      await checkInBox.clear();
+
+      // Contacts should NOT be cleared as per user request
+      // final contactBox = await Hive.openBox('contact_box');
+      // await contactBox.clear();
+
+      final moodBox = await Hive.openBox('mood_box');
+      await moodBox.clear();
+
+      final moodPendingBox = await Hive.openBox('mood_pending_box');
+      await moodPendingBox.clear();
+
+      // 2. Clear relevant SharedPreferences keys
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_checkin_time');
+      await prefs.remove(AppConstants.keyLastCheckin);
+      await prefs.remove(AppConstants.keyCheckinInterval);
+      await prefs.remove('mood_history_cache');
+      await prefs.remove('mood_stats_cache');
+
+      if (clearServer) {
+        // Online path — try to clear server immediately
+        bool serverCleared = false;
+        try {
+          final dio = Dio();
+          final token = await SharedPrefsService.getToken();
+          if (token != null) {
+            await dio
+                .delete(
+                  '${AppConstants.apiBaseUrl}/checkin',
+                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                )
+                .timeout(const Duration(seconds: 5));
+            await dio
+                .delete(
+                  '${AppConstants.apiBaseUrl}/mood',
+                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                )
+                .timeout(const Duration(seconds: 5));
+            await dio
+                .delete(
+                  '${AppConstants.apiBaseUrl}/notification',
+                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                )
+                .timeout(const Duration(seconds: 5));
+            serverCleared = true;
+          }
+        } catch (e) {
+          debugPrint('Backend cache clear failed (online path): $e');
+        }
+
+        // If server clear failed even online, queue it for retry
+        if (!serverCleared) {
+          final prefsService = ref.read(sharedPrefsServiceProvider);
+          await prefsService.setPendingServerClear(true);
+        }
+
+        // 3. Invalidate providers AFTER server is cleared
+        ref.invalidate(checkinHistoryFromBackendProvider);
+        ref.invalidate(checkinStatusProvider);
+        ref.invalidate(userStatsFromBackendProvider);
+        // ref.invalidate(contactProvider); // Do not invalidate contacts
+
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                serverCleared
+                    ? '${s.settingsClearDataSuccess} ✓'
+                    : '${s.settingsClearDataSuccess} ✓ (${s.settingsClearDataOfflineNote})',
+                style: const TextStyle(fontFamily: 'HindSiliguri'),
+              ),
+              backgroundColor: serverCleared ? Colors.green : Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        // Offline path — mark pending server clear for background sync
+        final prefsService = ref.read(sharedPrefsServiceProvider);
+        await prefsService.setPendingServerClear(true);
+
+        // 3. Invalidate providers for offline mode
+        ref.invalidate(checkinHistoryFromBackendProvider);
+        ref.invalidate(checkinStatusProvider);
+        ref.invalidate(userStatsFromBackendProvider);
+
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              content: Row(
+                children: [
+                  const Icon(Icons.sync_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      s.isBangla
+                          ? 'ডিভাইসের ডেটা মোছা হয়েছে। ইন্টারনেট চালু হলে server থেকেও মোছা হবে।'
+                          : 'Device data cleared. Server data will sync when internet is restored.',
+                      style: const TextStyle(fontFamily: 'HindSiliguri'),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange.shade700,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('${s.settingsClearCache} Error: $e',
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showLanguageDialog() {
@@ -656,7 +813,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final dio = Dio();
       final token = await SharedPrefsService.getToken() ?? '';
-      final response = await dio.get(
+      // 1. Fetch Mood Data
+      final moodResponse = await dio.get(
         '${AppConstants.apiBaseUrl}/mood/export',
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
@@ -664,110 +822,175 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
 
-      if (response.statusCode == 200) {
-        final csvData = response.data.toString();
+      // 2. Fetch Check-in Data
+      String? checkinCsv;
+      try {
+        final checkinResponse = await dio.get(
+          '${AppConstants.apiBaseUrl}/checkin/export',
+          options: Options(
+            headers: {'Authorization': 'Bearer $token'},
+            responseType: ResponseType.plain,
+          ),
+        );
+        if (checkinResponse.statusCode == 200) {
+          checkinCsv = checkinResponse.data.toString();
+        }
+      } catch (e) {
+        debugPrint('No check-in data or error fetching check-in export: $e');
+      }
 
-        // Parse CSV string — handle quoted fields properly
-        final lines = csvData
+      // Parse each CSV line respecting quoted fields
+      List<List<String>> parseCsv(List<String> csvLines) {
+        final result = <List<String>>[];
+        for (final line in csvLines) {
+          final fields = <String>[];
+          String current = '';
+          bool inQuotes = false;
+          for (int i = 0; i < line.length; i++) {
+            final c = line[i];
+            if (c == '"') {
+              inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+              fields.add(current.trim());
+              current = '';
+            } else {
+              current += c;
+            }
+          }
+          fields.add(current.trim());
+          result.add(fields);
+        }
+        return result;
+      }
+
+      List<List<String>> moodTableData = [];
+      if (moodResponse.statusCode == 200) {
+        final moodCsv = moodResponse.data.toString();
+        final moodLines = moodCsv
             .split('\n')
             .where((line) => line.trim().isNotEmpty)
             .toList();
+        moodTableData = parseCsv(moodLines);
+      }
 
-        if (lines.isEmpty) {
-          throw Exception('No mood data found');
+      // Parse Check-in Data if available
+      List<List<String>>? checkinTableData;
+      if (checkinCsv != null) {
+        final checkinLines = checkinCsv
+            .split('\n')
+            .where((line) => line.trim().isNotEmpty)
+            .toList();
+        if (checkinLines.isNotEmpty) {
+          checkinTableData = parseCsv(checkinLines);
         }
+      }
 
-        // Parse each CSV line respecting quoted fields
-        List<List<String>> parseCsv(List<String> csvLines) {
-          final result = <List<String>>[];
-          for (final line in csvLines) {
-            final fields = <String>[];
-            String current = '';
-            bool inQuotes = false;
-            for (int i = 0; i < line.length; i++) {
-              final c = line[i];
-              if (c == '"') {
-                inQuotes = !inQuotes;
-              } else if (c == ',' && !inQuotes) {
-                fields.add(current.trim());
-                current = '';
-              } else {
-                current += c;
-              }
-            }
-            fields.add(current.trim());
-            result.add(fields);
-          }
-          return result;
-        }
+      // Generate PDF
+      final pdf = pw.Document();
 
-        final tableData = parseCsv(lines);
-        if (tableData.isEmpty) {
-          throw Exception('No mood data to export');
-        }
+      // --- MOOD PAGE ---
+      if (moodTableData.isNotEmpty) {
+        final moodHeaders = moodTableData.first;
+        final moodRows = moodTableData.length > 1
+            ? moodTableData.sublist(1)
+            : <List<String>>[];
 
-        // Separate headers from data
-        final headers = tableData.first;
-        final dataRows =
-            tableData.length > 1 ? tableData.sublist(1) : <List<String>>[];
-
-        // Generate PDF
-        final pdf = pw.Document();
         pdf.addPage(
-          pw.Page(
+          pw.MultiPage(
             pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
             build: (pw.Context context) {
-              return pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Mood History Report',
+              return [
+                pw.Header(
+                  level: 0,
+                  child: pw.Text('Mood History Report',
                       style: pw.TextStyle(
                           fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 8),
-                  pw.Text('Total entries: ${dataRows.length}',
-                      style: const pw.TextStyle(
-                          fontSize: 12, color: PdfColors.grey600)),
-                  pw.SizedBox(height: 20),
-                  if (dataRows.isEmpty)
-                    pw.Text('No mood data available',
-                        style: const pw.TextStyle(fontSize: 14))
-                  else
-                    pw.TableHelper.fromTextArray(
-                      context: context,
-                      headers: headers,
-                      data: dataRows,
-                      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                      headerDecoration:
-                          const pw.BoxDecoration(color: PdfColors.grey300),
-                      cellAlignment: pw.Alignment.centerLeft,
-                      cellPadding: const pw.EdgeInsets.all(6),
-                    ),
-                ],
-              );
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text('Total mood entries: ${moodRows.length}',
+                    style: const pw.TextStyle(
+                        fontSize: 12, color: PdfColors.grey600)),
+                pw.SizedBox(height: 20),
+                pw.TableHelper.fromTextArray(
+                  context: context,
+                  headers: moodHeaders,
+                  data: moodRows,
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  headerDecoration:
+                      const pw.BoxDecoration(color: PdfColors.grey300),
+                  cellAlignment: pw.Alignment.centerLeft,
+                  cellPadding: const pw.EdgeInsets.all(6),
+                ),
+              ];
             },
           ),
         );
+      }
 
-        // Save PDF to temp directory
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/mood_history.pdf');
-        await file.writeAsBytes(await pdf.save());
+      // --- CHECK-IN PAGE ---
+      if (checkinTableData != null && checkinTableData.isNotEmpty) {
+        final checkinHeaders = checkinTableData.first;
+        final checkinRows = checkinTableData.length > 1
+            ? checkinTableData.sublist(1)
+            : <List<String>>[];
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${s.settingsExportSuccess} ✓',
-                  style: const TextStyle(fontFamily: 'HindSiliguri')),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Share the file
-          // ignore: deprecated_member_use
-          await Share.shareXFiles([XFile(file.path)],
-              text: 'Mood History Report');
-        }
-      } else {
-        throw Exception('Export failed');
+        pdf.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
+            build: (pw.Context context) {
+              return [
+                pw.Header(
+                  level: 0,
+                  child: pw.Text('Check-in History Report',
+                      style: pw.TextStyle(
+                          fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text('Total check-in entries: ${checkinRows.length}',
+                    style: const pw.TextStyle(
+                        fontSize: 12, color: PdfColors.grey600)),
+                pw.SizedBox(height: 20),
+                pw.TableHelper.fromTextArray(
+                  context: context,
+                  headers: checkinHeaders,
+                  data: checkinRows,
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  headerDecoration:
+                      const pw.BoxDecoration(color: PdfColors.blue100),
+                  cellAlignment: pw.Alignment.centerLeft,
+                  cellPadding: const pw.EdgeInsets.all(6),
+                ),
+              ];
+            },
+          ),
+        );
+      }
+
+      // Check if any data was added to the PDF
+      if (moodTableData.isEmpty &&
+          (checkinTableData == null || checkinTableData.isEmpty)) {
+        throw Exception('No mood or check-in data found to export');
+      }
+
+      // Save PDF to temp directory
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/are_you_okay_report.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${s.settingsExportSuccess} ✓',
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Share the file
+        // ignore: deprecated_member_use
+        await Share.shareXFiles([XFile(file.path)],
+            text: 'Are You Okay - Data Export Report');
       }
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {

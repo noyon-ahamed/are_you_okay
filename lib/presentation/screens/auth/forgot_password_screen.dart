@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/api/auth_api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../../core/localization/app_strings.dart';
 import '../../../provider/language_provider.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
@@ -52,9 +51,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
       if (mounted) {
         final s = ref.read(stringsProvider);
-        _showSuccess(s.isBangla
-            ? 'আপনার ইমেইলে ৬ সংখ্যার OTP কোড পাঠানো হয়েছে'
-            : 'A 6-digit OTP code has been sent to your email');
+        _showSuccess(s.forgotOtpSent);
         setState(() => _currentStep = 1);
       }
     } catch (e) {
@@ -71,9 +68,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Future<void> _verifyOtp() async {
     if (_otpController.text.trim().length != 6) {
       final s = ref.read(stringsProvider);
-      _showError(s.isBangla
-          ? 'অনুগ্রহ করে ৬ সংখ্যার OTP কোড দিন'
-          : 'Please enter 6-digit OTP code');
+      _showError(s.forgotOtpHint);
       return;
     }
 
@@ -87,9 +82,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
       if (mounted) {
         final s = ref.read(stringsProvider);
-        _showSuccess(s.isBangla
-            ? 'OTP সঠিক! এখন নতুন পাসওয়ার্ড দিন।'
-            : 'OTP verified! Now enter your new password.');
+        _showSuccess(s.forgotOtpVerified);
         setState(() {
           _resetToken = token;
           _currentStep = 2;
@@ -100,9 +93,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         final s = ref.read(stringsProvider);
         String msg = e.toString().replaceAll('Exception: ', '');
         if (msg.contains('Invalid') || msg.contains('expired')) {
-          msg = s.isBangla
-              ? 'ভুল বা মেয়াদোত্তীর্ণ OTP কোড। আবার চেষ্টা করুন।'
-              : 'Invalid or expired OTP code. Please try again.';
+          msg = s.forgotOtpInvalid;
         }
         _showError(msg);
       }
@@ -118,7 +109,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     if (_resetToken == null) {
       final s = ref.read(stringsProvider);
       _showError(
-          s.isBangla ? 'OTP ভেরিফিকেশন প্রয়োজন' : 'OTP verification required');
+          s.isBangla ? 'OTP যাচাই প্রয়োজন' : 'OTP verification required');
       return;
     }
 
@@ -207,7 +198,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       ? s.forgotTitle
                       : _currentStep == 1
                           ? s.forgotVerifyOTP
-                          : (s.isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password'),
+                          : s.forgotNewPassword,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -265,12 +256,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     prefixIcon: Icons.email_outlined,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return s.regEmail +
-                            ' ' +
-                            (s.isBangla ? 'দিন' : 'required');
+                        return '${s.regEmail} ${s.validationRequired}';
                       }
                       if (!value.contains('@')) {
-                        return s.contactsPhoneInvalid;
+                        return s.validationEmailInvalid;
                       }
                       return null;
                     },
@@ -301,8 +290,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _otpController,
-                    label: 'OTP ' + (s.isBangla ? 'কোড' : 'Code'),
-                    hint: s.isBangla ? '৬ সংখ্যার কোড' : '6-digit code',
+                    label: s.forgotOtpCode,
+                    hint: s.forgotOtpHint,
                     keyboardType: TextInputType.number,
                     prefixIcon: Icons.pin,
                     maxLines: 1,
@@ -326,7 +315,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                             _sendOtp();
                           },
                     child: Text(
-                      s.isBangla ? 'আবার OTP পাঠান' : 'Resend OTP',
+                      s.forgotResendOtp,
                       style: const TextStyle(fontFamily: 'HindSiliguri'),
                     ),
                   ),
@@ -336,7 +325,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 if (_currentStep == 2) ...[
                   CustomTextField(
                     controller: _newPasswordController,
-                    label: s.isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password',
+                    label: s.forgotNewPassword,
                     hint: '••••••••',
                     obscureText: _obscurePassword,
                     prefixIcon: Icons.lock_outline,
@@ -349,16 +338,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return (s.isBangla
-                                ? 'নতুন পাসওয়ার্ড'
-                                : 'New Password') +
-                            ' ' +
-                            (s.isBangla ? 'দিন' : 'required');
+                        return '${s.forgotNewPassword} ${s.validationRequired}';
                       }
                       if (value.length < 6) {
-                        return s.isBangla
-                            ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে'
-                            : 'Password must be at least 6 characters';
+                        return s.validationPassLength;
                       }
                       return null;
                     },
@@ -379,17 +362,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     ),
                     validator: (value) {
                       if (value != _newPasswordController.text) {
-                        return s.isBangla
-                            ? 'পাসওয়ার্ড মিলছে না'
-                            : 'Passwords do not match';
+                        return s.validationPassMatch;
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 32),
                   CustomButton(
-                    text:
-                        s.isBangla ? 'পাসওয়ার্ড রিসেট করুন' : 'Reset Password',
+                    text: s.forgotResetButton,
                     onPressed: _isLoading
                         ? null
                         : () {
@@ -406,7 +386,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      (s.isBangla ? 'মনে পড়েছে? ' : 'Remembered? '),
+                      s.forgotRemembered,
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(

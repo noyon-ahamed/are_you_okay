@@ -555,7 +555,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        AppConstants.moodLabels[index],
+                        s.moodLabels[index],
                         style: TextStyle(
                           fontSize: 10,
                           fontFamily: 'HindSiliguri',

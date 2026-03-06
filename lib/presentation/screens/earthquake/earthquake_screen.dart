@@ -33,6 +33,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   }
 
   Future<void> _fetchEarthquakeData() async {
+    final s = ref.read(stringsProvider);
     // Check connectivity first
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
@@ -72,12 +73,12 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text(
-                    'লোকেশন পারমিশন প্রয়োজন। অনুগ্রহ করে সেটিংস থেকে অনুমতি দিন।',
-                    style: TextStyle(fontFamily: 'HindSiliguri'),
+                  content: Text(
+                    s.earthquakeLocPermission,
+                    style: const TextStyle(fontFamily: 'HindSiliguri'),
                   ),
                   action: SnackBarAction(
-                    label: 'সেটিংস',
+                    label: s.earthquakeSettings,
                     onPressed: () => Geolocator.openAppSettings(),
                   ),
                   duration: const Duration(seconds: 5),
@@ -107,13 +108,19 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         setState(() {
           _localQuakes =
               _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
-          _globalQuakes =
+
+          // Sort and limit global quakes to Top 5
+          final parsedGlobal =
               _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
+          parsedGlobal.sort((a, b) => b.magnitude.compareTo(a.magnitude));
+          _globalQuakes = parsedGlobal.take(5).toList();
+
           _isLoading = false;
         });
 
         // Check for dangerous earthquakes in local vicinity and play siren
-        final dangerous = _localQuakes.where((q) => q.magnitude >= 6.0);
+        // User requested 4.5+ intensity for siren
+        final dangerous = _localQuakes.where((q) => q.magnitude >= 4.5);
         if (dangerous.isNotEmpty) {
           _playSirenAlert();
         }
@@ -133,32 +140,50 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       if (mounted) {
         showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (context) {
             final s = ref.read(stringsProvider);
             return AlertDialog(
               backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               title: Row(
                 children: [
                   const Icon(Icons.warning_amber_rounded,
-                      color: Colors.white, size: 28),
+                      color: Colors.white, size: 32),
                   const SizedBox(width: 8),
                   Text(
                     s.earthquakeAlertTitle,
                     style: const TextStyle(
-                        color: Colors.white, fontFamily: 'HindSiliguri'),
+                        color: Colors.white,
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
-              content: Text(
-                s.earthquakeAlertMessage,
-                style: const TextStyle(
-                    color: Colors.white, fontFamily: 'HindSiliguri'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.emergency_share,
+                      color: Colors.white, size: 64),
+                  const SizedBox(height: 16),
+                  Text(
+                    s.earthquakeAlertMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 16),
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(backgroundColor: Colors.white),
                   child: Text(s.earthquakeUnderstood,
-                      style: const TextStyle(color: Colors.white)),
+                      style: const TextStyle(
+                          color: AppColors.error, fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -168,37 +193,6 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     } catch (e) {
       debugPrint('Siren error: $e');
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final s = ref.watch(stringsProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          s.earthquakeTitle,
-          style: const TextStyle(fontFamily: 'HindSiliguri'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchEarthquakeData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? _buildLoadingList()
-          : _error != null
-              ? _buildErrorView()
-              : (_localQuakes.isEmpty && _globalQuakes.isEmpty)
-                  ? _buildEmptyView(s)
-                  : RefreshIndicator(
-                      onRefresh: _fetchEarthquakeData,
-                      child: _buildHistoryList(context, isDark, s),
-                    ),
-    );
   }
 
   List<_EarthquakeData> _parseQuakes(
@@ -250,14 +244,76 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     }).toList();
   }
 
-  Widget _buildHistoryList(BuildContext context, bool isDark, AppStrings s) {
-    // Highest magnitude calculation (using both sets for stats, or just local. Let's use local for stats to be relevant to user)
-    double highestMag = 0.0;
-    int highMagnitudeCount = 0;
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
 
-    for (var quake in _localQuakes) {
-      if (quake.magnitude > highestMag) highestMag = quake.magnitude;
-      if (quake.magnitude >= 4.5) highMagnitudeCount++;
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            s.earthquakeTitle,
+            style: const TextStyle(fontFamily: 'HindSiliguri'),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _fetchEarthquakeData,
+            ),
+          ],
+          bottom: TabBar(
+            indicatorColor: AppColors.primary,
+            labelStyle: const TextStyle(
+                fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
+            unselectedLabelStyle: const TextStyle(fontFamily: 'HindSiliguri'),
+            tabs: [
+              Tab(text: s.earthquakeTabNear),
+              Tab(text: s.earthquakeTabGlobal),
+            ],
+          ),
+        ),
+        body: _isLoading
+            ? _buildLoadingList()
+            : _error != null
+                ? _buildErrorView()
+                : TabBarView(
+                    children: [
+                      // TAB 1: Near Me
+                      RefreshIndicator(
+                        onRefresh: _fetchEarthquakeData,
+                        child: _buildTabContent(context, _localQuakes, s, true),
+                      ),
+                      // TAB 2: Global
+                      RefreshIndicator(
+                        onRefresh: _fetchEarthquakeData,
+                        child:
+                            _buildTabContent(context, _globalQuakes, s, false),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildTabContent(BuildContext context, List<_EarthquakeData> quakes,
+      AppStrings s, bool isLocal) {
+    if (quakes.isEmpty) {
+      return _buildEmptyView(s);
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Stats for local only
+    double? highestMag;
+    int? highCount;
+    if (isLocal) {
+      highestMag = 0.0;
+      highCount = 0;
+      for (var q in quakes) {
+        if (q.magnitude > highestMag!) highestMag = q.magnitude;
+        if (q.magnitude >= 4.5) highCount = highCount! + 1;
+      }
     }
 
     return CustomScrollView(
@@ -265,74 +321,25 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       slivers: [
-        // Stats header
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            child: _buildStatsHeader(
-                context, isDark, highestMag, highMagnitudeCount, s),
+        if (isLocal && highestMag != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: _buildStatsHeader(
+                  context, isDark, highestMag, highCount ?? 0, s),
+            ),
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return _buildQuakeItem(context, quakes[index], isDark);
+              },
+              childCount: quakes.length,
+            ),
           ),
         ),
-
-        // Local Header
-        if (_localQuakes.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Text(
-                s.earthquakeNearby,
-                style: const TextStyle(
-                    fontFamily: 'HindSiliguri',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-
-        // Local Timeline list
-        if (_localQuakes.isNotEmpty)
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildQuakeItem(context, _localQuakes[index], isDark),
-                );
-              },
-              childCount: _localQuakes.length,
-            ),
-          ),
-
-        // Global Header
-        if (_globalQuakes.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                  left: 20, right: 20, top: 24, bottom: 8),
-              child: Text(
-                s.earthquakeGlobal,
-                style: const TextStyle(
-                    fontFamily: 'HindSiliguri',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-
-        // Global Timeline list
-        if (_globalQuakes.isNotEmpty)
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildQuakeItem(context, _globalQuakes[index], isDark),
-                );
-              },
-              childCount: _globalQuakes.length,
-            ),
-          ),
-
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );

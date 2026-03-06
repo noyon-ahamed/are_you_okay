@@ -42,7 +42,7 @@ class EmergencyApiService {
       if (response.data['success'] == true) {
         final contacts =
             List<Map<String, dynamic>>.from(response.data['contacts'] ?? []);
-        // Cache fetched contacts to Hive
+        // Only clear and replace local cache AFTER backend call succeeds
         final hive = HiveService();
         await hive.clearContacts();
         for (final c in contacts) {
@@ -57,8 +57,8 @@ class EmergencyApiService {
         throw Exception(response.data['error'] ?? 'Failed to fetch contacts');
       }
     } on DioException catch (e) {
-      debugPrint('Failed to load contacts from backend: $e');
-      // Fall back to Hive cache
+      debugPrint('Failed to load contacts from backend (offline?): $e');
+      // Fallback — return untouched local Hive cache
       final hive = HiveService();
       final cached = hive.getAllContacts();
       if (cached.isNotEmpty) {

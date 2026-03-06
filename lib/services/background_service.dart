@@ -12,7 +12,8 @@ import 'notification_service.dart';
 const String backgroundTaskKey = 'checkin_monitoring_task';
 
 // Keys for SharedPreferences
-const String _kLastCheckIn = 'last_checkin_time';
+const String _kLastCheckIn =
+    'last_checkin'; // matches AppConstants.keyLastCheckin
 const String _kLastDismissed = 'last_notification_dismissed_at';
 const String _kNotificationsEnabled = 'notifications_enabled';
 
@@ -46,11 +47,11 @@ void callbackDispatcher() {
       }
 
       // Check if user actually checked in within the last 24 hours
-      final lastCheckInStr = prefs.getString(_kLastCheckIn);
-      if (lastCheckInStr != null) {
-        final lastCheckIn = DateTime.tryParse(lastCheckInStr);
-        if (lastCheckIn != null &&
-            DateTime.now().difference(lastCheckIn).inHours < 24) {
+      // Corrected: last_checkin is stored as int (millisecondsSinceEpoch) in SharedPrefsService
+      final lastCheckInTs = prefs.getInt(_kLastCheckIn);
+      if (lastCheckInTs != null) {
+        final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
+        if (DateTime.now().difference(lastCheckIn).inHours < 24) {
           debugPrint('User checked in within 24h — no reminders needed');
           return Future.value(true);
         }

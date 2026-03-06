@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/api/auth_api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../../core/localization/app_strings.dart';
 import '../../../provider/language_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -108,9 +107,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   prefixIcon: Icons.person_outline,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s.regName +
-                          ' ' +
-                          (s.isBangla ? 'দিন' : 'required');
+                      return '${s.regName} ${s.validationRequired}';
                     }
                     return null;
                   },
@@ -127,12 +124,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   prefixIcon: Icons.email_outlined,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s.regEmail +
-                          ' ' +
-                          (s.isBangla ? 'দিন' : 'required');
+                      return '${s.regEmail} ${s.validationRequired}';
                     }
                     if (!value.contains('@')) {
-                      return s.contactsPhoneInvalid;
+                      return s.validationEmailInvalid;
                     }
                     return null;
                   },
@@ -144,8 +139,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 CustomTextField(
                   controller: _phoneController,
                   label:
-                      s.regPhone + ' (${s.isBangla ? 'ঐচ্ছিক' : 'Optional'})',
-                  hint: '+880...',
+                      '${s.regPhone} (${s.isBangla ? 'ঐচ্ছিক' : 'Optional'})',
+                  hint: '01XXXXXXXXX',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
                 ),
@@ -172,14 +167,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s.regPassword +
-                          ' ' +
-                          (s.isBangla ? 'দিন' : 'required');
+                      return '${s.regPassword} ${s.validationRequired}';
                     }
                     if (value.length < 6) {
-                      return s.isBangla
-                          ? 'কমপক্ষে ৬ অক্ষর দিন'
-                          : 'At least 6 characters';
+                      return s.validationPassLength;
                     }
                     return null;
                   },
@@ -207,14 +198,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s.regConfirmPass +
-                          ' ' +
-                          (s.isBangla ? 'দিন' : 'required');
+                      return '${s.regConfirmPass} ${s.validationRequired}';
                     }
                     if (value != _passwordController.text) {
-                      return s.isBangla
-                          ? 'পাসওয়ার্ড মিলছে না'
-                          : 'Passwords do not match';
+                      return s.validationPassMatch;
                     }
                     return null;
                   },
@@ -240,7 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      s.regHaveAccount.split('?')[0] + '? ',
+                      s.isBangla ? 'অ্যাকাউন্ট আছে? ' : 'Have account? ',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(

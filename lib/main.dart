@@ -273,7 +273,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   final data = message.data;
-  final title = message.notification?.title ?? 'সতর্কতা';
+  final title = message.notification?.title ?? 'Alert';
   final body = message.notification?.body ?? '';
 
   final distanceKmStr = data['distanceKm'];

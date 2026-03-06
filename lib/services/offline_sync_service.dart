@@ -1,9 +1,14 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart'; // For Color
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../core/constants/app_constants.dart';
 import '../repository/checkin_repository.dart';
 import '../services/api/mood_api_service.dart';
+import '../services/shared_prefs_service.dart';
 import 'mood_local_service.dart';
 
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
@@ -26,7 +31,8 @@ class OfflineSyncService {
     _isOnline = result != ConnectivityResult.none;
 
     // Listen to changes
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((result) {
+    _connectivitySubscription =
+        _connectivity.onConnectivityChanged.listen((result) {
       final wasOffline = !_isOnline;
       _isOnline = result != ConnectivityResult.none;
 
@@ -44,14 +50,151 @@ class OfflineSyncService {
   Future<void> _triggerSync() async {
     try {
       debugPrint('Connectivity restored. Triggering sync...');
-      
-      // Sync pending check-ins
+
+      // 0. Check and show missed reminders if deadline passed while offline
+      await _checkAndShowMissedReminder();
+
+      // 1. Sync pending server clear FIRST (before syncing new check-ins)
+      //    This ensures old server data is wiped before new data is pushed.
+      await _syncPendingServerClear();
+
+      // 2. Sync pending check-ins
       await ref.read(checkinRepositoryProvider).syncPendingCheckIns();
-      
-      // Sync pending moods
+
+      // 3. Sync pending moods
       await _syncPendingMoods();
     } catch (e) {
       debugPrint('Sync trigger failed: $e');
+    }
+  }
+
+  /// Checks if check-in deadline passed while offline, and triggers an alert if needed
+  Future<void> _checkAndShowMissedReminder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastCheckInTs = prefs.getInt(AppConstants.keyLastCheckin);
+      final intervalDays = prefs.getInt(AppConstants.keyCheckinInterval) ??
+          AppConstants.defaultCheckinIntervalDays;
+
+      if (lastCheckInTs == null) return; // No check-in history
+
+      final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
+
+      final deadline = lastCheckIn.add(Duration(days: intervalDays));
+      final now = DateTime.now();
+
+      // If deadline has passed
+      if (now.isAfter(deadline)) {
+        // Did we already notify recently?
+        final lastAlertStr = prefs.getString('last_offline_missed_alert');
+        if (lastAlertStr != null) {
+          final lastAlert = DateTime.tryParse(lastAlertStr);
+          if (lastAlert != null && now.difference(lastAlert).inHours < 12) {
+            return; // Don't spam, wait 12h
+          }
+        }
+
+        debugPrint(
+            'Offline sync detected missed check-in deadline. Notifying user.');
+
+        // Show local notification immediately
+        final notificationPlugin = FlutterLocalNotificationsPlugin();
+        const androidDetails = AndroidNotificationDetails(
+          'emergency_alerts',
+          'জরুরি সতর্কতা',
+          importance: Importance.max,
+          priority: Priority.max,
+          color: Color(0xFFDC143C),
+        );
+        const iosDetails =
+            DarwinNotificationDetails(presentAlert: true, presentSound: true);
+
+        await notificationPlugin.show(
+          888, // Unique ID
+          '🚨 চেক-ইন মিস করেছেন!',
+          'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন যাতে আপনার জরুরি যোগাযোগদের সতর্ক করা না হয়।',
+          const NotificationDetails(android: androidDetails, iOS: iosDetails),
+        );
+
+        // Record that we alerted
+        await prefs.setString(
+            'last_offline_missed_alert', now.toIso8601String());
+
+        // Also post to backend so it appears in App Notification Screen
+        final token = await SharedPrefsService.getToken();
+        if (token != null) {
+          final dio = Dio();
+          await dio.post(
+            '${AppConstants.apiBaseUrl}/notification',
+            options: Options(headers: {'Authorization': 'Bearer $token'}),
+            data: {
+              'title': 'চেক-ইন ডেডলাইন পার হয়েছে',
+              'title_en': 'Check-in Deadline Missed',
+              'body':
+                  'আপনি অনেকক্ষণ ধরে অ্যাপে আসেননি। অনুগ্রহ করে চেক-ইন করুন।',
+              'type': 'alert'
+            },
+          ).catchError((_) => Response(
+              requestOptions:
+                  RequestOptions(path: ''))); // ignore backend errors
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to check missed reminder: $e');
+    }
+  }
+
+  /// Sends DELETE to server for check-ins & moods when user cleared data offline.
+  Future<void> _syncPendingServerClear() async {
+    try {
+      final prefs = ref.read(sharedPrefsServiceProvider);
+      if (!prefs.hasPendingServerClear) return;
+
+      debugPrint('Pending server clear detected. Sending DELETE to server...');
+
+      final token = await SharedPrefsService.getToken();
+      if (token == null) {
+        debugPrint('No token found, skipping server clear sync.');
+        return;
+      }
+
+      final dio = Dio();
+      bool checkinCleared = false;
+      bool moodCleared = false;
+
+      try {
+        await dio
+            .delete(
+              '${AppConstants.apiBaseUrl}/checkin',
+              options: Options(headers: {'Authorization': 'Bearer $token'}),
+            )
+            .timeout(const Duration(seconds: 10));
+        checkinCleared = true;
+      } catch (e) {
+        debugPrint('Server check-in clear failed: $e');
+      }
+
+      try {
+        await dio
+            .delete(
+              '${AppConstants.apiBaseUrl}/mood',
+              options: Options(headers: {'Authorization': 'Bearer $token'}),
+            )
+            .timeout(const Duration(seconds: 10));
+        moodCleared = true;
+      } catch (e) {
+        debugPrint('Server mood clear failed: $e');
+      }
+
+      if (checkinCleared && moodCleared) {
+        // Only remove the flag if both succeeded
+        await prefs.setPendingServerClear(false);
+        debugPrint('Pending server clear synced successfully ✓');
+      } else {
+        debugPrint('Server clear partially failed — will retry on next sync.');
+      }
+    } catch (e) {
+      debugPrint('Pending server clear sync error: $e');
     }
   }
 
@@ -61,11 +204,11 @@ class OfflineSyncService {
       final moodLocal = ref.read(moodLocalServiceProvider);
       final moodApi = MoodApiService();
       final pendingMoods = moodLocal.getPendingMoods();
-      
+
       if (pendingMoods.isEmpty) return;
-      
+
       debugPrint('Syncing ${pendingMoods.length} pending moods...');
-      
+
       for (final mood in pendingMoods) {
         try {
           await moodApi.saveMood(
@@ -90,7 +233,7 @@ class OfflineSyncService {
       await _triggerSync();
     }
   }
-  
+
   void dispose() {
     _connectivitySubscription?.cancel();
   }

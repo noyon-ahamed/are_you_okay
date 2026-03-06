@@ -24,8 +24,9 @@ class ContactRepository {
   Future<List<EmergencyContactModel>> loadContactsFromBackend() async {
     try {
       final backendContacts = await api.getContacts();
-      
-      // Clear local cache and replace with backend data
+
+      // Only replace local data AFTER backend call succeeds
+      // This prevents data loss when offline
       final currentLocal = hive.getAllContacts();
       for (final c in currentLocal) {
         await hive.deleteContact(c.id);
@@ -43,7 +44,8 @@ class ContactRepository {
           priority: bc['priority'] as int? ?? 1,
           notifyViaSMS: true,
           notifyViaCall: false,
-          notifyViaEmail: bc['email'] != null && bc['email'].toString().isNotEmpty,
+          notifyViaEmail:
+              bc['email'] != null && bc['email'].toString().isNotEmpty,
           notifyViaApp: true,
           createdAt: bc['createdAt'] != null
               ? DateTime.tryParse(bc['createdAt'].toString()) ?? DateTime.now()
@@ -59,8 +61,8 @@ class ContactRepository {
       contacts.sort((a, b) => a.priority.compareTo(b.priority));
       return contacts;
     } catch (e) {
-      debugPrint('Failed to load contacts from backend: $e');
-      // Fallback to local data
+      debugPrint('Failed to load contacts from backend (offline?): $e');
+      // Fallback — return whatever is in local Hive cache (untouched)
       return hive.getAllContacts();
     }
   }
@@ -115,7 +117,7 @@ class ContactRepository {
       await hive.saveContact(contact);
       return contact;
     } catch (e) {
-      // If backend fails, still save locally
+      // Backend failed (offline) — still save locally for later sync
       debugPrint('Backend addContact failed, saving locally: $e');
       final user = hive.getCurrentUser();
       final contact = EmergencyContactModel(
@@ -134,7 +136,8 @@ class ContactRepository {
         updatedAt: DateTime.now(),
       );
       await hive.saveContact(contact);
-      rethrow;
+      // Don't rethrow — local save succeeded, UI should show the new contact
+      return contact;
     }
   }
 
@@ -228,7 +231,11 @@ class ContactRepository {
   /// Get contacts for notifications (sorted by priority)
   List<EmergencyContactModel> getNotificationContacts() {
     return getAllContacts()
-        .where((c) => c.notifyViaSMS || c.notifyViaCall || c.notifyViaEmail || c.notifyViaApp)
+        .where((c) =>
+            c.notifyViaSMS ||
+            c.notifyViaCall ||
+            c.notifyViaEmail ||
+            c.notifyViaApp)
         .toList();
   }
 }

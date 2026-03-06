@@ -338,8 +338,8 @@ class _EmergencyContactsScreenState
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 labelText: s.isBangla
-                    ? 'ইমেইল অ্যাড্রেস (ঐচ্ছিক)'
-                    : 'Email Address (Optional)',
+                    ? 'ইমেইল (চেক-ইন মিস করলে অ্যালার্ট পাবে)'
+                    : 'Email (will get alert if check-in missed)',
                 prefixIcon: const Icon(Icons.email_outlined),
               ),
             ),

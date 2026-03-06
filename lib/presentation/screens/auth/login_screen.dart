@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../provider/auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../../core/localization/app_strings.dart';
 import '../../../provider/language_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -89,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } else if (message.contains('Network error')) {
       message = s.networkError;
     } else if (message.contains('Login failed')) {
-      message = s.loginTitle + ' ' + s.error.toLowerCase();
+      message = '${s.loginTitle} ${s.error.toLowerCase()}';
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -181,12 +180,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: Icons.email_outlined,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s
-                          .contactsPhoneReq; // Reusing "required" string logic if needed, or specific ones
+                      return '${s.loginEmail} ${s.validationRequired}';
                     }
                     if (!value.contains('@')) {
-                      return s
-                          .contactsPhoneInvalid; // Reusing or using specific
+                      return s.validationEmailInvalid;
                     }
                     return null;
                   },
@@ -213,9 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return s.loginPassword +
-                          ' ' +
-                          s.loading; // Placeholder logic for "enter password"
+                      return '${s.loginPassword} ${s.validationRequired}';
                     }
                     return null;
                   },
@@ -252,13 +247,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      s.loginNoAccount.split('?')[0] + '? ',
+                      s.isBangla ? 'অ্যাকাউন্ট নেই? ' : 'No account? ',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
                       onPressed: () => context.push('/register'),
                       child: Text(
-                        s.loginNoAccount.split('?').last.trim(),
+                        s.isBangla ? 'রেজিস্ট্রেশন করুন' : 'Register',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

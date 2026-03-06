@@ -443,11 +443,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      s.isBangla
-                          ? mood
-                          : (s.lang == 'en'
-                              ? mood
-                              : mood), // Fallback if mood is already translated or in English
+                      index != -1 ? s.moodLabels[index] : mood,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,

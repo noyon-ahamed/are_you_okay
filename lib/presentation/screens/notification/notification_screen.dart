@@ -7,7 +7,6 @@ import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import '../../../../provider/language_provider.dart';
-import '../../../../core/localization/app_strings.dart';
 
 // Create a Notifier for notifications for silent refresh
 class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
@@ -137,7 +136,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   color: isRead
                       ? (isDark ? AppColors.surfaceDark : AppColors.surface)
                       : (isDark
+                          // ignore: deprecated_member_use
                           ? AppColors.primary.withOpacity(0.15)
+                          // ignore: deprecated_member_use
                           : AppColors.primaryLight.withOpacity(0.3)),
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(
@@ -153,6 +154,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     leading: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
+                        // ignore: deprecated_member_use
                         color: AppColors.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),

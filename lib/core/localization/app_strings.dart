@@ -25,6 +25,16 @@ class AppStrings {
       ? 'অফলাইনে ক্যাশ করা ডেটা দেখানো হচ্ছে'
       : 'Showing cached data (offline)';
 
+  String get validationRequired => isBangla ? 'প্রয়োজন' : 'required';
+  String get validationEmailInvalid =>
+      isBangla ? 'সঠিক ইমেইল লিখুন' : 'Enter valid email';
+  String get validationPassLength =>
+      isBangla ? 'কমপক্ষে ৬ অক্ষর প্রয়োজন' : 'At least 6 characters required';
+  String get validationPassMatch =>
+      isBangla ? 'পাসওয়ার্ড মিলছে না' : 'Passwords do not match';
+  String get validationPhoneReq =>
+      isBangla ? 'ফোন নম্বর প্রয়োজন' : 'Phone number required';
+
   // ===================== Navigation =====================
   String get navHome => isBangla ? 'হোম' : 'Home';
   String get navHistory => isBangla ? 'ইতিহাস' : 'History';
@@ -126,11 +136,19 @@ class AppStrings {
       ? 'হোম স্ক্রিন থেকে আজ আপনার মেজাজ কেমন তা সেভ করুন'
       : 'Save your mood today from the home screen';
   // Names
-  String get moodHappy => isBangla ? 'খুশি' : 'Happy';
+  String get moodHappy => isBangla ? 'চমৎকার' : 'Great';
   String get moodGood => isBangla ? 'ভালো' : 'Good';
-  String get moodNeutral => isBangla ? 'স্বাভাবিক' : 'Neutral';
-  String get moodAnxious => isBangla ? 'উদ্বিগ্ন' : 'Anxious';
-  String get moodSad => isBangla ? 'দুঃখিত' : 'Sad';
+  String get moodNeutral => isBangla ? 'ঠিকঠাক' : 'Neutral';
+  String get moodSad => isBangla ? 'খারাপ' : 'Sad';
+  String get moodAnxious => isBangla ? 'চিন্তিত' : 'Anxious';
+
+  List<String> get moodLabels => [
+        moodHappy,
+        moodGood,
+        moodNeutral,
+        moodSad,
+        moodAnxious,
+      ];
 
   // ===================== Settings =====================
   String get settingsTitle => isBangla ? 'সেটিংস' : 'Settings';
@@ -362,12 +380,10 @@ class AppStrings {
   String get earthquakeUnderstood => isBangla ? 'বুঝেছি' : 'Understood';
   String get earthquakeEmpty =>
       isBangla ? 'কোনো সাম্প্রতিক ভূমিকম্প নেই' : 'No recent earthquakes';
-  String get earthquakeNearby =>
-      isBangla ? 'আপনার কাছাকাছি (৩০০০ কি.মি)' : 'Near You (3000 km)';
-  String get earthquakeGlobal => isBangla
-      ? 'বিশ্বের বড় ভূমিকম্প (টপ ৫)'
-      : 'Global Major Earthquakes (Top 5)';
   String get earthquakeNearbyStat => isBangla ? 'কাছাকাছি' : 'Nearby';
+  String get earthquakeTabNear => isBangla ? 'আপনার কাছে' : 'Near You';
+  String get earthquakeTabGlobal =>
+      isBangla ? 'শীর্ষ ৫ বৈশ্বিক' : 'Top 5 Global';
   String get earthquakeMaxMag => isBangla ? 'সর্বোচ্চ মাত্রা' : 'Max Magnitude';
   String get earthquakeMag45 => isBangla ? '৪.৫+ মাত্রা' : '4.5+ Magnitude';
   String get earthquakeAway => isBangla ? 'কি.মি. দূরে' : 'km away';
@@ -433,6 +449,20 @@ class AppStrings {
   String get forgotResetSuccess => isBangla
       ? 'পাসওয়ার্ড পরিবর্তন সফল হয়েছে!'
       : 'Password reset successful!';
+  String get forgotOtpSent => isBangla
+      ? 'আপনার ইমেইলে একটি OTP পাঠানো হয়েছে'
+      : 'An OTP has been sent to your email';
+  String get forgotOtpVerified =>
+      isBangla ? 'OTP যাচাই সফল হয়েছে!' : 'OTP verified successfully!';
+  String get forgotOtpInvalid =>
+      isBangla ? 'ভুল বা মেয়াদোত্তীর্ণ OTP কোড' : 'Invalid or expired OTP code';
+  String get forgotNewPassword => isBangla ? 'নতুন পাসওয়ার্ড' : 'New Password';
+  String get forgotResetButton =>
+      isBangla ? 'পাসওয়ার্ড রিসেট করুন' : 'Reset Password';
+  String get forgotOtpCode => isBangla ? 'OTP কোড' : 'OTP Code';
+  String get forgotOtpHint => isBangla ? '৬ সংখ্যার কোড' : '6-digit code';
+  String get forgotResendOtp => isBangla ? 'আবার OTP পাঠান' : 'Resend OTP';
+  String get forgotRemembered => isBangla ? 'মনে পড়েছে? ' : 'Remembered? ';
 
   // ===================== Onboarding =====================
   String get onbTitle1 => isBangla ? 'আপনি কি ঠিক আছেন?' : 'Are You Okay?';
@@ -452,6 +482,11 @@ class AppStrings {
   String get onbNext => isBangla ? 'পরবর্তী' : 'Next';
 
   // ===================== Notifications =====================
+  String get notifTitleDefault => isBangla ? 'সতর্কতা' : 'Alert';
+  String get notifEarthquakeTitle =>
+      isBangla ? 'ভূমিকম্প সতর্কতা' : 'Earthquake Alert';
+  String get notifEmergencyTitle =>
+      isBangla ? 'জরুরি সতর্কতা' : 'Emergency Alert';
   String get notifTitle => isBangla ? 'নোটিফিকেশন' : 'Notifications';
   String get notifEmpty =>
       isBangla ? 'কোনো নতুন নোটিফিকেশন নেই' : 'No new notifications';

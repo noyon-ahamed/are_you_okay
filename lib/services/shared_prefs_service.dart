@@ -35,7 +35,7 @@ class SharedPrefsService {
   // ==================== Language ====================
 
   String get language {
-    return _prefs?.getString(AppConstants.keyLanguage) ?? 'bn';
+    return _prefs?.getString(AppConstants.keyLanguage) ?? 'en';
   }
 
   Future<void> setLanguage(String lang) async {
@@ -120,5 +120,30 @@ class SharedPrefsService {
   Future<void> logout() async {
     await _prefs?.remove('user_id');
     await _prefs?.remove('user_token');
+  }
+
+  // ==================== Pending Server Clear ====================
+  // Used when user clears data offline — synced to server on next internet
+
+  bool get hasPendingServerClear {
+    return _prefs?.getBool('pending_server_clear') ?? false;
+  }
+
+  Future<void> setPendingServerClear(bool value) async {
+    if (value) {
+      await _prefs?.setBool('pending_server_clear', true);
+      await _prefs?.setInt(
+        'pending_clear_timestamp',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } else {
+      await _prefs?.remove('pending_server_clear');
+      await _prefs?.remove('pending_clear_timestamp');
+    }
+  }
+
+  DateTime? get pendingClearTimestamp {
+    final ts = _prefs?.getInt('pending_clear_timestamp');
+    return ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : null;
   }
 }
