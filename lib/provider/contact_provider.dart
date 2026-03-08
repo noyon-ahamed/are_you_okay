@@ -38,8 +38,10 @@ class ContactNotifier extends StateNotifier<ContactState> {
       if (!silent || state is! ContactLoaded) {
         state = const ContactLoading();
       }
-      // Fetch from backend, which also caches locally
-      final contacts = await _repository.loadContactsFromBackend();
+      // Fetch from backend (with 8s timeout), which also caches locally
+      final contacts = await _repository
+          .loadContactsFromBackend()
+          .timeout(const Duration(seconds: 8));
       state = ContactLoaded(contacts);
     } catch (e) {
       // Fallback to local Hive data
@@ -67,7 +69,7 @@ class ContactNotifier extends StateNotifier<ContactState> {
   }) async {
     try {
       state = const ContactLoading();
-      
+
       await _repository.addContact(
         name: name,
         phoneNumber: phoneNumber,
@@ -79,7 +81,7 @@ class ContactNotifier extends StateNotifier<ContactState> {
         notifyViaEmail: notifyViaEmail,
         notifyViaApp: notifyViaApp,
       );
-      
+
       await loadContacts();
     } catch (e) {
       state = ContactError(e.toString());

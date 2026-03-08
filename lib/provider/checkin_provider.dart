@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/checkin_model.dart';
 import '../repository/checkin_repository.dart';
 import '../services/api/auth_api_service.dart';
+import '../services/shared_prefs_service.dart';
 
 // ==================== Check-In Action State ====================
 
@@ -147,7 +148,9 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
     try {
       state = state.copyWith(isLoading: true);
 
-      final status = await _repository.fetchStatus();
+      // Add 8-second timeout — avoids hanging on slow WiFi
+      final status =
+          await _repository.fetchStatus().timeout(const Duration(seconds: 8));
 
       DateTime? lastCheckIn;
       if (status['lastCheckIn'] != null) {
@@ -181,10 +184,40 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
       );
     } catch (e) {
       debugPrint('Error fetching check-in status: $e');
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      // Offline / timeout fallback — read last check-in from local SharedPrefs
+      // so the button shows the correct state without waiting for the server.
+      _applyLocalFallback();
+    }
+  }
+
+  /// Applies a local fallback state using SharedPrefs when the server is unreachable.
+  void _applyLocalFallback() {
+    try {
+      final lastCheckIn = SharedPrefsService().lastCheckIn;
+      if (lastCheckIn != null) {
+        final nextCheckInTime = lastCheckIn.add(const Duration(hours: 24));
+        final canCheckIn = DateTime.now().isAfter(nextCheckInTime);
+        final hoursSince = DateTime.now().difference(lastCheckIn).inHours;
+        state = CheckInStatusData(
+          lastCheckIn: lastCheckIn,
+          hoursSinceLastCheckIn: hoursSince,
+          needsCheckIn: canCheckIn,
+          canCheckIn: canCheckIn,
+          nextCheckInTime: nextCheckInTime,
+          streak: state.streak,
+          isAtRisk: false,
+          isLoading: false,
+        );
+      } else {
+        // No local data — assume user needs to check in
+        state = state.copyWith(
+          isLoading: false,
+          canCheckIn: true,
+          needsCheckIn: true,
+        );
+      }
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
     }
   }
 

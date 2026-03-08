@@ -25,13 +25,7 @@ class ContactRepository {
     try {
       final backendContacts = await api.getContacts();
 
-      // Only replace local data AFTER backend call succeeds
-      // This prevents data loss when offline
-      final currentLocal = hive.getAllContacts();
-      for (final c in currentLocal) {
-        await hive.deleteContact(c.id);
-      }
-
+      // Build the full contacts list from backend data first
       final List<EmergencyContactModel> contacts = [];
       for (final bc in backendContacts) {
         final contact = EmergencyContactModel(
@@ -54,8 +48,21 @@ class ContactRepository {
               ? DateTime.tryParse(bc['updatedAt'].toString()) ?? DateTime.now()
               : DateTime.now(),
         );
-        await hive.saveContact(contact);
         contacts.add(contact);
+      }
+
+      // Only after we have the full list, upsert into Hive (safe — no data loss)
+      // Remove contacts that no longer exist in backend (stale local entries)
+      final backendIds = contacts.map((c) => c.id).toSet();
+      final currentLocal = hive.getAllContacts();
+      for (final c in currentLocal) {
+        if (!backendIds.contains(c.id)) {
+          await hive.deleteContact(c.id);
+        }
+      }
+      // Save/update all backend contacts into Hive
+      for (final contact in contacts) {
+        await hive.saveContact(contact);
       }
 
       contacts.sort((a, b) => a.priority.compareTo(b.priority));

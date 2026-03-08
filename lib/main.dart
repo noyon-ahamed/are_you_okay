@@ -79,15 +79,14 @@ void main() async {
           prefs.getBool('notifications_enabled') ?? true;
 
       if (notificationsEnabled) {
-        final lastCheckInStr = prefs.getString('last_checkin_time');
+        // Use SharedPrefsService.lastCheckIn which reads the canonical 'last_checkin' int key
+        // (same key that background_service.dart reads and home_screen.dart writes via setLastCheckIn)
+        final lastCheckIn = sharedPrefsService.lastCheckIn;
         bool needsReminder = true;
 
-        if (lastCheckInStr != null) {
-          final lastCheckIn = DateTime.tryParse(lastCheckInStr);
-          if (lastCheckIn != null &&
-              DateTime.now().difference(lastCheckIn).inHours < 24) {
-            needsReminder = false;
-          }
+        if (lastCheckIn != null &&
+            DateTime.now().difference(lastCheckIn).inHours < 24) {
+          needsReminder = false;
         }
 
         if (needsReminder) {

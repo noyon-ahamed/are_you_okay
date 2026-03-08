@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +20,7 @@ import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
+import '../../../services/shared_prefs_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -1002,9 +1002,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         await notifService.scheduleCheckinReminders(nextDeadline);
 
         // Save check-in time for background service WorkManager
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'last_checkin_time', DateTime.now().toIso8601String());
+        // Use SharedPrefsService so background_service.dart reads the same key ('last_checkin' int)
+        await ref
+            .read(sharedPrefsServiceProvider)
+            .setLastCheckIn(DateTime.now());
 
         setState(() {
           _selectedMood = -1;
