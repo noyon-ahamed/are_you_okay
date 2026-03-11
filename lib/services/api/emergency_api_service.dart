@@ -42,16 +42,6 @@ class EmergencyApiService {
       if (response.data['success'] == true) {
         final contacts =
             List<Map<String, dynamic>>.from(response.data['contacts'] ?? []);
-        // Only clear and replace local cache AFTER backend call succeeds
-        final hive = HiveService();
-        await hive.clearContacts();
-        for (final c in contacts) {
-          try {
-            final model = EmergencyContactModel.fromJson(c);
-            await hive.saveContact(model);
-          } catch (_) {}
-        }
-        debugPrint('Contacts cached to Hive (${contacts.length})');
         return contacts;
       } else {
         throw Exception(response.data['error'] ?? 'Failed to fetch contacts');
@@ -135,6 +125,55 @@ class EmergencyApiService {
       await prefs.setString(_kPendingContactsKey, jsonEncode(pending));
       debugPrint('Contact saved locally (pending sync): $name');
       return contactData; // return local data so UI updates immediately
+    }
+  }
+
+  Future<void> syncPendingContacts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingJson = prefs.getString(_kPendingContactsKey);
+    if (pendingJson == null || pendingJson.isEmpty) return;
+
+    final pending = List<Map<String, dynamic>>.from(jsonDecode(pendingJson));
+    if (pending.isEmpty) return;
+
+    final hive = HiveService();
+    final remaining = <Map<String, dynamic>>[];
+
+    for (final contact in pending) {
+      try {
+        final response = await _dio.post(
+          '$baseUrl/emergency/contacts',
+          data: {
+            'name': contact['name']?.toString() ?? '',
+            'phone': contact['phone']?.toString() ?? '',
+            if (contact['email'] != null &&
+                contact['email'].toString().isNotEmpty)
+              'email': contact['email'].toString(),
+            'relation': contact['relation']?.toString() ?? 'Other',
+            'priority': (contact['priority'] as num?)?.toInt() ?? 1,
+          },
+        );
+        if (response.data['success'] != true) {
+          throw Exception(response.data['error'] ?? 'Failed to sync contact');
+        }
+        final synced = Map<String, dynamic>.from(response.data['contact'] ?? {});
+
+        final pendingId = contact['id']?.toString();
+        if (pendingId != null && pendingId.isNotEmpty) {
+          await hive.deleteContact(pendingId);
+        }
+        final syncedModel = EmergencyContactModel.fromJson(synced);
+        await hive.saveContact(syncedModel);
+      } catch (e) {
+        debugPrint('Pending contact sync failed: $e');
+        remaining.add(contact);
+      }
+    }
+
+    if (remaining.isEmpty) {
+      await prefs.remove(_kPendingContactsKey);
+    } else {
+      await prefs.setString(_kPendingContactsKey, jsonEncode(remaining));
     }
   }
 

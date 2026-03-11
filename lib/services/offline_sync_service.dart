@@ -8,8 +8,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/constants/app_constants.dart';
 import '../repository/checkin_repository.dart';
 import '../services/api/mood_api_service.dart';
+import '../services/api/emergency_api_service.dart';
 import '../services/shared_prefs_service.dart';
 import 'mood_local_service.dart';
+import 'background_service.dart';
+import 'local_notification_history_service.dart';
+import 'notification_navigation_service.dart';
+import 'notification_service.dart';
 
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
   return OfflineSyncService(ref);
@@ -61,7 +66,10 @@ class OfflineSyncService {
       // 2. Sync pending check-ins
       await ref.read(checkinRepositoryProvider).syncPendingCheckIns();
 
-      // 3. Sync pending moods
+      // 3. Sync pending contacts
+      await EmergencyApiService().syncPendingContacts();
+
+      // 4. Sync pending moods
       await _syncPendingMoods();
     } catch (e) {
       debugPrint('Sync trigger failed: $e');
@@ -97,28 +105,45 @@ class OfflineSyncService {
         debugPrint(
             'Offline sync detected missed check-in deadline. Notifying user.');
 
-        // Show local notification immediately
-        final notificationPlugin = FlutterLocalNotificationsPlugin();
-        const androidDetails = AndroidNotificationDetails(
-          'emergency_alerts',
-          'জরুরি সতর্কতা',
-          importance: Importance.max,
-          priority: Priority.max,
-          color: Color(0xFFDC143C),
+        final notificationService = LocalNotificationService();
+        final payload = NotificationNavigationService.encodePayload(
+          NotificationNavigationService.payloadForReminder(
+            notificationId:
+                'missed-${now.year}-${now.month}-${now.day}-${deadline.millisecondsSinceEpoch}',
+          ),
         );
-        const iosDetails =
-            DarwinNotificationDetails(presentAlert: true, presentSound: true);
 
-        await notificationPlugin.show(
-          888, // Unique ID
-          '🚨 চেক-ইন মিস করেছেন!',
-          'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন যাতে আপনার জরুরি যোগাযোগদের সতর্ক করা না হয়।',
-          const NotificationDetails(android: androidDetails, iOS: iosDetails),
+        await notificationService.initialize(
+          onNotificationTap: NotificationNavigationService.handlePayload,
         );
+        await notificationService.showNotification(
+          id: 888,
+          title: '🚨 চেক-ইন মিস করেছেন!',
+          body:
+              'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন যাতে আপনার জরুরি যোগাযোগদের সতর্ক করা না হয়।',
+          payload: payload,
+          channelId: 'emergency_alerts',
+          priority: Priority.max,
+        );
+
+        await LocalNotificationHistoryService().saveNotification({
+          '_id':
+              'missed-${now.year}-${now.month}-${now.day}-${deadline.millisecondsSinceEpoch}',
+          'title': '🚨 চেক-ইন মিস করেছেন!',
+          'title_en': 'Check-in missed',
+          'body':
+              'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন।',
+          'type': 'reminder',
+          'payload': payload,
+          'createdAt': now.toIso8601String(),
+          'source': 'offline_sync',
+        });
 
         // Record that we alerted
         await prefs.setString(
             'last_offline_missed_alert', now.toIso8601String());
+
+        await BackgroundService.runImmediateReminderCheck();
 
         // Also post to backend so it appears in App Notification Screen
         final token = await SharedPrefsService.getToken();

@@ -56,6 +56,9 @@ class ContactRepository {
       final backendIds = contacts.map((c) => c.id).toSet();
       final currentLocal = hive.getAllContacts();
       for (final c in currentLocal) {
+        if (c.id.startsWith('pending_')) {
+          continue;
+        }
         if (!backendIds.contains(c.id)) {
           await hive.deleteContact(c.id);
         }
@@ -104,11 +107,13 @@ class ContactRepository {
         priority: priority,
       );
 
-      final contact = EmergencyContactModel(
-        id: backendContact['_id']?.toString() ?? _uuid.v4(),
-        userId: backendContact['userId']?.toString() ?? '',
-        name: name,
-        phoneNumber: phoneNumber,
+        final contact = EmergencyContactModel(
+          id: backendContact['_id']?.toString() ?? _uuid.v4(),
+          userId: backendContact['userId']?.toString() ??
+              backendContact['user']?.toString() ??
+              '',
+          name: name,
+          phoneNumber: phoneNumber,
         email: email,
         relationship: relationship,
         priority: backendContact['priority'] as int? ?? priority,
@@ -224,6 +229,7 @@ class ContactRepository {
 
         // Update backend priority
         try {
+          if (contact.id.startsWith('pending_')) continue;
           await api.updateContact(
             id: contact.id,
             priority: i + 1,

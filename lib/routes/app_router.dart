@@ -24,6 +24,7 @@ import '../../presentation/screens/notification/notification_screen.dart';
 
 import '../../provider/auth_provider.dart';
 import '../../provider/splash_provider.dart';
+import '../../services/shared_prefs_service.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -230,18 +231,21 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isSplashComplete = ref.read(splashDisplayCompleteProvider);
       final authState = ref.read(authProvider);
+      final sharedPrefs = ref.read(sharedPrefsServiceProvider);
       final currentPath = state.uri.path;
+      final isFirstLaunch = sharedPrefs.isFirstLaunch;
 
       if (!isSplashComplete) {
         return Routes.splash;
       }
 
-      // Splash
-
       final isAuthenticated = authState is AuthAuthenticated;
       final isLoading = authState is AuthLoading || authState is AuthInitial;
 
-      if (currentPath == Routes.onboarding) return null;
+      if (currentPath == Routes.onboarding) {
+        if (isAuthenticated) return Routes.home;
+        return isFirstLaunch ? null : Routes.login;
+      }
 
       final authPages = [
         Routes.login,
@@ -255,6 +259,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         return Routes.login;
       }
 
+      if (!isAuthenticated && isFirstLaunch) {
+        return Routes.onboarding;
+      }
+
       if (!isAuthenticated && !isAuthPage && currentPath != Routes.splash) {
         return Routes.login;
       }
@@ -264,7 +272,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (!isAuthenticated && currentPath == Routes.splash) {
-        return Routes.login;
+        return isFirstLaunch ? Routes.onboarding : Routes.login;
       }
 
       return null;

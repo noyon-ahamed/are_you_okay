@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../routes/app_router.dart';
+import '../../../services/shared_prefs_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../provider/language_provider.dart';
@@ -223,6 +224,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       Permission.notification,
       Permission.microphone,
     ].request();
+
+    await ref.read(sharedPrefsServiceProvider).setFirstLaunchComplete();
 
     if (mounted) {
       context.go(Routes.login);

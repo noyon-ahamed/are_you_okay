@@ -251,30 +251,41 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         foregroundColor: _isActivated ? Colors.white : null,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: _isActivating
-                    ? _buildCountdownView()
-                    : _isActivated
-                        ? _buildActivatedView()
-                        : _buildSOSButton(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: _isActivating || _isActivated ? 420 : 360,
+                      child: Center(
+                        child: _isActivating
+                            ? _buildCountdownView()
+                            : _isActivated
+                                ? _buildActivatedView()
+                                : _buildSOSButton(),
+                      ),
+                    ),
+
+                    // Service Selection
+                    if (!_isActivating && !_isActivated)
+                      _buildServiceSelection(isDark),
+
+                    // Emergency contacts
+                    if (!_isActivating && !_isActivated) ...[
+                      _buildContactsSection(contacts, isDark),
+                      const SizedBox(height: 16),
+                      _buildEmergencyNumbers(isDark),
+                      const SizedBox(height: 20),
+                    ],
+                  ],
+                ),
               ),
-            ),
-
-            // Service Selection
-            if (!_isActivating && !_isActivated) _buildServiceSelection(isDark),
-
-            // Emergency contacts
-            if (!_isActivating && !_isActivated) ...[
-              _buildContactsSection(contacts, isDark),
-              const SizedBox(height: 16),
-              // Emergency Numbers
-              _buildEmergencyNumbers(isDark),
-              const SizedBox(height: 20),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -282,6 +293,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
 
   Widget _buildSOSButton() {
     final s = ref.watch(stringsProvider);
+    final buttonSize = MediaQuery.of(context).size.width < 390 ? 184.0 : 200.0;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -304,8 +317,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
             child: Hero(
               tag: 'sos_icon',
               child: Container(
-                width: 200,
-                height: 200,
+                width: buttonSize,
+                height: buttonSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
@@ -333,15 +346,22 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                   children: [
                     const Icon(Icons.sos, color: Colors.white, size: 56),
                     const SizedBox(height: 8),
-                    Text(
-                      s.sosTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'HindSiliguri',
-                        letterSpacing: 4,
-                        decoration: TextDecoration.none,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          s.sosTitle,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'HindSiliguri',
+                            letterSpacing: 2,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -370,7 +390,9 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
             children: [
               _buildCheckbox(s.sosPolice, _needPolice,
                   (v) => setState(() => _needPolice = v!)),
@@ -387,7 +409,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
 
   Widget _buildCheckbox(
       String label, bool value, ValueChanged<bool?> onChanged) {
-    return Expanded(
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 110, maxWidth: 160),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

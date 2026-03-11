@@ -18,6 +18,8 @@ import '../../../routes/app_router.dart';
 import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/background_service.dart';
+import '../../../services/notification_navigation_service.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
 import '../../../services/shared_prefs_service.dart';
@@ -41,6 +43,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _isSavingMood = false;
   bool _isCheckingInLocally = false;
   final TextEditingController _moodNoteController = TextEditingController();
+  final ValueNotifier<Duration> _timeRemainingNotifier =
+      ValueNotifier(const Duration(hours: 24));
 
   // Profile Image Cache to prevent flickering on 1s tick
   ImageProvider? _cachedProfileImage;
@@ -83,7 +87,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       // Fetch check-in status from server
       ref.read(checkinStatusProvider.notifier).fetchStatus();
+      _handlePendingReminderAction();
     });
+    pendingNotificationAction.addListener(_handlePendingReminderAction);
 
     // Start countdown timer
     _startCountdown();
@@ -104,9 +110,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (!statusData.isLoading) {
         final remaining = statusData.timeRemaining;
         if (remaining != _timeRemaining) {
-          setState(() {
-            _timeRemaining = remaining;
-          });
+          _timeRemaining = remaining;
+          _timeRemainingNotifier.value = remaining;
         }
       }
     });
@@ -119,22 +124,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _ringController.dispose();
     _countdownTimer?.cancel();
     _moodNoteController.dispose();
+    _timeRemainingNotifier.dispose();
+    pendingNotificationAction.removeListener(_handlePendingReminderAction);
     ref.read(shakeDetectorProvider).stopListening();
     super.dispose();
-  }
-
-  double get _urgencyPercent {
-    final total = const Duration(hours: 24).inSeconds;
-    final remaining = _timeRemaining.inSeconds.clamp(0, total);
-    return 1.0 - (remaining / total);
-  }
-
-  Color get _urgencyColor {
-    final statusData = ref.read(checkinStatusProvider);
-    if (statusData.hasCheckedInToday) return AppColors.success;
-    if (_urgencyPercent < 0.5) return AppColors.success;
-    if (_urgencyPercent < 0.75) return AppColors.warning;
-    return AppColors.error;
   }
 
   @override
@@ -310,140 +303,147 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final isLoading = state is CheckInLoading || _isCheckingInLocally;
     final hasCheckedIn = statusData.hasCheckedInToday || _isCheckingInLocally;
 
-    final hours = _timeRemaining.inHours;
-    final minutes = _timeRemaining.inMinutes.remainder(60);
-    final seconds = _timeRemaining.inSeconds.remainder(60);
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _timeRemainingNotifier,
+      builder: (context, remaining, _) {
+        final hours = remaining.inHours;
+        final minutes = remaining.inMinutes.remainder(60);
+        final seconds = remaining.inSeconds.remainder(60);
+        final urgencyPercent = _calculateUrgencyPercent(remaining);
+        final urgencyColor = _calculateUrgencyColor(statusData, remaining);
 
-    return Center(
-      child: AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: (isLoading || hasCheckedIn) ? 1.0 : _pulseAnimation.value,
-            child: child,
-          );
-        },
-        child: GestureDetector(
-          onTap: isLoading
-              ? null
-              : hasCheckedIn
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${s.homeWaitCheckin} $hours ${s.homeHoursLeft} $minutes ${s.homeWaitAfter}',
-                            style: const TextStyle(fontFamily: 'HindSiliguri'),
+        return Center(
+          child: AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: (isLoading || hasCheckedIn) ? 1.0 : _pulseAnimation.value,
+                child: child,
+              );
+            },
+            child: GestureDetector(
+              onTap: isLoading
+                  ? null
+                  : hasCheckedIn
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${s.homeWaitCheckin} $hours ${s.homeHoursLeft} $minutes ${s.homeWaitAfter}',
+                                style:
+                                    const TextStyle(fontFamily: 'HindSiliguri'),
+                              ),
+                              backgroundColor: AppColors.warning,
+                            ),
+                          );
+                        }
+                      : _performCheckin,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: AppDecorations.coloredShadow(
+                    hasCheckedIn ? AppColors.success : urgencyColor,
+                    opacity: 0.35,
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _ringAnimation,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          size: const Size(180, 180),
+                          painter: _SafetyRingPainter(
+                            progress: hasCheckedIn ? 1.0 : (1.0 - urgencyPercent),
+                            color:
+                                hasCheckedIn ? AppColors.success : urgencyColor,
+                            rotation: _ringAnimation.value,
                           ),
-                          backgroundColor: AppColors.warning,
+                        );
+                      },
+                    ),
+                    Container(
+                      width: 150,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: hasCheckedIn
+                              ? [
+                                  AppColors.success,
+                                  // ignore: deprecated_member_use
+                                  AppColors.success.withOpacity(0.8)
+                                ]
+                              // ignore: deprecated_member_use
+                              : [urgencyColor, urgencyColor.withOpacity(0.8)],
                         ),
-                      );
-                    }
-                  : _performCheckin,
-          child: Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: AppDecorations.coloredShadow(
-                hasCheckedIn ? AppColors.success : _urgencyColor,
-                opacity: 0.35,
+                      ),
+                      child: isLoading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 3,
+                                ),
+                              ),
+                            )
+                          : hasCheckedIn
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                      size: 36,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${s.homeCheckinDone} ✓\n${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'HindSiliguri',
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.favorite,
+                                      color: Colors.white,
+                                      size: 36,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      s.homeCheckinBtn,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'HindSiliguri',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Animated ring
-                AnimatedBuilder(
-                  animation: _ringAnimation,
-                  builder: (context, child) {
-                    return CustomPaint(
-                      size: const Size(180, 180),
-                      painter: _SafetyRingPainter(
-                        progress: hasCheckedIn ? 1.0 : (1.0 - _urgencyPercent),
-                        color: hasCheckedIn ? AppColors.success : _urgencyColor,
-                        rotation: _ringAnimation.value,
-                      ),
-                    );
-                  },
-                ),
-                // Inner circle
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: hasCheckedIn
-                          ? [
-                              AppColors.success,
-                              // ignore: deprecated_member_use
-                              AppColors.success.withOpacity(0.8)
-                            ]
-                          // ignore: deprecated_member_use
-                          : [_urgencyColor, _urgencyColor.withOpacity(0.8)],
-                    ),
-                  ),
-                  child: isLoading
-                      ? const Center(
-                          child: SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
-                            ),
-                          ),
-                        )
-                      : hasCheckedIn
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white,
-                                  size: 36,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${s.homeCheckinDone} ✓\n${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'HindSiliguri',
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.favorite,
-                                  color: Colors.white,
-                                  size: 36,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  s.homeCheckinBtn,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'HindSiliguri',
-                                  ),
-                                ),
-                              ],
-                            ),
-                ),
-              ],
-            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -451,60 +451,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildCountdownTimer(
       CheckInStatusData statusData, bool isDark, AppStrings s) {
     final hasCheckedIn = statusData.hasCheckedInToday;
-    final hours = _timeRemaining.inHours;
-    final minutes = _timeRemaining.inMinutes.remainder(60);
-    final seconds = _timeRemaining.inSeconds.remainder(60);
-    final s = ref.watch(stringsProvider);
 
-    return Center(
-      child: Column(
-        children: [
-          StatusBadge(
-            type: hasCheckedIn
-                ? StatusType.safe
-                : _urgencyPercent < 0.5
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _timeRemainingNotifier,
+      builder: (context, remaining, _) {
+        final hours = remaining.inHours;
+        final minutes = remaining.inMinutes.remainder(60);
+        final seconds = remaining.inSeconds.remainder(60);
+        final urgencyPercent = _calculateUrgencyPercent(remaining);
+        final urgencyColor = _calculateUrgencyColor(statusData, remaining);
+
+        return Center(
+          child: Column(
+            children: [
+              StatusBadge(
+                type: hasCheckedIn
                     ? StatusType.safe
-                    : _urgencyPercent < 0.75
-                        ? StatusType.warning
-                        : StatusType.danger,
-            label: hasCheckedIn
-                ? '${s.homeCheckinDone} ✓'
-                : _urgencyPercent < 0.5
-                    ? s.statusSafe
-                    : _urgencyPercent < 0.75
-                        ? s.statusNeedCheckin
-                        : s.statusEmergency,
-          ),
-          const SizedBox(height: 12),
-          if (!hasCheckedIn) ...[
-            Text(
-              '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w300,
-                letterSpacing: 4,
-                color: _urgencyColor,
+                    : urgencyPercent < 0.5
+                        ? StatusType.safe
+                        : urgencyPercent < 0.75
+                            ? StatusType.warning
+                            : StatusType.danger,
+                label: hasCheckedIn
+                    ? '${s.homeCheckinDone} ✓'
+                    : urgencyPercent < 0.5
+                        ? s.statusSafe
+                        : urgencyPercent < 0.75
+                            ? s.statusNeedCheckin
+                            : s.statusEmergency,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              s.homeCheckinRemaining,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ] else ...[
-            if (statusData.streak > 0)
-              Text(
-                '🔥 ${statusData.streak} ${s.homeStreakX}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                  fontFamily: 'HindSiliguri',
+              const SizedBox(height: 12),
+              if (!hasCheckedIn) ...[
+                Text(
+                  '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 4,
+                    color: urgencyColor,
+                  ),
                 ),
-              ),
-          ],
-        ],
-      ),
+                const SizedBox(height: 4),
+                Text(
+                  s.homeCheckinRemaining,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ] else ...[
+                if (statusData.streak > 0)
+                  Text(
+                    '🔥 ${statusData.streak} ${s.homeStreakX}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      fontFamily: 'HindSiliguri',
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -966,6 +973,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return _cachedProfileImage;
   }
 
+  double _calculateUrgencyPercent(Duration remaining) {
+    final total = const Duration(hours: 24).inSeconds;
+    final clamped = remaining.inSeconds.clamp(0, total);
+    return 1.0 - (clamped / total);
+  }
+
+  Color _calculateUrgencyColor(
+      CheckInStatusData statusData, Duration remaining) {
+    if (statusData.hasCheckedInToday) return AppColors.success;
+    final urgencyPercent = _calculateUrgencyPercent(remaining);
+    if (urgencyPercent < 0.5) return AppColors.success;
+    if (urgencyPercent < 0.75) return AppColors.warning;
+    return AppColors.error;
+  }
+
+  void _handlePendingReminderAction() {
+    if (!mounted) return;
+    final action = NotificationNavigationService.consumePendingAction();
+    if (action != 'open_checkin') return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final statusData = ref.read(checkinStatusProvider);
+      final s = ref.read(stringsProvider);
+      if (!statusData.canCheckIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              s.homeCheckinDone,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+          ),
+        );
+        return;
+      }
+
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Check-in Reminder'),
+            content: const Text('You have a pending reminder. Check in now?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(s.cancel),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _performCheckin();
+                },
+                child: Text(s.homeCheckinBtn),
+              ),
+            ],
+          );
+        },
+      );
+    });
+  }
+
   void _performCheckin() async {
     final s = ref.read(stringsProvider);
     String? notes;
@@ -996,16 +1064,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final notifService = LocalNotificationService();
         await notifService.cancelCheckinReminders();
         await notifService.cancelNotification(1);
-
-        // Schedule reminders for next check-in (24h from now)
-        final nextDeadline = DateTime.now().add(const Duration(hours: 24));
-        await notifService.scheduleCheckinReminders(nextDeadline);
+        await notifService.cancelDailyReminders();
 
         // Save check-in time for background service WorkManager
         // Use SharedPrefsService so background_service.dart reads the same key ('last_checkin' int)
         await ref
             .read(sharedPrefsServiceProvider)
             .setLastCheckIn(DateTime.now());
+        await markNotificationDismissed();
+        await BackgroundService.runImmediateReminderCheck();
 
         setState(() {
           _selectedMood = -1;

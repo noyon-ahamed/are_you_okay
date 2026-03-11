@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 // ignore: depend_on_referenced_packages
@@ -8,6 +9,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'notification_service.dart';
+import 'local_notification_history_service.dart';
+import 'notification_navigation_service.dart';
 
 const String backgroundTaskKey = 'checkin_monitoring_task';
 
@@ -17,6 +20,12 @@ const String _kLastCheckIn =
 const String _kLastDismissed = 'last_notification_dismissed_at';
 const String _kNotificationsEnabled = 'notifications_enabled';
 
+const List<_TimeSlot> _dailyReminderSlots = [
+  _TimeSlot(id: 201, hour: 9, minute: 0, label: 'সকাল'),
+  _TimeSlot(id: 202, hour: 14, minute: 0, label: 'দুপুর'),
+  _TimeSlot(id: 203, hour: 21, minute: 0, label: 'রাত'),
+];
+
 /// Called by Workmanager in the background isolate.
 /// Schedules / cancels the 3 daily reminder notifications.
 @pragma('vm:entry-point')
@@ -25,42 +34,7 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     debugPrint('Background task fired: $task');
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Respect the user's notification preference
-      final notificationsEnabled =
-          prefs.getBool(_kNotificationsEnabled) ?? true;
-      if (!notificationsEnabled) {
-        debugPrint('Notifications disabled by user — skipping');
-        return Future.value(true);
-      }
-
-      // Check if user dismissed within the last 24 hours (i.e. tapped and checked in)
-      final dismissedStr = prefs.getString(_kLastDismissed);
-      if (dismissedStr != null) {
-        final dismissed = DateTime.tryParse(dismissedStr);
-        if (dismissed != null &&
-            DateTime.now().difference(dismissed).inHours < 24) {
-          debugPrint('Dismissed within 24h — skipping reminders');
-          return Future.value(true);
-        }
-      }
-
-      // Check if user actually checked in within the last 24 hours
-      // Corrected: last_checkin is stored as int (millisecondsSinceEpoch) in SharedPrefsService
-      final lastCheckInTs = prefs.getInt(_kLastCheckIn);
-      if (lastCheckInTs != null) {
-        final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
-        if (DateTime.now().difference(lastCheckIn).inHours < 24) {
-          debugPrint('User checked in within 24h — no reminders needed');
-          return Future.value(true);
-        }
-      }
-
-      // Schedule 3 daily reminders
-      final notificationService = LocalNotificationService();
-      await notificationService.initialize(onNotificationTap: (_) {});
-      await scheduleDailyReminders(notificationService);
+      await processReminderCheck();
     } catch (e) {
       debugPrint('Background task error: $e');
       return Future.value(false);
@@ -81,13 +55,7 @@ Future<void> scheduleDailyReminders(
     // Cancel any old daily reminders first
     await notificationService.cancelDailyReminders();
 
-    final reminderTimes = [
-      const _TimeSlot(id: 201, hour: 9, minute: 0, label: 'সকাল'),
-      const _TimeSlot(id: 202, hour: 14, minute: 0, label: 'দুপুর'),
-      const _TimeSlot(id: 203, hour: 21, minute: 0, label: 'রাত'),
-    ];
-
-    for (final slot in reminderTimes) {
+    for (final slot in _dailyReminderSlots) {
       await notificationService.scheduleDailyNotification(
         id: slot.id,
         title: 'আপনি কি ঠিক আছেন? 🔔',
@@ -101,6 +69,89 @@ Future<void> scheduleDailyReminders(
     debugPrint('3 daily reminders scheduled (9 AM / 2 PM / 9 PM)');
   } catch (e) {
     debugPrint('Error scheduling daily reminders: $e');
+  }
+}
+
+Future<void> processReminderCheck() async {
+  if (kIsWeb) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final notificationsEnabled = prefs.getBool(_kNotificationsEnabled) ?? true;
+  if (!notificationsEnabled) {
+    debugPrint('Notifications disabled by user — skipping reminder check');
+    return;
+  }
+
+  final connectivity = await Connectivity().checkConnectivity();
+  if (connectivity == ConnectivityResult.none) {
+    debugPrint('No internet — skipping reminder check');
+    return;
+  }
+
+  final dismissedStr = prefs.getString(_kLastDismissed);
+  if (dismissedStr != null) {
+    final dismissed = DateTime.tryParse(dismissedStr);
+    if (dismissed != null &&
+        DateTime.now().difference(dismissed).inHours < 24) {
+      debugPrint('User already checked in after reminder — skipping');
+      return;
+    }
+  }
+
+  final lastCheckInTs = prefs.getInt(_kLastCheckIn);
+  if (lastCheckInTs != null) {
+    final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
+    if (DateTime.now().difference(lastCheckIn).inHours < 24) {
+      debugPrint('User checked in within 24h — no reminder needed');
+      return;
+    }
+  }
+
+  final notificationService = LocalNotificationService();
+  await notificationService.initialize(
+    onNotificationTap: NotificationNavigationService.handlePayload,
+  );
+
+  final historyService = LocalNotificationHistoryService();
+  final now = DateTime.now();
+  final dueSlots = _dailyReminderSlots.where((slot) {
+    final scheduledTime =
+        DateTime(now.year, now.month, now.day, slot.hour, slot.minute);
+    return !scheduledTime.isAfter(now);
+  });
+
+  for (final slot in dueSlots) {
+    final notificationId = _historyIdForSlot(slot, now);
+    if (await historyService.containsNotification(notificationId)) {
+      continue;
+    }
+
+    final payload = NotificationNavigationService.encodePayload(
+      NotificationNavigationService.payloadForReminder(
+        notificationId: notificationId,
+      ),
+    );
+
+    await notificationService.showCheckinReminder(
+      title: 'আপনি কি ঠিক আছেন? 🔔',
+      body: '${slot.label}ের চেক-ইন রিমাইন্ডার। অনুগ্রহ করে অ্যাপে চেক-ইন করুন।',
+      payload: payload,
+    );
+
+    await historyService.saveNotification({
+      '_id': notificationId,
+      'title': 'আপনি কি ঠিক আছেন? 🔔',
+      'title_en': 'Are you okay? Reminder',
+      'body': '${slot.label}ের চেক-ইন রিমাইন্ডার। অনুগ্রহ করে অ্যাপে চেক-ইন করুন।',
+      'type': 'reminder',
+      'payload': payload,
+      'createdAt': now.toIso8601String(),
+      'scheduledFor':
+          DateTime(now.year, now.month, now.day, slot.hour, slot.minute)
+              .toIso8601String(),
+      'notificationId': 1,
+      'source': 'background',
+    });
   }
 }
 
@@ -143,7 +194,7 @@ class BackgroundService {
       backgroundTaskKey,
       frequency: const Duration(hours: 1),
       constraints: Constraints(
-        networkType: NetworkType.notRequired,
+        networkType: NetworkType.connected,
       ),
       existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
@@ -155,4 +206,13 @@ class BackgroundService {
     await Workmanager().cancelAll();
     debugPrint('All background tasks cancelled');
   }
+
+  static Future<void> runImmediateReminderCheck() async {
+    await processReminderCheck();
+  }
+}
+
+String _historyIdForSlot(_TimeSlot slot, DateTime now) {
+  final day = '${now.year}-${now.month}-${now.day}';
+  return 'local-$day-${slot.id}';
 }

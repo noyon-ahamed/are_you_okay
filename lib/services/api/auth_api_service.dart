@@ -184,6 +184,25 @@ class AuthApiService {
     }
   }
 
+  Future<void> updateNotificationPreferences({
+    required bool notificationEnabled,
+    List<String>? reminderTimes,
+    String? timezone,
+  }) async {
+    try {
+      await _dio.put(
+        '$baseUrl/auth/notification-preferences',
+        data: {
+          'notificationEnabled': notificationEnabled,
+          if (reminderTimes != null) 'reminderTimes': reminderTimes,
+          if (timezone != null) 'timezone': timezone,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
   /// Request password reset
   Future<void> forgotPassword(String email) async {
     try {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/settings_model.dart';
 import '../services/hive_service.dart';
+import '../services/api/auth_api_service.dart';
 import '../services/background_service.dart';
 import '../services/notification_service.dart';
 
@@ -35,6 +36,11 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   Future<void> setCheckinInterval(int days) async {
     state = state.copyWith(checkinIntervalDays: days);
     await _hiveService.saveSettings(state);
+    try {
+      await AuthApiService().updateNotificationPreferences(
+        notificationEnabled: state.notificationsEnabled,
+      );
+    } catch (_) {}
   }
 
   Future<void> toggleNotifications() async {
@@ -46,13 +52,19 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications_enabled', newValue);
 
+    try {
+      await AuthApiService().updateNotificationPreferences(
+        notificationEnabled: newValue,
+      );
+    } catch (_) {}
+
     final notifService = LocalNotificationService();
     await notifService.initialize(onNotificationTap: (_) {});
 
     if (newValue) {
-      // Notifications turned ON → re-register background task and reschedule daily reminders
+      // Notifications turned ON → re-register background task and run an immediate check
       await BackgroundService.registerPeriodicTask();
-      await scheduleDailyReminders(notifService);
+      await BackgroundService.runImmediateReminderCheck();
     } else {
       // Notifications turned OFF → cancel all notifications and background task
       await notifService.cancelAllNotifications();

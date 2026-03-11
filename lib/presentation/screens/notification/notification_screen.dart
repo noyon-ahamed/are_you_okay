@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decorations.dart';
 import '../../../../services/api/notification_api_service.dart';
+import '../../../../services/local_notification_history_service.dart';
+import '../../../../services/notification_navigation_service.dart';
+import '../../../../services/notification_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 import 'package:intl/intl.dart';
@@ -20,8 +23,29 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
     }
     try {
       final api = NotificationApiService();
-      final data = await api.getNotifications();
-      state = AsyncData(data['notifications'] as List<dynamic>);
+      List<dynamic> remoteNotifications = <dynamic>[];
+      try {
+        final data = await api.getNotifications();
+        remoteNotifications = data['notifications'] as List<dynamic>? ?? [];
+      } catch (_) {
+        remoteNotifications = <dynamic>[];
+      }
+
+      final localNotifications =
+          await LocalNotificationHistoryService().getNotifications();
+      final merged = <Map<String, dynamic>>[
+        ...localNotifications.map((item) => Map<String, dynamic>.from(item)),
+        ...remoteNotifications.map((item) => Map<String, dynamic>.from(item)),
+      ];
+      merged.sort((a, b) {
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+      state = AsyncData(merged);
     } catch (e, st) {
       if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
@@ -31,25 +55,42 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
 
   Future<void> markAllAsRead() async {
     try {
-      await NotificationApiService().markAllAsRead();
+      await LocalNotificationHistoryService().markAllAsRead();
+      try {
+        await NotificationApiService().markAllAsRead();
+      } catch (_) {}
       fetch(silent: true);
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<void> markAsRead(String id) async {
+  Future<void> markAsRead(Map<String, dynamic> notification) async {
     try {
-      await NotificationApiService().markAsRead(id);
+      final id = notification['_id']?.toString() ?? '';
+      if (notification['isLocal'] == true) {
+        await LocalNotificationHistoryService().markAsRead(id);
+      } else {
+        await NotificationApiService().markAsRead(id);
+      }
       fetch(silent: true);
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<void> deleteNotification(String id) async {
+  Future<void> deleteNotification(Map<String, dynamic> notification) async {
     try {
-      await NotificationApiService().deleteNotification(id);
+      final id = notification['_id']?.toString() ?? '';
+      if (notification['isLocal'] == true) {
+        await LocalNotificationHistoryService().deleteNotification(id);
+        final localId = notification['notificationId'];
+        if (localId is int) {
+          await LocalNotificationService().cancelNotification(localId);
+        }
+      } else {
+        await NotificationApiService().deleteNotification(id);
+      }
       fetch(silent: true);
     } catch (e) {
       rethrow;
@@ -204,10 +245,23 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                         try {
                           await ref
                               .read(notificationsProvider.notifier)
-                              .markAsRead(notif['_id']);
+                              .markAsRead(Map<String, dynamic>.from(notif));
                         } catch (e) {
                           // ignore
                         }
+                      }
+                      final payload = notif['payload']?.toString();
+                      if (payload != null && payload.isNotEmpty) {
+                        NotificationNavigationService.handlePayload(payload);
+                      } else if (notif['type'] == 'reminder') {
+                        NotificationNavigationService.handlePayload(
+                          NotificationNavigationService.encodePayload(
+                            NotificationNavigationService.payloadForReminder(
+                              notificationId:
+                                  notif['_id']?.toString() ?? 'notification',
+                            ),
+                          ),
+                        );
                       }
                     },
                     trailing: PopupMenuButton(
@@ -225,7 +279,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                           try {
                             await ref
                                 .read(notificationsProvider.notifier)
-                                .deleteNotification(notif['_id']);
+                                .deleteNotification(
+                                    Map<String, dynamic>.from(notif));
                           } catch (e) {
                             // ignore
                           }

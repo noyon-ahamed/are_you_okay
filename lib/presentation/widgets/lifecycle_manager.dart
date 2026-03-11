@@ -25,7 +25,10 @@ class _LifecycleManagerState extends ConsumerState<LifecycleManager>
 
     // Initialize offline sync on startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(offlineSyncServiceProvider).init();
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        ref.read(offlineSyncServiceProvider).init();
+      });
     });
   }
 

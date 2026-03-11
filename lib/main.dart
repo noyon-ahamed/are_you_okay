@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,8 +18,10 @@ import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'provider/settings_provider.dart';
 import 'services/hive_service.dart';
+import 'services/local_notification_history_service.dart';
 import 'services/shared_prefs_service.dart';
 import 'services/background_service.dart';
+import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
 import 'presentation/screens/fake_call/fake_call_active_screen.dart';
@@ -61,51 +64,6 @@ void main() async {
   sharedPrefsService = SharedPrefsService();
   await sharedPrefsService.init();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(
-          _firebaseMessagingBackgroundHandler);
-    } catch (e) {
-      debugPrint('Firebase initialization warning: $e');
-    }
-
-    await BackgroundService.initialize();
-    await BackgroundService.registerPeriodicTask();
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final notificationsEnabled =
-          prefs.getBool('notifications_enabled') ?? true;
-
-      if (notificationsEnabled) {
-        // Use SharedPrefsService.lastCheckIn which reads the canonical 'last_checkin' int key
-        // (same key that background_service.dart reads and home_screen.dart writes via setLastCheckIn)
-        final lastCheckIn = sharedPrefsService.lastCheckIn;
-        bool needsReminder = true;
-
-        if (lastCheckIn != null &&
-            DateTime.now().difference(lastCheckIn).inHours < 24) {
-          needsReminder = false;
-        }
-
-        if (needsReminder) {
-          final notifService = LocalNotificationService();
-          await notifService.initialize(onNotificationTap: (_) {});
-          await scheduleDailyReminders(notifService);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error scheduling startup reminders: $e');
-    }
-
-    final bool isSimulator = Platform.isIOS &&
-        Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
-    if (!isSimulator) {
-      MobileAds.instance.initialize();
-    }
-  });
-
   runApp(
     ProviderScope(
       overrides: [
@@ -128,19 +86,86 @@ class AreYouOkayApp extends ConsumerStatefulWidget {
 
 class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     with WidgetsBindingObserver {
+  bool _servicesBootstrapped = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bootstrapNonCriticalServices();
+    });
+  }
+
+  Future<void> _bootstrapNonCriticalServices() async {
+    if (_servicesBootstrapped) return;
+    _servicesBootstrapped = true;
+
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+      _setupFirebaseMessaging();
+    } catch (e) {
+      debugPrint('Firebase initialization warning: $e');
+    }
+
+    unawaited(_initializeBackgroundReminderFlow());
     _listenToCallKitEvents();
-    _checkActiveCalls();
-    _setupFirebaseMessaging();
+    unawaited(_checkActiveCalls());
+
+    final bool isSimulator = Platform.isIOS &&
+        Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
+    if (!isSimulator) {
+      unawaited(MobileAds.instance.initialize());
+    }
+  }
+
+  Future<void> _initializeBackgroundReminderFlow() async {
+    try {
+      await BackgroundService.initialize();
+      await BackgroundService.registerPeriodicTask();
+
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled =
+          prefs.getBool('notifications_enabled') ?? true;
+
+      if (!notificationsEnabled) return;
+
+      final sharedPrefs = ref.read(sharedPrefsServiceProvider);
+      final lastCheckIn = sharedPrefs.lastCheckIn;
+      final needsReminder = lastCheckIn == null ||
+          DateTime.now().difference(lastCheckIn).inHours >= 24;
+
+      if (!needsReminder) return;
+
+      final notifService = LocalNotificationService();
+      await notifService.initialize(
+        onNotificationTap: NotificationNavigationService.handlePayload,
+      );
+      await BackgroundService.runImmediateReminderCheck();
+    } catch (e) {
+      debugPrint('Error scheduling startup reminders: $e');
+    }
   }
 
   void _setupFirebaseMessaging() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Foreground message received: ${message.notification?.title}');
       _handleFirebaseMessage(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleRemoteMessageTap(message);
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        _handleRemoteMessageTap(message);
+      }
     });
   }
 
@@ -285,21 +310,56 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   }
 
   final notifService = LocalNotificationService();
-  await notifService.initialize(onNotificationTap: (_) {});
+  await notifService.initialize(
+    onNotificationTap: NotificationNavigationService.handlePayload,
+  );
 
+  final payload = NotificationNavigationService.encodePayload({
+    'route': Routes.notifications,
+    'action': data['type'] == 'checkin_reminder' ? 'open_checkin' : '',
+    'type': data['type'] ?? 'alert',
+    'source': 'push',
+  });
   if (data['isClose'] == '1' || isSeismicClose) {
     await notifService.showEmergencyAlert(
       title: title,
       body: body,
-      payload: 'earthquake_alert',
+      payload: payload,
       isSeismicClose: true,
     );
   } else {
     await notifService.showEmergencyAlert(
       title: title,
       body: body,
-      payload: 'emergency_alert',
+      payload: payload,
       isSeismicClose: false,
     );
   }
+
+  await LocalNotificationHistoryService().saveNotification({
+    '_id': data['notificationId']?.toString() ??
+        'push-${message.messageId ?? DateTime.now().millisecondsSinceEpoch}',
+    'title': title,
+    'title_en': title,
+    'body': body,
+    'type': data['type'] ?? 'alert',
+    'payload': payload,
+    'createdAt': DateTime.now().toIso8601String(),
+    'source': 'push',
+  });
+}
+
+void _handleRemoteMessageTap(RemoteMessage message) {
+  final data = message.data;
+  final payload = NotificationNavigationService.encodePayload({
+    'route': data['route'] ?? Routes.home,
+    'action': data['action'] ??
+        ((data['type'] == 'checkin_reminder' ||
+                data['type'] == 'reminder')
+            ? 'open_checkin'
+            : ''),
+    'type': data['type'] ?? 'alert',
+    'source': 'push',
+  });
+  NotificationNavigationService.handlePayload(payload);
 }

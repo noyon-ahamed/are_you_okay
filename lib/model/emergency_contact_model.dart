@@ -33,13 +33,13 @@ class EmergencyContactModel {
 
   factory EmergencyContactModel.fromJson(Map<String, dynamic> json) {
     return EmergencyContactModel(
-      id: json['id'],
-      userId: json['userId'] ?? '',
-      name: json['name'],
-      phoneNumber: json['phoneNumber'],
+      id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? json['user']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      phoneNumber: json['phoneNumber']?.toString() ?? json['phone']?.toString() ?? '',
       email: json['email'],
       relationship: json['relationship'] ?? json['relation'] ?? 'Other',
-      priority: json['priority'],
+      priority: (json['priority'] as num?)?.toInt() ?? 1,
       isActive: json['isActive'] ?? true,
       notifyViaSMS: json['notifyViaSMS'] ?? true,
       notifyViaCall: json['notifyViaCall'] ?? true,
