@@ -185,17 +185,20 @@ class AuthApiService {
   }
 
   Future<void> updateNotificationPreferences({
-    required bool notificationEnabled,
+    bool? notificationEnabled,
     List<String>? reminderTimes,
     String? timezone,
+    String? language,
   }) async {
     try {
       await _dio.put(
         '$baseUrl/auth/notification-preferences',
         data: {
-          'notificationEnabled': notificationEnabled,
+          if (notificationEnabled != null)
+            'notificationEnabled': notificationEnabled,
           if (reminderTimes != null) 'reminderTimes': reminderTimes,
           if (timezone != null) 'timezone': timezone,
+          if (language != null) 'language': language,
         },
       );
     } on DioException catch (e) {

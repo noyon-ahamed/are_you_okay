@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../provider/language_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/shared_prefs_service.dart';
 import '../../widgets/custom_button.dart';
-import '../../../core/localization/app_strings.dart';
-import '../../../provider/language_provider.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -27,20 +27,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _OnboardingItem(
         title: s.onbTitle1,
         description: s.onbDesc1,
-        image: 'assets/images/onboarding_1.png', // Placeholder
-        icon: Icons.shield_moon_rounded,
+        icon: Icons.favorite_rounded,
+        accent: const Color(0xFFE8F5F0),
+        stat: s.isBangla ? 'দৈনিক সেফটি চেক' : 'Daily safety check',
       ),
       _OnboardingItem(
         title: s.onbTitle2,
         description: s.onbDesc2,
-        image: 'assets/images/onboarding_2.png',
         icon: Icons.location_on_rounded,
+        accent: const Color(0xFFFFF1E3),
+        stat: s.isBangla ? 'রিয়েল-টাইম লোকেশন' : 'Real-time location',
       ),
       _OnboardingItem(
         title: s.onbTitle3,
         description: s.onbDesc3,
-        image: 'assets/images/onboarding_3.png',
-        icon: Icons.emergency_rounded,
+        icon: Icons.shield_rounded,
+        accent: const Color(0xFFFFE8EB),
+        stat: s.isBangla ? 'জরুরি সাহায্য' : 'Emergency support',
       ),
     ];
   }
@@ -58,159 +61,280 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: Stack(
-        children: [
-          // Background Blob
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                // ignore: deprecated_member_use
-                color: AppColors.primary.withOpacity(0.1),
-                boxShadow: [
-                  BoxShadow(
-                    // ignore: deprecated_member_use
-                    color: AppColors.primary.withOpacity(0.2),
-                    blurRadius: 100,
-                    spreadRadius: 50,
-                  ),
-                ],
-              ),
-            ),
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF7F6F2),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? const [Color(0xFF0E1714), Color(0xFF12231D), Color(0xFF1A1715)]
+                : const [Color(0xFFF7F6F2), Color(0xFFE9F4EF), Color(0xFFFFF3EE)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                // Skip Button
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16, top: 8),
-                    child: TextButton(
-                      onPressed: _completeOnboarding,
-                      child: Text(
-                        s.isBangla ? 'এড়িয়ে যান' : 'Skip',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontFamily: 'HindSiliguri',
-                          fontWeight: FontWeight.w600,
-                        ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, top: 8),
+                  child: TextButton(
+                    onPressed: _completeOnboarding,
+                    child: Text(
+                      s.isBangla ? 'এড়িয়ে যান' : 'Skip',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ),
-
-                // Page View
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: items.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentPage = index);
-                    },
-                    itemBuilder: (context, index) {
-                      return _buildPageItem(items[index]);
-                    },
-                  ),
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: items.length,
+                  onPageChanged: (index) {
+                    setState(() => _currentPage = index);
+                  },
+                  itemBuilder: (context, index) {
+                    return _buildPageItem(context, items[index], isDark, s);
+                  },
                 ),
-
-                // Bottom Section
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      // Indicators
-                      SmoothPageIndicator(
-                        controller: _pageController,
-                        count: items.length,
-                        effect: ExpandingDotsEffect(
-                          activeDotColor: AppColors.primary,
-                          // ignore: deprecated_member_use
-                          dotColor: AppColors.primary.withOpacity(0.2),
-                          dotHeight: 8,
-                          dotWidth: 8,
-                          expansionFactor: 4,
-                        ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Column(
+                  children: [
+                    SmoothPageIndicator(
+                      controller: _pageController,
+                      count: items.length,
+                      effect: ExpandingDotsEffect(
+                        activeDotColor: AppColors.primary,
+                        dotColor: AppColors.primary.withValues(alpha: 0.18),
+                        dotHeight: 8,
+                        dotWidth: 8,
+                        expansionFactor: 3.8,
                       ),
-                      const SizedBox(height: 32),
+                    ),
+                    const SizedBox(height: 24),
+                    CustomButton(
+                      text: _currentPage == items.length - 1
+                          ? s.onbGetStarted
+                          : s.onbNext,
+                      onPressed: () {
+                        if (_currentPage < items.length - 1) {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 320),
+                            curve: Curves.easeOutCubic,
+                          );
+                        } else {
+                          _completeOnboarding();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-                      // Next / Start Button
-                      CustomButton(
-                        text: _currentPage == items.length - 1
-                            ? s.onbGetStarted
-                            : s.onbNext,
-                        onPressed: () {
-                          if (_currentPage < items.length - 1) {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          } else {
-                            _completeOnboarding();
-                          }
-                        },
-                      ),
-                    ],
+  Widget _buildPageItem(
+    BuildContext context,
+    _OnboardingItem item,
+    bool isDark,
+    AppStrings s,
+  ) {
+    final textPrimary =
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final textSecondary =
+        isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          const Spacer(),
+          _buildHeroCard(item, isDark, s),
+          const SizedBox(height: 36),
+          Text(
+            item.title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'HindSiliguri',
+              color: textPrimary,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            item.description,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: textSecondary,
+              fontFamily: 'HindSiliguri',
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.white,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(item.icon, color: AppColors.primary, size: 18),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    item.stat,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+          const Spacer(),
         ],
       ),
     );
   }
 
-  Widget _buildPageItem(_OnboardingItem item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Icon Placeholder (simulating illustration)
-          Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              // ignore: deprecated_member_use
-              color: AppColors.primary.withOpacity(0.05),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              item.icon,
-              size: 80,
-              color: AppColors.primary,
-            ),
+  Widget _buildHeroCard(_OnboardingItem item, bool isDark, AppStrings s) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 360),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color:
+              isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
           ),
-          const SizedBox(height: 48),
-
-          Text(
-            item.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'HindSiliguri',
-              color: AppColors.textPrimary,
-            ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 170,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        item.accent,
+                        item.accent.withValues(alpha: 0.75),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            item.icon,
+                            color: AppColors.primary,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 18,
+                        bottom: 18,
+                        child: Image.asset(
+                          'assets/images/logo_padded.png',
+                          width: 88,
+                          height: 88,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                      Positioned(
+                        left: 20,
+                        right: 108,
+                        bottom: 22,
+                        child: Text(
+                          s.isBangla
+                              ? 'আপনার নিরাপত্তা সবসময় পাশে থাকবে'
+                              : 'Your safety stays one tap away',
+                          style: const TextStyle(
+                            fontFamily: 'HindSiliguri',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: AppColors.textPrimary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-
-          Text(
-            item.description,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-              fontFamily: 'HindSiliguri',
-              height: 1.5,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _FeatureStrip(
+                  color: AppColors.primary,
+                  label: s.isBangla ? 'চেক-ইন' : 'Check-in',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _FeatureStrip(
+                  color: AppColors.secondary,
+                  label: s.isBangla ? 'সতর্কতা' : 'Alerts',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -218,7 +342,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _completeOnboarding() async {
-    // Request permissions
     await [
       Permission.location,
       Permission.notification,
@@ -233,16 +356,48 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 }
 
-class _OnboardingItem {
-  final String title;
-  final String description;
-  final String image;
-  final IconData icon;
+class _FeatureStrip extends StatelessWidget {
+  const _FeatureStrip({
+    required this.color,
+    required this.label,
+  });
 
-  _OnboardingItem({
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: 'HindSiliguri',
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingItem {
+  const _OnboardingItem({
     required this.title,
     required this.description,
-    required this.image,
     required this.icon,
+    required this.accent,
+    required this.stat,
   });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color accent;
+  final String stat;
 }

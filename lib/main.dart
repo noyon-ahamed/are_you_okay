@@ -13,14 +13,17 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/call_event.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
+import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
+import 'provider/language_provider.dart';
 import 'provider/settings_provider.dart';
+import 'services/api/auth_api_service.dart';
 import 'services/hive_service.dart';
 import 'services/local_notification_history_service.dart';
 import 'services/shared_prefs_service.dart';
-import 'services/background_service.dart';
 import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
@@ -109,6 +112,7 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
         _firebaseMessagingBackgroundHandler,
       );
       _setupFirebaseMessaging();
+      unawaited(_syncNotificationPreferences());
     } catch (e) {
       debugPrint('Firebase initialization warning: $e');
     }
@@ -126,29 +130,33 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
 
   Future<void> _initializeBackgroundReminderFlow() async {
     try {
-      await BackgroundService.initialize();
-      await BackgroundService.registerPeriodicTask();
-
-      final prefs = await SharedPreferences.getInstance();
-      final notificationsEnabled =
-          prefs.getBool('notifications_enabled') ?? true;
-
-      if (!notificationsEnabled) return;
-
-      final sharedPrefs = ref.read(sharedPrefsServiceProvider);
-      final lastCheckIn = sharedPrefs.lastCheckIn;
-      final needsReminder = lastCheckIn == null ||
-          DateTime.now().difference(lastCheckIn).inHours >= 24;
-
-      if (!needsReminder) return;
-
       final notifService = LocalNotificationService();
       await notifService.initialize(
         onNotificationTap: NotificationNavigationService.handlePayload,
       );
-      await BackgroundService.runImmediateReminderCheck();
+      await notifService.cancelDailyReminders();
+      await notifService.cancelCheckinReminders();
     } catch (e) {
       debugPrint('Error scheduling startup reminders: $e');
+    }
+  }
+
+  Future<void> _syncNotificationPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled =
+          prefs.getBool('notifications_enabled') ?? true;
+      final timezone = await FlutterTimezone.getLocalTimezone();
+      final language = ref.read(languageProvider);
+
+      await AuthApiService().updateNotificationPreferences(
+        notificationEnabled: notificationsEnabled,
+        reminderTimes: AppConstants.defaultReminderTimes,
+        timezone: timezone,
+        language: language,
+      );
+    } catch (e) {
+      debugPrint('Notification preferences sync warning: $e');
     }
   }
 
@@ -292,7 +300,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint('Firebase init background warning: $e');
   }
   debugPrint("Handling a background message: ${message.messageId}");
-  await _handleFirebaseMessage(message);
+  await _saveFirebaseMessageToHistory(message);
 }
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
@@ -315,12 +323,21 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   );
 
   final payload = NotificationNavigationService.encodePayload({
-    'route': Routes.notifications,
+    'route': (data['type'] == 'checkin_reminder' || data['type'] == 'reminder')
+        ? Routes.home
+        : Routes.notifications,
     'action': data['type'] == 'checkin_reminder' ? 'open_checkin' : '',
     'type': data['type'] ?? 'alert',
     'source': 'push',
   });
-  if (data['isClose'] == '1' || isSeismicClose) {
+
+  if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
+    await notifService.showCheckinReminder(
+      title: title,
+      body: body,
+      payload: payload,
+    );
+  } else if (data['isClose'] == '1' || isSeismicClose) {
     await notifService.showEmergencyAlert(
       title: title,
       body: body,
@@ -328,20 +345,40 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
       isSeismicClose: true,
     );
   } else {
-    await notifService.showEmergencyAlert(
+    await notifService.showNotification(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title: title,
       body: body,
       payload: payload,
-      isSeismicClose: false,
+      channelId: data['channelId']?.toString() ?? 'info_updates',
     );
   }
+
+  await _saveFirebaseMessageToHistory(message, payloadOverride: payload);
+}
+
+Future<void> _saveFirebaseMessageToHistory(
+  RemoteMessage message, {
+  String? payloadOverride,
+}) async {
+  final data = message.data;
+  final payload = payloadOverride ??
+      NotificationNavigationService.encodePayload({
+        'route':
+            (data['type'] == 'checkin_reminder' || data['type'] == 'reminder')
+                ? Routes.home
+                : Routes.notifications,
+        'action': data['type'] == 'checkin_reminder' ? 'open_checkin' : '',
+        'type': data['type'] ?? 'alert',
+        'source': 'push',
+      });
 
   await LocalNotificationHistoryService().saveNotification({
     '_id': data['notificationId']?.toString() ??
         'push-${message.messageId ?? DateTime.now().millisecondsSinceEpoch}',
-    'title': title,
-    'title_en': title,
-    'body': body,
+    'title': message.notification?.title ?? 'Alert',
+    'title_en': message.notification?.title ?? 'Alert',
+    'body': message.notification?.body ?? '',
     'type': data['type'] ?? 'alert',
     'payload': payload,
     'createdAt': DateTime.now().toIso8601String(),

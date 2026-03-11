@@ -21,8 +21,14 @@ class AppConstants {
   static const int minimumCheckinIntervalDays = 3; // 3 days
   static const int maximumCheckinIntervalDays = 7; // 7 days
 
-  // Notification Reminder Times (hours before deadline)
-  static const List<int> reminderTimes = [6, 2]; // 6h and 2h before
+  // Notification reminder slots
+  static const List<String> defaultReminderTimes = [
+    '09:00',
+    '12:00',
+    '17:00',
+    '22:00',
+  ];
+  static const List<int> reminderTimes = [6, 2]; // Legacy deadline-based values
   static const int criticalReminderMinutes = 30; // 30 min before
 
   // Emergency Contact Limits

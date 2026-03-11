@@ -188,6 +188,7 @@ class LocalNotificationService {
                 : Priority.defaultPriority,
         playSound: true,
         enableVibration: true,
+        icon: 'ic_notification',
         sound: channelId == 'seismic_alerts'
             ? const RawResourceAndroidNotificationSound('earthquake_siren')
             : null,
@@ -244,6 +245,7 @@ class LocalNotificationService {
         priority: Priority.high,
         playSound: true,
         enableVibration: true,
+        icon: 'ic_notification',
         color: const Color(0xFFDC143C),
       );
 
@@ -306,6 +308,7 @@ class LocalNotificationService {
         priority: Priority.high,
         playSound: true,
         enableVibration: true,
+        icon: 'ic_notification',
         color: const Color(0xFFDC143C),
       );
 

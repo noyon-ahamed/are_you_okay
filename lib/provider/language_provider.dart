@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/shared_prefs_service.dart';
+import '../services/api/auth_api_service.dart';
 import '../core/localization/app_strings.dart';
 
 /// Provides the current language as a string: 'en' or 'bn' (default: 'en')
@@ -19,6 +20,9 @@ class LanguageNotifier extends StateNotifier<String> {
   Future<void> setLanguage(String lang) async {
     await _prefs.setLanguage(lang);
     state = lang;
+    try {
+      await AuthApiService().updateNotificationPreferences(language: lang);
+    } catch (_) {}
   }
 
   void toggle() {

@@ -18,7 +18,6 @@ import '../../../routes/app_router.dart';
 import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
-import '../../../services/background_service.dart';
 import '../../../services/notification_navigation_service.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
@@ -1071,8 +1070,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         await ref
             .read(sharedPrefsServiceProvider)
             .setLastCheckIn(DateTime.now());
-        await markNotificationDismissed();
-        await BackgroundService.runImmediateReminderCheck();
 
         setState(() {
           _selectedMood = -1;
