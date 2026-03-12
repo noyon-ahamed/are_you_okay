@@ -7,9 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/constants/earthquake_countries.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
+import '../../../provider/settings_provider.dart';
+import '../../../services/api/auth_api_service.dart';
 import '../../../services/api/earthquake_service.dart';
+import '../../../services/location_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 
@@ -22,18 +26,38 @@ class EarthquakeScreen extends ConsumerStatefulWidget {
 
 class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   bool _isLoading = true;
+  bool _showingCachedData = false;
   String? _error;
+  String _selectedCountry = '';
   List<_EarthquakeData> _localQuakes = [];
+  List<_EarthquakeData> _countryQuakes = [];
   List<_EarthquakeData> _globalQuakes = [];
+  final Set<String> _shownDangerAlerts = <String>{};
 
   @override
   void initState() {
     super.initState();
+    _loadCachedEarthquakeData();
     _fetchEarthquakeData();
+  }
+
+  Future<void> _loadCachedEarthquakeData() async {
+    final earthquakeService = ref.read(earthquakeServiceProvider);
+    final cached = await earthquakeService.getCachedEarthquakes();
+    if (!mounted || cached == null) return;
+    _applyEarthquakeResponse(cached, allowCachedState: true);
   }
 
   Future<void> _fetchEarthquakeData() async {
     final s = ref.read(stringsProvider);
+    final sessionOverride = ref.read(earthquakeCountryOverrideProvider);
+    var selectedCountry =
+        sessionOverride ?? ref.read(settingsProvider).earthquakeCountry.trim();
+    final locationService = ref.read(locationServiceProvider);
+    final hasVisibleData = _localQuakes.isNotEmpty ||
+        _countryQuakes.isNotEmpty ||
+        _globalQuakes.isNotEmpty;
+
     // Check connectivity first
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
@@ -46,83 +70,145 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!hasVisibleData) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _error = null;
+      });
+    }
 
     try {
-      double? lat;
-      double? lng;
+      final serviceEnabled = await locationService.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await _showLocationRequiredDialog(
+          s: s,
+          openSettings: locationService.openLocationSettings,
+        );
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _error = 'location_required';
+        });
+        return;
+      }
 
-      // Try to get current location to filter earthquake data
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          debugPrint('Location services disabled');
-        } else {
-          LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await locationService.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await locationService.requestPermission();
+      }
 
-          // Request permission if denied
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        await _showLocationRequiredDialog(
+          s: s,
+          openSettings: permission == LocationPermission.deniedForever
+              ? locationService.openAppSettings
+              : locationService.openLocationSettings,
+        );
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _error = 'location_required';
+        });
+        return;
+      }
 
-          // If permanently denied, show dialog to open settings
-          if (permission == LocationPermission.deniedForever) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    s.earthquakeLocPermission,
-                    style: const TextStyle(fontFamily: 'HindSiliguri'),
-                  ),
-                  action: SnackBarAction(
-                    label: s.earthquakeSettings,
-                    onPressed: () => Geolocator.openAppSettings(),
-                  ),
-                  duration: const Duration(seconds: 5),
-                ),
-              );
-            }
-          }
-
-          if (permission == LocationPermission.always ||
-              permission == LocationPermission.whileInUse) {
-            Position position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.low,
-            );
-            lat = position.latitude;
-            lng = position.longitude;
-          }
+      final position = await locationService.getLastKnownLocation() ??
+          await locationService
+              .getCurrentLocation(accuracy: LocationAccuracy.low)
+              .timeout(const Duration(seconds: 6), onTimeout: () => null);
+      if (position == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = 'location_required';
+          });
         }
-      } catch (e) {
-        debugPrint('Could not fetch location directly: $e');
+        return;
+      }
+      final lat = position.latitude;
+      final lng = position.longitude;
+
+      unawaited(
+        AuthApiService()
+            .updateLocation(
+          latitude: lat,
+          longitude: lng,
+        )
+            .catchError((e) {
+          debugPrint('Could not sync user location: $e');
+        }),
+      );
+
+      final detectedCountryFuture = locationService
+          .getCountryFromCoordinates(
+            latitude: lat,
+            longitude: lng,
+          )
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
+      String? detectedCountry;
+      if (selectedCountry.isEmpty) {
+        detectedCountry = await detectedCountryFuture;
+      } else {
+        unawaited(
+          detectedCountryFuture.then((country) async {
+            if (sessionOverride == null &&
+                country != null &&
+                EarthquakeCountries.supported.contains(country) &&
+                country !=
+                    ref.read(settingsProvider).earthquakeCountry.trim()) {
+              await ref
+                  .read(settingsProvider.notifier)
+                  .setEarthquakeCountry(country);
+            }
+          }),
+        );
+      }
+
+      if (sessionOverride == null &&
+          detectedCountry != null &&
+          EarthquakeCountries.supported.contains(detectedCountry) &&
+          detectedCountry != selectedCountry) {
+        selectedCountry = detectedCountry;
+        await ref
+            .read(settingsProvider.notifier)
+            .setEarthquakeCountry(detectedCountry);
+      }
+
+      if (selectedCountry.isEmpty) {
+        selectedCountry = detectedCountry != null &&
+                EarthquakeCountries.supported.contains(detectedCountry)
+            ? detectedCountry
+            : '';
       }
 
       final earthquakeService = ref.read(earthquakeServiceProvider);
-      final responseData =
-          await earthquakeService.getLatestEarthquakes(lat: lat, lng: lng);
+      final responseData = await earthquakeService.getLatestEarthquakes(
+        lat: lat,
+        lng: lng,
+        country: selectedCountry,
+      );
 
       if (mounted) {
-        setState(() {
-          _localQuakes =
-              _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
-
-          // Sort and limit global quakes to Top 5
-          final parsedGlobal =
-              _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
-          parsedGlobal.sort((a, b) => b.magnitude.compareTo(a.magnitude));
-          _globalQuakes = parsedGlobal.take(5).toList();
-
-          _isLoading = false;
-        });
+        _applyEarthquakeResponse(
+          responseData,
+          lat: lat,
+          lng: lng,
+          fallbackCountry: selectedCountry,
+        );
 
         // Check for dangerous earthquakes in local vicinity and play siren
-        // User requested 4.5+ intensity for siren
-        final dangerous = _localQuakes.where((q) => q.magnitude >= 4.5);
+        final dangerous = [
+          ..._localQuakes.where(_shouldTriggerDangerAlert),
+          ..._countryQuakes.where(_shouldTriggerCountryAlert),
+        ];
         if (dangerous.isNotEmpty) {
-          _playSirenAlert();
+          _playSirenAlert(dangerous.first);
         }
       }
     } catch (e) {
@@ -135,8 +221,141 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     }
   }
 
-  Future<void> _playSirenAlert() async {
+  void _applyEarthquakeResponse(
+    Map<String, dynamic> responseData, {
+    double? lat,
+    double? lng,
+    String fallbackCountry = '',
+    bool allowCachedState = false,
+  }) {
+    final parsedLocal =
+        _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
+    final parsedCountry =
+        _parseQuakes(responseData['countryAlerts'] as List?, lat, lng);
+    final parsedGlobal =
+        _parseQuakes(responseData['globalAlerts'] as List?, lat, lng);
+    parsedGlobal.sort((a, b) => b.magnitude.compareTo(a.magnitude));
+
+    setState(() {
+      _selectedCountry =
+          responseData['selectedCountry']?.toString() ?? fallbackCountry;
+      _localQuakes = parsedLocal;
+      _countryQuakes = parsedCountry.isEmpty
+          ? _buildCountryFallbackQuakes(
+              selectedCountry: _selectedCountry,
+              localQuakes: parsedLocal,
+              globalQuakes: parsedGlobal,
+            )
+          : parsedCountry;
+      _globalQuakes = parsedGlobal.take(5).toList();
+      _showingCachedData =
+          allowCachedState || responseData['_fromCache'] == true;
+      _isLoading = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _showLocationRequiredDialog({
+    required AppStrings s,
+    required Future<bool> Function() openSettings,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          s.isBangla ? 'লোকেশন চালু করুন' : 'Turn on location',
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        content: Text(
+          s.isBangla
+              ? 'ভূমিকম্প স্ক্রিন দেখতে হলে লোকেশন অন এবং পারমিশন দেয়া লাগবে। এতে আপনার দেশ, Near You, আর সতর্কবার্তা ঠিকমতো কাজ করবে।'
+              : 'Earthquake alerts need location access to show your country, Near You data, and send accurate alerts.',
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              s.retry,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await openSettings();
+            },
+            child: Text(
+              s.earthquakeSettings,
+              style: const TextStyle(fontFamily: 'HindSiliguri'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<_EarthquakeData> _buildCountryFallbackQuakes({
+    required String selectedCountry,
+    required List<_EarthquakeData> localQuakes,
+    required List<_EarthquakeData> globalQuakes,
+  }) {
+    final normalizedCountry = selectedCountry.trim().toLowerCase();
+    final seen = <String>{};
+    final combined = <_EarthquakeData>[
+      ...localQuakes,
+      ...globalQuakes,
+    ];
+
+    final matched = combined.where((quake) {
+      final location = quake.location.toLowerCase();
+      return normalizedCountry.isNotEmpty &&
+          location.contains(normalizedCountry);
+    }).where((quake) {
+      final key = quake.eventId.isNotEmpty
+          ? quake.eventId
+          : '${quake.location}-${quake.timestamp.toIso8601String()}';
+      if (seen.contains(key)) return false;
+      seen.add(key);
+      return true;
+    }).toList();
+
+    matched.sort((a, b) {
+      final timeCompare = b.timestamp.compareTo(a.timestamp);
+      if (timeCompare != 0) return timeCompare;
+      return b.magnitude.compareTo(a.magnitude);
+    });
+
+    return matched.take(10).toList();
+  }
+
+  bool _shouldTriggerDangerAlert(_EarthquakeData quake) {
+    final age = DateTime.now().difference(quake.timestamp);
+    final isRecent = age.inMinutes <= 15;
+    final isClose = quake.distanceKm != null && quake.distanceKm! <= 100;
+    final alreadyShown = _shownDangerAlerts.contains(quake.eventId);
+    return quake.magnitude >= 4.5 &&
+        isRecent &&
+        isClose &&
+        !alreadyShown &&
+        quake.eventId.isNotEmpty;
+  }
+
+  bool _shouldTriggerCountryAlert(_EarthquakeData quake) {
+    final age = DateTime.now().difference(quake.timestamp);
+    final isRecent = age.inMinutes <= 15;
+    final alreadyShown = _shownDangerAlerts.contains(quake.eventId);
+    return quake.magnitude >= 6.0 &&
+        isRecent &&
+        !alreadyShown &&
+        quake.eventId.isNotEmpty;
+  }
+
+  Future<void> _playSirenAlert(_EarthquakeData quake) async {
     try {
+      _shownDangerAlerts.add(quake.eventId);
       if (mounted) {
         showDialog(
           context: context,
@@ -168,7 +387,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                       color: Colors.white, size: 64),
                   const SizedBox(height: 16),
                   Text(
-                    s.earthquakeAlertMessage,
+                    '${s.earthquakeAlertMessage}\n\n${quake.location}\n${quake.magnitude.toStringAsFixed(1)}M',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: Colors.white,
@@ -249,7 +468,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     final s = ref.watch(stringsProvider);
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -268,7 +487,12 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                 fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
             unselectedLabelStyle: const TextStyle(fontFamily: 'HindSiliguri'),
             tabs: [
-              Tab(text: s.earthquakeTabNear),
+              Tab(
+                text: _selectedCountry.isEmpty
+                    ? (s.isBangla ? 'দেশ' : 'Country')
+                    : _selectedCountry,
+              ),
+              Tab(text: s.earthquakeTabNearWithRadius),
               Tab(text: s.earthquakeTabGlobal),
             ],
           ),
@@ -279,16 +503,43 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
                 ? _buildErrorView()
                 : TabBarView(
                     children: [
+                      RefreshIndicator(
+                        onRefresh: _fetchEarthquakeData,
+                        child: _buildTabContent(
+                          context,
+                          _countryQuakes,
+                          s,
+                          false,
+                          headerMessage: s.isBangla
+                              ? '$_selectedCountry দেশের সাম্প্রতিক ভূমিকম্প'
+                              : 'Recent earthquakes in $_selectedCountry',
+                        ),
+                      ),
                       // TAB 1: Near Me
                       RefreshIndicator(
                         onRefresh: _fetchEarthquakeData,
-                        child: _buildTabContent(context, _localQuakes, s, true),
+                        child: _buildTabContent(
+                          context,
+                          _localQuakes,
+                          s,
+                          true,
+                          headerMessage: s.isBangla
+                              ? 'আপনার কাছাকাছি ভূমিকম্প আগে দেখানো হচ্ছে'
+                              : 'Closest earthquakes are shown first',
+                        ),
                       ),
                       // TAB 2: Global
                       RefreshIndicator(
                         onRefresh: _fetchEarthquakeData,
-                        child:
-                            _buildTabContent(context, _globalQuakes, s, false),
+                        child: _buildTabContent(
+                          context,
+                          _globalQuakes,
+                          s,
+                          false,
+                          headerMessage: s.isBangla
+                              ? 'বিশ্বজুড়ে বড় ভূমিকম্প'
+                              : 'Major earthquakes worldwide',
+                        ),
                       ),
                     ],
                   ),
@@ -297,7 +548,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   }
 
   Widget _buildTabContent(BuildContext context, List<_EarthquakeData> quakes,
-      AppStrings s, bool isLocal) {
+      AppStrings s, bool isLocal,
+      {String? headerMessage}) {
     if (quakes.isEmpty) {
       return _buildEmptyView(s);
     }
@@ -321,6 +573,54 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       slivers: [
+        if (_showingCachedData)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  s.earthquakeCachedData,
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (headerMessage != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  headerMessage,
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (isLocal && highestMag != null)
           SliverToBoxAdapter(
             child: Padding(
@@ -571,6 +871,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
 
   Widget _buildErrorView() {
     final bool isOffline = _error == 'offline';
+    final bool isLocationRequired = _error == 'location_required';
     final s = ref.watch(stringsProvider);
     return Center(
       child: Padding(
@@ -579,18 +880,36 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              isOffline ? Icons.wifi_off_rounded : Icons.error_outline,
+              isLocationRequired
+                  ? Icons.location_off_rounded
+                  : isOffline
+                      ? Icons.wifi_off_rounded
+                      : Icons.error_outline,
               size: 64,
-              color: isOffline ? AppColors.warning : AppColors.error,
+              color: isLocationRequired
+                  ? AppColors.primary
+                  : isOffline
+                      ? AppColors.warning
+                      : AppColors.error,
             ),
             const SizedBox(height: 16),
             Text(
-              isOffline ? s.earthquakeOffline : s.networkError,
+              isLocationRequired
+                  ? (s.isBangla ? 'লোকেশন দরকার' : 'Location required')
+                  : isOffline
+                      ? s.earthquakeOffline
+                      : s.networkError,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              isOffline ? s.earthquakeOfflineMessage : s.earthquakeServerError,
+              isLocationRequired
+                  ? (s.isBangla
+                      ? 'ভূমিকম্প ডাটা দেখতে লোকেশন সার্ভিস ও পারমিশন চালু করুন।'
+                      : 'Enable location services and permission to load earthquake data.')
+                  : isOffline
+                      ? s.earthquakeOfflineMessage
+                      : s.earthquakeServerError,
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).textTheme.bodySmall?.color,
@@ -600,8 +919,16 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _fetchEarthquakeData,
-              icon: const Icon(Icons.refresh),
-              label: Text(s.retry),
+              icon: Icon(
+                isLocationRequired ? Icons.my_location_rounded : Icons.refresh,
+              ),
+              label: Text(
+                isLocationRequired
+                    ? (s.isBangla
+                        ? 'লোকেশন দিয়ে আবার চেষ্টা করুন'
+                        : 'Enable location and retry')
+                    : s.retry,
+              ),
             ),
           ],
         ),

@@ -29,21 +29,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         description: s.onbDesc1,
         icon: Icons.favorite_rounded,
         accent: const Color(0xFFE8F5F0),
-        stat: s.isBangla ? 'দৈনিক সেফটি চেক' : 'Daily safety check',
+        stat: s.onbStatDailySafety,
       ),
       _OnboardingItem(
         title: s.onbTitle2,
         description: s.onbDesc2,
         icon: Icons.location_on_rounded,
         accent: const Color(0xFFFFF1E3),
-        stat: s.isBangla ? 'রিয়েল-টাইম লোকেশন' : 'Real-time location',
+        stat: s.onbStatRealtimeLocation,
       ),
       _OnboardingItem(
         title: s.onbTitle3,
         description: s.onbDesc3,
         icon: Icons.shield_rounded,
         accent: const Color(0xFFFFE8EB),
-        stat: s.isBangla ? 'জরুরি সাহায্য' : 'Emergency support',
+        stat: s.onbStatEmergencySupport,
       ),
     ];
   }
@@ -61,13 +61,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF7F6F2),
+      backgroundColor:
+          isDark ? AppColors.backgroundDark : const Color(0xFFF7F6F2),
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isDark
-                ? const [Color(0xFF0E1714), Color(0xFF12231D), Color(0xFF1A1715)]
-                : const [Color(0xFFF7F6F2), Color(0xFFE9F4EF), Color(0xFFFFF3EE)],
+                ? const [
+                    Color(0xFF0E1714),
+                    Color(0xFF12231D),
+                    Color(0xFF1A1715)
+                  ]
+                : const [
+                    Color(0xFFF7F6F2),
+                    Color(0xFFE9F4EF),
+                    Color(0xFFFFF3EE)
+                  ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -82,7 +91,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: TextButton(
                     onPressed: _completeOnboarding,
                     child: Text(
-                      s.isBangla ? 'এড়িয়ে যান' : 'Skip',
+                      s.onbSkip,
                       style: TextStyle(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -237,8 +246,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             : Colors.white.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color:
-              isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
         ),
         boxShadow: [
           BoxShadow(
@@ -300,9 +308,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         right: 108,
                         bottom: 22,
                         child: Text(
-                          s.isBangla
-                              ? 'আপনার নিরাপত্তা সবসময় পাশে থাকবে'
-                              : 'Your safety stays one tap away',
+                          s.onbSafetyOneTap,
                           style: const TextStyle(
                             fontFamily: 'HindSiliguri',
                             fontWeight: FontWeight.w700,
@@ -324,14 +330,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               Expanded(
                 child: _FeatureStrip(
                   color: AppColors.primary,
-                  label: s.isBangla ? 'চেক-ইন' : 'Check-in',
+                  label: s.onbFeatureCheckin,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _FeatureStrip(
                   color: AppColors.secondary,
-                  label: s.isBangla ? 'সতর্কতা' : 'Alerts',
+                  label: s.onbFeatureAlerts,
                 ),
               ),
             ],

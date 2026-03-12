@@ -137,6 +137,23 @@ class LocationService {
     }
   }
 
+  /// Get country name from coordinates
+  Future<String?> getCountryFromCoordinates({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isEmpty) return null;
+      final country = placemarks.first.country?.trim();
+      if (country == null || country.isEmpty) return null;
+      return country;
+    } catch (e) {
+      debugPrint('Error getting country: $e');
+      return null;
+    }
+  }
+
   /// Get coordinates from address (geocoding)
   Future<Position?> getCoordinatesFromAddress(String address) async {
     try {

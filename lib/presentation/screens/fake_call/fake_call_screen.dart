@@ -111,11 +111,10 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
 
   Future<void> _startFakeCall() async {
     // Request notification permissions for CallKit (Required for Android 13+)
+    final s = ref.read(stringsProvider);
     await FlutterCallkitIncoming.requestNotificationPermission({
-      "rationaleMessagePermission":
-          "Notification permission is required to show the call screen.",
-      "postNotificationMessageRequired":
-          "Please allow notification permission from settings to receive fake calls."
+      "rationaleMessagePermission": s.fcNotificationPermissionRationale,
+      "postNotificationMessageRequired": s.fcNotificationPermissionSettings,
     });
 
     if (!mounted) return;

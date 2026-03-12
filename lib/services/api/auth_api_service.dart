@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -14,8 +16,8 @@ class AuthApiService {
   final Dio _dio = Dio();
 
   AuthApiService() {
-    _dio.options.connectTimeout = const Duration(seconds: 60);
-    _dio.options.receiveTimeout = const Duration(seconds: 60);
+    _dio.options.connectTimeout = const Duration(seconds: 15);
+    _dio.options.receiveTimeout = const Duration(seconds: 20);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -83,7 +85,7 @@ class AuthApiService {
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
 
-        await sendFcmToken();
+        unawaited(sendFcmToken());
 
         return response.data['data'];
       } else {
@@ -117,7 +119,7 @@ class AuthApiService {
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
 
-        await sendFcmToken();
+        unawaited(sendFcmToken());
 
         return response.data['data'];
       } else {
@@ -189,6 +191,8 @@ class AuthApiService {
     List<String>? reminderTimes,
     String? timezone,
     String? language,
+    bool? earthquakeAlerts,
+    String? earthquakeCountry,
   }) async {
     try {
       await _dio.put(
@@ -199,6 +203,25 @@ class AuthApiService {
           if (reminderTimes != null) 'reminderTimes': reminderTimes,
           if (timezone != null) 'timezone': timezone,
           if (language != null) 'language': language,
+          if (earthquakeAlerts != null) 'earthquakeAlerts': earthquakeAlerts,
+          if (earthquakeCountry != null) 'earthquakeCountry': earthquakeCountry,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
+  Future<void> updateLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      await _dio.post(
+        '$baseUrl/auth/update-location',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
         },
       );
     } on DioException catch (e) {

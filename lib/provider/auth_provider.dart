@@ -68,6 +68,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final updatedUser = UserModel.fromJson(userMap);
         final hive = HiveService();
         await hive.saveUser(updatedUser);
+        await _syncLocalSettings(userMap);
         if (mounted && state is AuthAuthenticated) {
           state = AuthAuthenticated(updatedUser);
         }
@@ -145,6 +146,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final updatedUser = UserModel.fromJson(userMap);
         final hive = HiveService();
         await hive.saveUser(updatedUser);
+        await _syncLocalSettings(userMap);
         if (mounted && state is AuthAuthenticated) {
           state = AuthAuthenticated(updatedUser);
         }
@@ -179,11 +181,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final user = UserModel.fromJson(userData);
         final hive = HiveService();
         await hive.saveUser(user);
+        await _syncLocalSettings(userData);
         state = AuthAuthenticated(user);
       }
     } catch (e) {
       debugPrint('Failed to refresh profile: $e');
     }
+  }
+
+  Future<void> _syncLocalSettings(Map<String, dynamic> userData) async {
+    final remoteSettings = userData['settings'] as Map<String, dynamic>?;
+    if (remoteSettings == null) return;
+
+    final hive = HiveService();
+    final current = hive.getSettings();
+    await hive.saveSettings(
+      current.copyWith(
+        notificationsEnabled: remoteSettings['notificationEnabled'] as bool? ??
+            current.notificationsEnabled,
+        language: remoteSettings['language']?.toString() ?? current.language,
+        earthquakeCountry:
+            remoteSettings['earthquakeCountry']?.toString() ??
+                current.earthquakeCountry,
+      ),
+    );
   }
 }
 

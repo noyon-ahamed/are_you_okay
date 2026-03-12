@@ -67,7 +67,7 @@ class NotificationNavigationService {
       return payloadForReminder(notificationId: payload);
     }
     if (payload.contains('earthquake')) {
-      return <String, dynamic>{'route': Routes.notifications};
+      return <String, dynamic>{'route': Routes.earthquake, 'type': 'earthquake'};
     }
     return <String, dynamic>{};
   }

@@ -173,6 +173,7 @@ class HiveService {
       'locationEnabled': settings.locationEnabled,
       'checkinIntervalDays': settings.checkinIntervalDays,
       'language': settings.language,
+      'earthquakeCountry': settings.earthquakeCountry,
       'themeIsDark': settings.themeIsDark,
       'biometricEnabled': settings.biometricEnabled,
       'updatedAt': settings.updatedAt?.toIso8601String(),
@@ -190,6 +191,7 @@ class HiveService {
           locationEnabled: map['locationEnabled'] ?? true,
           checkinIntervalDays: map['checkinIntervalDays'] ?? 3,
           language: map['language'] ?? 'en',
+          earthquakeCountry: map['earthquakeCountry'] ?? '',
           themeIsDark: map['themeIsDark'] ?? false,
           biometricEnabled: map['biometricEnabled'] ?? false,
           updatedAt: map['updatedAt'] != null

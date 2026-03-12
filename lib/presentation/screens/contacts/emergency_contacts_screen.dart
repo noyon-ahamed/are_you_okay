@@ -85,9 +85,7 @@ class _EmergencyContactsScreenState
       return EmptyState(
         icon: Icons.contacts_outlined,
         title: s.contactsEmpty,
-        description: s.isBangla
-            ? 'আপনার প্রিয়জনদের জরুরি যোগাযোগ\nহিসেবে যোগ করুন'
-            : 'Add loved ones as emergency contacts',
+        description: s.contactsEmptyDesc,
         buttonText: s.contactsAdd,
         onButtonPressed: () => _showAddContactSheet(context, ref, s),
       );
@@ -261,9 +259,8 @@ class _EmergencyContactsScreenState
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(s.isBangla ? 'মুছে ফেলুন' : 'Delete'),
-        content: Text(
-            s.isBangla ? 'এই যোগাযোগ মুছে ফেলতে চান?' : 'Delete this contact?'),
+        title: Text(s.contactsDeleteConfirm),
+        content: Text(s.contactsDeleteAsk),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -271,7 +268,7 @@ class _EmergencyContactsScreenState
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(s.isBangla ? 'মুছুন' : 'Delete',
+            child: Text(s.contactsDeleteBtn,
                 style: const TextStyle(color: AppColors.error)),
           ),
         ],
@@ -337,9 +334,7 @@ class _EmergencyContactsScreenState
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                labelText: s.isBangla
-                    ? 'ইমেইল (চেক-ইন মিস করলে অ্যালার্ট পাবে)'
-                    : 'Email (will get alert if check-in missed)',
+                labelText: s.contactsEmailMissedAlert,
                 prefixIcon: const Icon(Icons.email_outlined),
               ),
             ),
@@ -376,11 +371,7 @@ class _EmergencyContactsScreenState
       context: context,
       builder: (context) => AlertDialog(
         title: Text(s.contactsTitle),
-        content: Text(
-          s.isBangla
-              ? 'জরুরি সময়ে এই যোগাযোগকারীদের SMS ও নোটিফিকেশন পাঠানো হবে। ড্র্যাগ করে অগ্রাধিকার পরিবর্তন করুন।'
-              : 'These contacts will receive SMS and notifications in an emergency. Drag to reorder priority.',
-        ),
+        content: Text(s.contactsInfoDesc),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

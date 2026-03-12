@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../provider/language_provider.dart';
 
 /// Notification Settings Screen
-class NotificationSettingsScreen extends StatefulWidget {
+class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  State<NotificationSettingsScreen> createState() =>
+  ConsumerState<NotificationSettingsScreen> createState() =>
       _NotificationSettingsScreenState();
 }
 
 class _NotificationSettingsScreenState
-    extends State<NotificationSettingsScreen> {
+    extends ConsumerState<NotificationSettingsScreen> {
   bool _pushNotifications = true;
   bool _smsAlerts = true;
   bool _wellnessReminders = true;
@@ -19,33 +21,34 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('বিজ্ঞপ্তি সেটিংস'),
+        title: Text(s.notifSettingsTitle),
       ),
       body: ListView(
         children: [
           _buildSwitchTile(
-            title: 'পুশ বিজ্ঞপ্তি',
-            subtitle: 'অ্যাপের মাধ্যমে সরাসরি আপডেট পান',
+            title: s.notifPushTitle,
+            subtitle: s.notifPushSubtitle,
             value: _pushNotifications,
             onChanged: (v) => setState(() => _pushNotifications = v),
           ),
           _buildSwitchTile(
-            title: 'SMS অ্যালার্ট',
-            subtitle: 'জরুরি অবস্থায় SMS পাঠাতে অনুমতি দিন',
+            title: s.notifSmsTitle,
+            subtitle: s.notifSmsSubtitle,
             value: _smsAlerts,
             onChanged: (v) => setState(() => _smsAlerts = v),
           ),
           _buildSwitchTile(
-            title: 'ওয়েলনেস রিমাইন্ডার',
-            subtitle: 'প্রতিদিন সকালে আপনার খোঁজ নেওয়ার জন্য',
+            title: s.notifWellnessTitle,
+            subtitle: s.notifWellnessSubtitle,
             value: _wellnessReminders,
             onChanged: (v) => setState(() => _wellnessReminders = v),
           ),
           _buildSwitchTile(
-            title: 'জরুরি অ্যালার্ট',
-            subtitle: 'গুরুত্বপূর্ণ সুরক্ষা অ্যালার্ট গ্রহণ করুন',
+            title: s.notifEmergencyAlertsTitle,
+            subtitle: s.notifEmergencyAlertsSubtitle,
             value: _emergencyAlerts,
             onChanged: (v) => setState(() => _emergencyAlerts = v),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../provider/language_provider.dart';
 import '../../../provider/splash_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -144,6 +145,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final s = ref.watch(stringsProvider);
 
     return Scaffold(
       body: Container(
@@ -213,9 +215,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       opacity: _textOpacity,
                       child: Column(
                         children: [
-                          const Text(
-                            AppConstants.appNameBangla,
-                            style: TextStyle(
+                          Text(
+                            s.appName,
+                            style: const TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -255,7 +257,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 ),
                               ),
                               child: Text(
-                                AppConstants.appTaglineBangla,
+                                s.appTagline,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
@@ -351,7 +353,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               builder: (context, _) {
                                 final percent = (_progress.value * 100).toInt();
                                 return Text(
-                                  'লোড হচ্ছে... $percent%',
+                                  '${s.splashLoading} $percent%',
                                   style: TextStyle(
                                     fontSize: 12,
                                     // ignore: deprecated_member_use

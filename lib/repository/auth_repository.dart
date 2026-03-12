@@ -22,6 +22,7 @@ class AuthRepository {
     final response = await _apiService.login(email: email, password: password);
     final user = UserModel.fromJson(response['user']);
     await _hiveService.saveUser(user);
+    await _syncSettingsFromUserPayload(response['user'] as Map<String, dynamic>?);
     return user;
   }
 
@@ -39,6 +40,7 @@ class AuthRepository {
     );
     final user = UserModel.fromJson(response['user']);
     await _hiveService.saveUser(user);
+    await _syncSettingsFromUserPayload(response['user'] as Map<String, dynamic>?);
     return user;
   }
 
@@ -84,5 +86,21 @@ class AuthRepository {
 
   Future<void> forgotPassword(String email) async {
     await _apiService.forgotPassword(email);
+  }
+
+  Future<void> _syncSettingsFromUserPayload(Map<String, dynamic>? payload) async {
+    final settings = payload?['settings'] as Map<String, dynamic>?;
+    if (settings == null) return;
+
+    final current = _hiveService.getSettings();
+    await _hiveService.saveSettings(
+      current.copyWith(
+        notificationsEnabled: settings['notificationEnabled'] as bool? ??
+            current.notificationsEnabled,
+        language: settings['language']?.toString() ?? current.language,
+        earthquakeCountry:
+            settings['earthquakeCountry']?.toString() ?? current.earthquakeCountry,
+      ),
+    );
   }
 }

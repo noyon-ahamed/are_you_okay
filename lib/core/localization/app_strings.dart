@@ -9,6 +9,9 @@ class AppStrings {
 
   // ===================== Common =====================
   String get appName => isBangla ? 'আপনি কি ঠিক আছেন?' : 'Are You Okay?';
+  String get appTagline => isBangla
+      ? 'আপনার নিরাপত্তা, আমাদের দায়িত্ব'
+      : 'Your safety, our responsibility';
   String get cancel => isBangla ? 'বাতিল' : 'Cancel';
   String get save => isBangla ? 'সংরক্ষণ করুন' : 'Save';
   String get ok => isBangla ? 'ঠিক আছে' : 'OK';
@@ -332,6 +335,9 @@ class AppStrings {
   String get contactsInfoDesc => isBangla
       ? 'জরুরি সময়ে এই যোগাযোগকারীদের SMS ও নোটিফিকেশন পাঠানো হবে। ড্র্যাগ করে অগ্রাধিকার পরিবর্তন করুন।'
       : 'These contacts will receive SMS and notifications in an emergency. Drag to reorder priority.';
+  String get contactsEmailMissedAlert => isBangla
+      ? 'ইমেইল (চেক-ইন মিস করলে অ্যালার্ট পাবে)'
+      : 'Email (will get alert if check-in missed)';
   String get contactsNewContact => isBangla ? 'নতুন কন্টাক্ট' : 'New Contact';
   String get contactsNameHint =>
       isBangla ? 'ব্যক্তির নাম লিখুন' : 'Enter person\'s name';
@@ -382,6 +388,8 @@ class AppStrings {
       isBangla ? 'কোনো সাম্প্রতিক ভূমিকম্প নেই' : 'No recent earthquakes';
   String get earthquakeNearbyStat => isBangla ? 'কাছাকাছি' : 'Nearby';
   String get earthquakeTabNear => isBangla ? 'আপনার কাছে' : 'Near You';
+  String get earthquakeTabNearWithRadius =>
+      isBangla ? 'আপনার কাছে (100km)' : 'Near You (100 km)';
   String get earthquakeTabGlobal =>
       isBangla ? 'শীর্ষ ৫ বৈশ্বিক' : 'Top 5 Global';
   String get earthquakeMaxMag => isBangla ? 'সর্বোচ্চ মাত্রা' : 'Max Magnitude';
@@ -389,6 +397,9 @@ class AppStrings {
   String get earthquakeAway => isBangla ? 'কি.মি. দূরে' : 'km away';
   String get earthquakeServerError =>
       isBangla ? 'সার্ভারে সমস্যা হয়েছে' : 'Server error';
+  String get earthquakeCachedData => isBangla
+      ? 'নতুন ডাটা আনার সময় আপাতত সর্বশেষ সংরক্ষিত ভূমিকম্প তথ্য দেখানো হচ্ছে।'
+      : 'Showing the last saved earthquake data while refreshing.';
 
   // ===================== Toast Messages =====================
   String get toastCheckinSuccess =>
@@ -480,6 +491,18 @@ class AppStrings {
       : 'Track your mood and get advice from AI assistant.';
   String get onbGetStarted => isBangla ? 'শুরু করুন' : 'Get Started';
   String get onbNext => isBangla ? 'পরবর্তী' : 'Next';
+  String get onbSkip => isBangla ? 'এড়িয়ে যান' : 'Skip';
+  String get onbStatDailySafety =>
+      isBangla ? 'দৈনিক সেফটি চেক' : 'Daily safety check';
+  String get onbStatRealtimeLocation =>
+      isBangla ? 'রিয়েল-টাইম লোকেশন' : 'Real-time location';
+  String get onbStatEmergencySupport =>
+      isBangla ? 'জরুরি সাহায্য' : 'Emergency support';
+  String get onbSafetyOneTap => isBangla
+      ? 'আপনার নিরাপত্তা সবসময় পাশে থাকবে'
+      : 'Your safety stays one tap away';
+  String get onbFeatureCheckin => isBangla ? 'চেক-ইন' : 'Check-in';
+  String get onbFeatureAlerts => isBangla ? 'সতর্কতা' : 'Alerts';
 
   // ===================== Notifications =====================
   String get notifTitleDefault => isBangla ? 'সতর্কতা' : 'Alert';
@@ -493,6 +516,27 @@ class AppStrings {
   String get notifMarkRead =>
       isBangla ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read';
   String get notifClearAll => isBangla ? 'সব মুছে ফেলুন' : 'Clear all';
+  String get notifSettingsTitle =>
+      isBangla ? 'বিজ্ঞপ্তি সেটিংস' : 'Notification Settings';
+  String get notifPushTitle =>
+      isBangla ? 'পুশ বিজ্ঞপ্তি' : 'Push Notifications';
+  String get notifPushSubtitle => isBangla
+      ? 'অ্যাপের মাধ্যমে সরাসরি আপডেট পান'
+      : 'Get updates directly in the app';
+  String get notifSmsTitle => isBangla ? 'SMS অ্যালার্ট' : 'SMS Alerts';
+  String get notifSmsSubtitle => isBangla
+      ? 'জরুরি অবস্থায় SMS পাঠাতে অনুমতি দিন'
+      : 'Allow SMS alerts during emergencies';
+  String get notifWellnessTitle =>
+      isBangla ? 'ওয়েলনেস রিমাইন্ডার' : 'Wellness Reminders';
+  String get notifWellnessSubtitle => isBangla
+      ? 'প্রতিদিন সকালে আপনার খোঁজ নেওয়ার জন্য'
+      : 'Daily reminder to check on your wellbeing';
+  String get notifEmergencyAlertsTitle =>
+      isBangla ? 'জরুরি অ্যালার্ট' : 'Emergency Alerts';
+  String get notifEmergencyAlertsSubtitle => isBangla
+      ? 'গুরুত্বপূর্ণ সুরক্ষা অ্যালার্ট গ্রহণ করুন'
+      : 'Receive critical safety alerts';
 
   // ===================== Profile / Edit =====================
   String get profileDefaultUser => isBangla ? 'ব্যবহারকারী' : 'User';
@@ -540,6 +584,31 @@ class AppStrings {
   String get aiChatError => isBangla
       ? 'দুঃখিত, একটি সমস্যা হয়েছে। ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন।'
       : 'Sorry, an error occurred. Please check your internet connection and try again.';
+  String get aiChatClear => isBangla ? 'চ্যাট মুছুন' : 'Clear chat';
+  String get aiChatDisclaimer => isBangla
+      ? 'এটি সাধারণ তথ্যের জন্য। গুরুতর সমস্যায় ডাক্তারের কাছে যান।'
+      : 'This is general information only. For serious issues, consult a doctor.';
+  List<String> get aiChatSuggestions => isBangla
+      ? const [
+          '🤕 মাথাব্যথা হচ্ছে',
+          '😴 ঘুম হচ্ছে না',
+          '😔 মন খারাপ লাগছে',
+          '🤒 জ্বর হলে কী করব?',
+          '💊 ওষুধ খাওয়ার নিয়ম',
+          '🧘 স্ট্রেস কমানোর উপায়',
+          '🏃 ব্যায়ামের পরামর্শ',
+          '🍎 সুষম খাদ্যতালিকা',
+        ]
+      : const [
+          '🤕 I have a headache',
+          '😴 I cannot sleep',
+          '😔 I feel low',
+          '🤒 What should I do for fever?',
+          '💊 How should I take medicine?',
+          '🧘 Ways to reduce stress',
+          '🏃 Exercise advice',
+          '🍎 Balanced diet tips',
+        ];
 
   // ===================== Fake Call =====================
   String get fcTitle => isBangla ? 'ফেক কল' : 'Fake Call';
@@ -563,4 +632,13 @@ class AppStrings {
   String get fcDecline => isBangla ? 'হটান' : 'Decline';
   String get fcMissedCall => isBangla ? 'মিসড কল' : 'Missed Call';
   String get fcCallBack => isBangla ? 'কল ব্যাক' : 'Call Back';
+  String get fcNotificationPermissionRationale => isBangla
+      ? 'কল স্ক্রিন দেখানোর জন্য নোটিফিকেশন পারমিশন প্রয়োজন।'
+      : 'Notification permission is required to show the call screen.';
+  String get fcNotificationPermissionSettings => isBangla
+      ? 'ফেক কল পেতে সেটিংস থেকে নোটিফিকেশন পারমিশন দিন।'
+      : 'Please allow notification permission from settings to receive fake calls.';
+
+  // ===================== Splash =====================
+  String get splashLoading => isBangla ? 'লোড হচ্ছে...' : 'Loading...';
 }

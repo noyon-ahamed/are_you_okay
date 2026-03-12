@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +13,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/earthquake_countries.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
@@ -22,6 +24,7 @@ import '../../../services/api/checkin_api_service.dart';
 import '../../../services/shared_prefs_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../services/location_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -35,6 +38,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     // Watch for theme changes but not rebuild entire widget from top-down watcher
     final settings = ref.watch(settingsProvider);
+    final earthquakeCountryOverride =
+        ref.watch(earthquakeCountryOverrideProvider);
+    final displayedCountry =
+        earthquakeCountryOverride ?? settings.earthquakeCountry.trim();
     final isDark = settings.themeIsDark;
     ref.watch(checkinStatusProvider);
     final s = ref.watch(stringsProvider);
@@ -96,6 +103,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: (_) {
                 ref.read(settingsProvider.notifier).toggleNotifications();
               },
+            ),
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.public_rounded,
+              iconColor: const Color(0xFFE53935),
+              title: s.isBangla
+                  ? 'ভূমিকম্প মনিটর দেশ'
+                  : 'Earthquake Watch Country',
+              subtitle: s.isBangla
+                  ? displayedCountry.isEmpty
+                      ? 'কোনো ডিফল্ট দেশ সেভ নেই, স্ক্রিনে ঢুকলে বর্তমান লোকেশন অনুযায়ী দেখাবে'
+                      : '$displayedCountry দেখাবে${earthquakeCountryOverride != null ? ' (এই সেশন)' : ''}'
+                  : displayedCountry.isEmpty
+                      ? 'No default country saved. The earthquake screen will use your current location.'
+                      : 'Showing $displayedCountry${earthquakeCountryOverride != null ? ' for this session' : ''}',
+              onTap: _showEarthquakeCountryDialog,
             ),
             _buildDivider(),
             _buildSwitchTile(
@@ -383,6 +406,364 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showEarthquakeCountryDialog() {
+    final s = ref.read(stringsProvider);
+    final currentCountry = ref.read(earthquakeCountryOverrideProvider) ??
+        ref.read(settingsProvider).earthquakeCountry;
+    final isDark = ref.read(settingsProvider).themeIsDark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) {
+        final searchController = TextEditingController();
+        var selectedCountry = currentCountry;
+        var isDetecting = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final query = searchController.text.trim().toLowerCase();
+            final filteredCountries = EarthquakeCountries.supported
+                .where((country) => country.toLowerCase().contains(query))
+                .toList();
+
+            Future<void> selectCountry(String country) async {
+              setModalState(() {
+                selectedCountry = country;
+              });
+              ref.read(earthquakeCountryOverrideProvider.notifier).state =
+                  country;
+              if (!mounted) return;
+              Navigator.of(this.context).pop();
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    s.isBangla
+                        ? 'এই সেশনের জন্য $country দেখানো হবে'
+                        : '$country will be shown for this session',
+                    style: const TextStyle(fontFamily: 'HindSiliguri'),
+                  ),
+                ),
+              );
+            }
+
+            Future<void> autoDetectCountry() async {
+              setModalState(() {
+                isDetecting = true;
+              });
+              final locationService = ref.read(locationServiceProvider);
+              final position = await locationService.getCurrentLocation(
+                accuracy: LocationAccuracy.medium,
+              );
+              if (position == null) {
+                if (!mounted) return;
+                setModalState(() {
+                  isDetecting = false;
+                });
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      s.isBangla
+                          ? 'লোকেশন পাওয়া যায়নি। ম্যানুয়ালি দেশ বাছাই করুন।'
+                          : 'Could not detect your location. Choose a country manually.',
+                      style: const TextStyle(fontFamily: 'HindSiliguri'),
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              final detectedCountry =
+                  await locationService.getCountryFromCoordinates(
+                latitude: position.latitude,
+                longitude: position.longitude,
+              );
+              setModalState(() {
+                isDetecting = false;
+              });
+
+              if (detectedCountry == null ||
+                  !EarthquakeCountries.supported.contains(detectedCountry)) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      s.isBangla
+                          ? 'আপনার দেশ শনাক্ত করা যায়নি। ম্যানুয়ালি বেছে নিন।'
+                          : 'Your country could not be detected. Please choose manually.',
+                      style: const TextStyle(fontFamily: 'HindSiliguri'),
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              ref.read(earthquakeCountryOverrideProvider.notifier).state = null;
+              await ref
+                  .read(settingsProvider.notifier)
+                  .setEarthquakeCountry(detectedCountry);
+              if (!mounted) return;
+              Navigator.of(this.context).pop();
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    s.isBangla
+                        ? 'বর্তমান লোকেশন থেকে $detectedCountry সেট করা হয়েছে'
+                        : 'Set to your current country: $detectedCountry',
+                    style: const TextStyle(fontFamily: 'HindSiliguri'),
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.82,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF171717) : const Color(0xFFF8F7F3),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white24
+                                : Colors.black12,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        s.isBangla
+                            ? 'ভূমিকম্প মনিটর দেশ'
+                            : 'Earthquake Watch Country',
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        s.isBangla
+                            ? 'লোকেশন থেকে অটো ধরতে পারেন, না হলে সার্চ করে দেশ বেছে নিন। ওই দেশ আলাদা ট্যাবে দেখাবে।'
+                            : 'Auto-detect from your location or search and choose a country. That country gets its own tab.',
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 13,
+                          height: 1.5,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark
+                                ? const [Color(0xFF1B2B25), Color(0xFF1E1E1E)]
+                                : const [Color(0xFFE7F4EE), Color(0xFFF8F7F3)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.public_rounded,
+                                  color: AppColors.primary),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.isBangla ? 'এখন নির্বাচিত' : 'Currently selected',
+                                    style: TextStyle(
+                                      fontFamily: 'HindSiliguri',
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.color,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    selectedCountry.isEmpty
+                                        ? (s.isBangla
+                                            ? 'এখনো কোনো দেশ সেভ নেই'
+                                            : 'No country saved yet')
+                                        : selectedCountry,
+                                    style: TextStyle(
+                                      fontFamily: 'HindSiliguri',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: isDetecting ? null : autoDetectCountry,
+                              icon: isDetecting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.my_location_rounded,
+                                      size: 16),
+                              label: Text(
+                                s.isBangla ? 'অটো' : 'Auto',
+                                style: const TextStyle(fontFamily: 'HindSiliguri'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: searchController,
+                        onChanged: (_) => setModalState(() {}),
+                        decoration: InputDecoration(
+                          hintText: s.isBangla
+                              ? 'দেশ সার্চ করুন'
+                              : 'Search country',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          filled: true,
+                          fillColor:
+                              isDark ? const Color(0xFF202020) : Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          suffixIcon: searchController.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    searchController.clear();
+                                    setModalState(() {});
+                                  },
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Expanded(
+                        child: Container(
+                          decoration: AppDecorations.cardDecoration(
+                            context: context,
+                            borderRadius: 20,
+                          ),
+                          child: ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            itemCount: filteredCountries.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final country = filteredCountries[index];
+                              final isSelected = selectedCountry == country;
+                              return ListTile(
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                                leading: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary.withValues(alpha: 0.14)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    isSelected
+                                        ? Icons.check_circle
+                                        : Icons.location_searching_rounded,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color,
+                                    size: 18,
+                                  ),
+                                ),
+                                title: Text(
+                                  country,
+                                  style: const TextStyle(
+                                    fontFamily: 'HindSiliguri',
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  s.isBangla
+                                      ? '$country দেশের ভূমিকম্প আগে দেখাবে'
+                                      : 'Prioritize earthquakes from $country',
+                                  style: TextStyle(
+                                    fontFamily: 'HindSiliguri',
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.color,
+                                  ),
+                                ),
+                                trailing: isSelected
+                                    ? const Icon(Icons.arrow_forward_rounded,
+                                        color: AppColors.primary)
+                                    : null,
+                                onTap: () => selectCountry(country),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

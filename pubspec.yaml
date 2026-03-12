@@ -12,12 +12,9 @@ dependencies:
 
   # UI
   cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
   flutter_svg: ^2.0.9
-  lottie: ^3.0.0
   shimmer: ^3.0.0
   smooth_page_indicator: ^1.1.0
-  cached_network_image: ^3.3.1  
 
   flutter_native_splash: ^2.4.0
 
@@ -27,10 +24,8 @@ dependencies:
   freezed_annotation: ^2.4.1
 
   # Localization
-  easy_localization: ^3.0.3
   
   # Security
-  local_auth: ^2.1.8
   
   # Sensors
   sensors_plus: ^4.0.2
@@ -73,19 +68,15 @@ dependencies:
   flutter_phone_direct_caller: ^2.1.1
   
   # Audio/Voice
-  just_audio: ^0.9.36
   # record: 5.1.0
   
   # Background tasks
   workmanager: ^0.9.0
-  flutter_background_service: ^5.0.5
   
   # Image
   image_picker: ^1.0.5
   
   # Animation
-  animations: ^2.0.11
-  flutter_animate: ^4.3.0
   
   # AI
   google_generative_ai: ^0.4.6
@@ -95,7 +86,6 @@ dependencies:
 
   # Ads
   google_mobile_ads: ^7.0.0
-  audioplayers: ^6.5.1
   flutter_callkit_incoming: ^3.0.0
   wakelock_plus: ^1.4.0
   share_plus: ^12.0.1

@@ -148,12 +148,14 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
           prefs.getBool('notifications_enabled') ?? true;
       final timezone = await FlutterTimezone.getLocalTimezone();
       final language = ref.read(languageProvider);
+      final earthquakeCountry = ref.read(settingsProvider).earthquakeCountry;
 
       await AuthApiService().updateNotificationPreferences(
         notificationEnabled: notificationsEnabled,
         reminderTimes: AppConstants.defaultReminderTimes,
         timezone: timezone,
         language: language,
+        earthquakeCountry: earthquakeCountry,
       );
     } catch (e) {
       debugPrint('Notification preferences sync warning: $e');
@@ -323,10 +325,8 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   );
 
   final payload = NotificationNavigationService.encodePayload({
-    'route': (data['type'] == 'checkin_reminder' || data['type'] == 'reminder')
-        ? Routes.home
-        : Routes.notifications,
-    'action': data['type'] == 'checkin_reminder' ? 'open_checkin' : '',
+    'route': _routeForNotificationType(data),
+    'action': _actionForNotificationType(data),
     'type': data['type'] ?? 'alert',
     'source': 'push',
   });
@@ -364,11 +364,8 @@ Future<void> _saveFirebaseMessageToHistory(
   final data = message.data;
   final payload = payloadOverride ??
       NotificationNavigationService.encodePayload({
-        'route':
-            (data['type'] == 'checkin_reminder' || data['type'] == 'reminder')
-                ? Routes.home
-                : Routes.notifications,
-        'action': data['type'] == 'checkin_reminder' ? 'open_checkin' : '',
+        'route': _routeForNotificationType(data),
+        'action': _actionForNotificationType(data),
         'type': data['type'] ?? 'alert',
         'source': 'push',
       });
@@ -386,15 +383,40 @@ Future<void> _saveFirebaseMessageToHistory(
   });
 }
 
+String _routeForNotificationType(Map<String, dynamic> data) {
+  final explicitRoute = data['route']?.toString();
+  if (explicitRoute != null && explicitRoute.isNotEmpty) {
+    return explicitRoute;
+  }
+
+  final type = data['type']?.toString();
+  if (type == 'checkin_reminder' || type == 'reminder') {
+    return Routes.home;
+  }
+  if (type == 'earthquake') {
+    return Routes.earthquake;
+  }
+  return Routes.notifications;
+}
+
+String _actionForNotificationType(Map<String, dynamic> data) {
+  final explicitAction = data['action']?.toString();
+  if (explicitAction != null && explicitAction.isNotEmpty) {
+    return explicitAction;
+  }
+
+  final type = data['type']?.toString();
+  if (type == 'checkin_reminder' || type == 'reminder') {
+    return 'open_checkin';
+  }
+  return '';
+}
+
 void _handleRemoteMessageTap(RemoteMessage message) {
   final data = message.data;
   final payload = NotificationNavigationService.encodePayload({
-    'route': data['route'] ?? Routes.home,
-    'action': data['action'] ??
-        ((data['type'] == 'checkin_reminder' ||
-                data['type'] == 'reminder')
-            ? 'open_checkin'
-            : ''),
+    'route': _routeForNotificationType(data),
+    'action': _actionForNotificationType(data),
     'type': data['type'] ?? 'alert',
     'source': 'push',
   });

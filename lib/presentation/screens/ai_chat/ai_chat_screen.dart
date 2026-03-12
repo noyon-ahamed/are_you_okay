@@ -161,7 +161,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'চ্যাট মুছুন',
+            tooltip: s.aiChatClear,
             onPressed: _messages.length > 1
                 ? () {
                     _aiService.resetChat();
@@ -181,14 +181,15 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             // ignore: deprecated_member_use
             color: AppColors.warning.withOpacity(0.1),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: AppColors.warning),
-                SizedBox(width: 8),
+                const Icon(Icons.info_outline,
+                    size: 16, color: AppColors.warning),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'এটি সাধারণ তথ্যের জন্য। গুরুতর সমস্যায় ডাক্তারের কাছে যান।',
-                    style: TextStyle(
+                    s.aiChatDisclaimer,
+                    style: const TextStyle(
                       fontFamily: 'HindSiliguri',
                       fontSize: 11,
                       color: AppColors.warning,
@@ -225,16 +226,8 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildSuggestions() {
-    final suggestions = [
-      '🤕 মাথাব্যথা হচ্ছে',
-      '😴 ঘুম হচ্ছে না',
-      '😔 মন খারাপ লাগছে',
-      '🤒 জ্বর হলে কী করব?',
-      '💊 ওষুধ খাওয়ার নিয়ম',
-      '🧘 স্ট্রেস কমানোর উপায়',
-      '🏃 ব্যায়ামের পরামর্শ',
-      '🍎 সুষম খাদ্যতালিকা',
-    ];
+    final s = ref.watch(stringsProvider);
+    final suggestions = s.aiChatSuggestions;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -389,6 +382,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildInputBar(bool isDark) {
+    final s = ref.watch(stringsProvider);
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -417,7 +411,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
-                hintText: 'আপনার প্রশ্ন লিখুন...',
+                hintText: s.aiChatInputHint,
                 hintStyle: const TextStyle(fontFamily: 'HindSiliguri'),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),

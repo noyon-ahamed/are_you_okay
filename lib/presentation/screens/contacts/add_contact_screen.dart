@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../provider/contact_provider.dart';
+import '../../../provider/language_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
@@ -33,9 +34,10 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('নতুন কন্টাক্ট'),
+        title: Text(s.contactsNewContact),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -46,12 +48,12 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
             children: [
               CustomTextField(
                 controller: _nameController,
-                label: 'নাম',
-                hint: 'ব্যক্তির নাম লিখুন',
+                label: s.contactsName,
+                hint: s.contactsNameHint,
                 prefixIcon: Icons.person_outline,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'নাম প্রয়োজন';
+                    return s.contactsNameReq;
                   }
                   return null;
                 },
@@ -60,16 +62,16 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
 
               CustomTextField(
                 controller: _phoneController,
-                label: 'ফোন নম্বর',
-                hint: '01XXXXXXXXX',
+                label: s.contactsPhone,
+                hint: s.contactsPhoneHint,
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'ফোন নম্বর প্রয়োজন';
+                    return s.contactsPhoneReq;
                   }
                   if (value.length < 11) {
-                    return 'সঠিক ফোন নম্বর লিখুন';
+                    return s.contactsPhoneInvalid;
                   }
                   return null;
                 },
@@ -78,12 +80,12 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
 
               CustomTextField(
                 controller: _relationshipController,
-                label: 'সম্পর্ক',
-                hint: 'যেমন: বাবা, মা, ভাই, বন্ধু',
+                label: s.contactsRelation,
+                hint: s.contactsRelationHint,
                 prefixIcon: Icons.people_outline,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'সম্পর্ক উল্লেখ করুন';
+                    return s.contactsRelationReq;
                   }
                   return null;
                 },
@@ -91,9 +93,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 24),
 
               // Priority
-              const Text(
-                'অগ্রাধিকার লেভেল',
-                style: TextStyle(
+              Text(
+                s.contactsPriorityLevel,
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -134,9 +136,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                 }).toList(),
               ),
               const SizedBox(height: 8),
-              const Text(
-                '১ নং অগ্রাধিকার সবচেয়ে বেশি গুরুত্বপূর্ণ।',
-                style: TextStyle(
+              Text(
+                s.contactsPriorityDesc,
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
@@ -144,9 +146,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 24),
 
               // Notification Methods
-              const Text(
-                'বিজ্ঞপ্তির ধরণ',
-                style: TextStyle(
+              Text(
+                s.contactsNotifType,
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -154,14 +156,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               ),
               const SizedBox(height: 8),
               SwitchListTile(
-                title: const Text('SMS এর মাধ্যমে জানান'),
+                title: Text(s.contactsNotifySMS),
                 value: _notifyViaSMS,
                 onChanged: (value) => setState(() => _notifyViaSMS = value),
                 activeThumbColor: AppColors.primary,
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
-                title: const Text('অ্যাপ বিজ্ঞপ্তির মাধ্যমে জানান'),
+                title: Text(s.contactsNotifyApp),
                 value: _notifyViaApp,
                 onChanged: (value) => setState(() => _notifyViaApp = value),
                 activeThumbColor: AppColors.primary,
@@ -170,7 +172,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 40),
 
               CustomButton(
-                text: 'কন্টাক্ট যোগ করুন',
+                text: s.contactsAdd,
                 onPressed: _saveContact,
               ),
             ],
@@ -181,6 +183,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
   }
 
   Future<void> _saveContact() async {
+    final s = ref.read(stringsProvider);
     if (_formKey.currentState!.validate()) {
       await ref.read(contactProvider.notifier).addContact(
             name: _nameController.text,
@@ -194,7 +197,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('নতুন কন্টাক্ট যোগ করা হয়েছে।')),
+          SnackBar(content: Text(s.contactsAddedToast)),
         );
       }
     }

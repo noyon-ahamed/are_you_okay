@@ -33,6 +33,16 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     await _hiveService.saveSettings(state);
   }
 
+  Future<void> setEarthquakeCountry(String country) async {
+    state = state.copyWith(earthquakeCountry: country);
+    await _hiveService.saveSettings(state);
+    try {
+      await AuthApiService().updateNotificationPreferences(
+        earthquakeCountry: country,
+      );
+    } catch (_) {}
+  }
+
   Future<void> setCheckinInterval(int days) async {
     state = state.copyWith(checkinIntervalDays: days);
     await _hiveService.saveSettings(state);
@@ -55,6 +65,7 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     try {
       await AuthApiService().updateNotificationPreferences(
         notificationEnabled: newValue,
+        earthquakeCountry: state.earthquakeCountry,
       );
     } catch (_) {}
 
@@ -104,3 +115,8 @@ final themeModeProvider = Provider<ThemeMode>((ref) {
 final isDarkModeProvider = Provider<bool>((ref) {
   return ref.watch(settingsProvider).themeIsDark;
 });
+
+/// Session-only override for earthquake country browsing.
+/// This lets the user preview another country without replacing
+/// the auto-detected/persisted home country permanently.
+final earthquakeCountryOverrideProvider = StateProvider<String?>((ref) => null);

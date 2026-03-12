@@ -134,7 +134,6 @@ class LocalNotificationService {
       description: 'কাছাকাছি ভূমিকম্পের জন্য সাইরেন সতর্কতা',
       importance: Importance.max,
       playSound: true,
-      sound: RawResourceAndroidNotificationSound('earthquake_siren'),
       enableVibration: true,
       enableLights: true,
       ledColor: Color(0xFFDC143C),
@@ -188,10 +187,9 @@ class LocalNotificationService {
                 : Priority.defaultPriority,
         playSound: true,
         enableVibration: true,
+        fullScreenIntent:
+            channelId == 'emergency_alerts' || channelId == 'seismic_alerts',
         icon: 'ic_notification',
-        sound: channelId == 'seismic_alerts'
-            ? const RawResourceAndroidNotificationSound('earthquake_siren')
-            : null,
       );
 
       const iosDetails = DarwinNotificationDetails(
