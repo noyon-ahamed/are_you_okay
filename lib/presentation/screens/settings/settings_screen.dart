@@ -33,7 +33,40 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with RestorationMixin {
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
+
+  @override
+  String? get restorationId => 'settings_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollOffset.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch for theme changes but not rebuild entire widget from top-down watcher
@@ -51,6 +84,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(s.settingsTitle),
       ),
       body: ListView(
+        key: const PageStorageKey('settings_scroll'),
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         children: [
@@ -103,6 +138,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: (_) {
                 ref.read(settingsProvider.notifier).toggleNotifications();
               },
+            ),
+            _buildDivider(),
+            _buildListTile(
+              icon: Icons.tune_rounded,
+              iconColor: const Color(0xFF7E57C2),
+              title: s.notifSettingsTitle,
+              subtitle: s.isBangla
+                  ? 'পুশ, SMS, ওয়েলনেস ও জরুরি সতর্কতা কনফিগার করুন'
+                  : 'Configure push, SMS, wellness, and emergency alerts',
+              onTap: () => context.push(Routes.notificationSettings),
             ),
             _buildDivider(),
             _buildListTile(
@@ -526,7 +571,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Container(
                 height: MediaQuery.of(context).size.height * 0.82,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF171717) : const Color(0xFFF8F7F3),
+                  color: isDark
+                      ? const Color(0xFF171717)
+                      : const Color(0xFFF8F7F3),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(28)),
                 ),
@@ -540,9 +587,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           width: 44,
                           height: 5,
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white24
-                                : Colors.black12,
+                            color: isDark ? Colors.white24 : Colors.black12,
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -595,7 +640,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               width: 46,
                               height: 46,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Icon(Icons.public_rounded,
@@ -607,7 +653,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    s.isBangla ? 'এখন নির্বাচিত' : 'Currently selected',
+                                    s.isBangla
+                                        ? 'এখন নির্বাচিত'
+                                        : 'Currently selected',
                                     style: TextStyle(
                                       fontFamily: 'HindSiliguri',
                                       fontSize: 12,
@@ -650,7 +698,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       size: 16),
                               label: Text(
                                 s.isBangla ? 'অটো' : 'Auto',
-                                style: const TextStyle(fontFamily: 'HindSiliguri'),
+                                style:
+                                    const TextStyle(fontFamily: 'HindSiliguri'),
                               ),
                             ),
                           ],
@@ -661,9 +710,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         controller: searchController,
                         onChanged: (_) => setModalState(() {}),
                         decoration: InputDecoration(
-                          hintText: s.isBangla
-                              ? 'দেশ সার্চ করুন'
-                              : 'Search country',
+                          hintText:
+                              s.isBangla ? 'দেশ সার্চ করুন' : 'Search country',
                           prefixIcon: const Icon(Icons.search_rounded),
                           filled: true,
                           fillColor:
@@ -709,7 +757,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   height: 36,
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppColors.primary.withValues(alpha: 0.14)
+                                        ? AppColors.primary
+                                            .withValues(alpha: 0.14)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(12),
                                   ),

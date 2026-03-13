@@ -22,7 +22,8 @@ class AuthRepository {
     final response = await _apiService.login(email: email, password: password);
     final user = UserModel.fromJson(response['user']);
     await _hiveService.saveUser(user);
-    await _syncSettingsFromUserPayload(response['user'] as Map<String, dynamic>?);
+    await _syncSettingsFromUserPayload(
+        response['user'] as Map<String, dynamic>?);
     return user;
   }
 
@@ -40,7 +41,8 @@ class AuthRepository {
     );
     final user = UserModel.fromJson(response['user']);
     await _hiveService.saveUser(user);
-    await _syncSettingsFromUserPayload(response['user'] as Map<String, dynamic>?);
+    await _syncSettingsFromUserPayload(
+        response['user'] as Map<String, dynamic>?);
     return user;
   }
 
@@ -88,7 +90,8 @@ class AuthRepository {
     await _apiService.forgotPassword(email);
   }
 
-  Future<void> _syncSettingsFromUserPayload(Map<String, dynamic>? payload) async {
+  Future<void> _syncSettingsFromUserPayload(
+      Map<String, dynamic>? payload) async {
     final settings = payload?['settings'] as Map<String, dynamic>?;
     if (settings == null) return;
 
@@ -97,9 +100,14 @@ class AuthRepository {
       current.copyWith(
         notificationsEnabled: settings['notificationEnabled'] as bool? ??
             current.notificationsEnabled,
+        smsAlerts: settings['smsAlerts'] as bool? ?? current.smsAlerts,
+        wellnessReminders:
+            settings['wellnessReminders'] as bool? ?? current.wellnessReminders,
+        emergencyAlerts:
+            settings['emergencyAlerts'] as bool? ?? current.emergencyAlerts,
         language: settings['language']?.toString() ?? current.language,
-        earthquakeCountry:
-            settings['earthquakeCountry']?.toString() ?? current.earthquakeCountry,
+        earthquakeCountry: settings['earthquakeCountry']?.toString() ??
+            current.earthquakeCountry,
       ),
     );
   }

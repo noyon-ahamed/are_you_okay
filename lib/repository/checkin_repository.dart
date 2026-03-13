@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../model/checkin_model.dart';
 import '../services/api/checkin_api_service.dart';
@@ -18,6 +20,8 @@ final checkinRepositoryProvider = Provider<CheckInRepository>((ref) {
 });
 
 class CheckInRepository {
+  static const String _historyCacheKey = 'checkin_history_cache_v1';
+  static const String _historyMetaKey = 'checkin_history_cache_meta_v1';
   final HiveService hive;
   final SharedPrefsService prefs;
   final SocketService socketService;
@@ -41,7 +45,7 @@ class CheckInRepository {
     // Get location if not provided
     double lat = latitude ?? 23.8103;
     double lng = longitude ?? 90.4125;
-    
+
     try {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -67,7 +71,9 @@ class CheckInRepository {
 
       final checkIn = CheckInModel(
         id: response['checkIn']?['_id'] ?? _uuid.v4(),
-        userId: response['checkIn']?['user'] ?? response['checkIn']?['userId'] ?? '',
+        userId: response['checkIn']?['user'] ??
+            response['checkIn']?['userId'] ??
+            '',
         timestamp: DateTime.now(),
         latitude: lat,
         longitude: lng,
@@ -123,11 +129,18 @@ class CheckInRepository {
     int limit = 30,
     int skip = 0,
   }) async {
-    final localHistory = getAllCheckIns().map(_checkinModelToApiMap).toList();
+    final localHistory = getAllCheckIns().map(checkinModelToApiMap).toList();
     try {
-      final response = await api.getHistory(limit: limit, skip: skip);
-      final remote = List<Map<String, dynamic>>.from(response['checkIns'] ?? []);
-      final merged = _mergeHistory(remote, localHistory);
+      final response = await api.getHistory(
+        limit: limit,
+        skip: skip,
+        latestCreatedAt: await getLatestHistoryCreatedAt(),
+      );
+      final remote =
+          List<Map<String, dynamic>>.from(response['checkIns'] ?? []);
+      final cachedHistory = await getCachedHistory();
+      final merged =
+          mergeHistory(remote, mergeHistory(cachedHistory, localHistory));
 
       for (final item in remote) {
         final model = _apiMapToCheckinModel(item, isSynced: true);
@@ -136,10 +149,49 @@ class CheckInRepository {
         }
       }
 
+      await _saveHistoryCache(merged);
+      await _setLatestHistoryCreatedAt(
+        response['sync']?['latestCreatedAt']?.toString(),
+        merged,
+      );
+
       return merged;
     } catch (e) {
       debugPrint('Failed to fetch history from backend: $e');
-      return _mergeHistory(<Map<String, dynamic>>[], localHistory);
+      final cachedHistory = await getCachedHistory();
+      return mergeHistory(cachedHistory, localHistory);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_historyCacheKey);
+    if (raw == null || raw.isEmpty) return <Map<String, dynamic>>[];
+
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<String?> getLatestHistoryCreatedAt() async {
+    final cached = await getCachedHistory();
+    if (cached.isEmpty) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_historyMetaKey);
+    if (raw == null || raw.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded['latestCreatedAt']?.toString();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -226,8 +278,9 @@ class CheckInRepository {
         ? localLastCheckIn
         : remoteLastCheckIn;
 
-    final hoursSince =
-        effectiveLast != null ? DateTime.now().difference(effectiveLast).inHours : null;
+    final hoursSince = effectiveLast != null
+        ? DateTime.now().difference(effectiveLast).inHours
+        : null;
     final canCheckIn = hoursSince == null || hoursSince >= 24;
 
     return {
@@ -241,7 +294,7 @@ class CheckInRepository {
     };
   }
 
-  List<Map<String, dynamic>> _mergeHistory(
+  List<Map<String, dynamic>> mergeHistory(
     List<Map<String, dynamic>> remote,
     List<Map<String, dynamic>> local,
   ) {
@@ -257,8 +310,10 @@ class CheckInRepository {
     }
 
     merged.sort((a, b) {
-      final aTime = _parseCheckinTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bTime = _parseCheckinTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final aTime =
+          _parseCheckinTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime =
+          _parseCheckinTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bTime.compareTo(aTime);
     });
     return merged;
@@ -267,7 +322,8 @@ class CheckInRepository {
   String _historyKey(Map<String, dynamic> item) {
     final dt = _parseCheckinTime(item);
     final epochMinute = dt == null ? 0 : dt.millisecondsSinceEpoch ~/ 60000;
-    final lat = (item['latitude'] ?? item['location']?['latitude'] ?? 0).toString();
+    final lat =
+        (item['latitude'] ?? item['location']?['latitude'] ?? 0).toString();
     final lng =
         (item['longitude'] ?? item['location']?['longitude'] ?? 0).toString();
     return '$epochMinute-$lat-$lng';
@@ -279,7 +335,7 @@ class CheckInRepository {
     return DateTime.tryParse(raw.toString());
   }
 
-  Map<String, dynamic> _checkinModelToApiMap(CheckInModel model) {
+  Map<String, dynamic> checkinModelToApiMap(CheckInModel model) {
     return {
       'id': model.id,
       'userId': model.userId,
@@ -304,7 +360,8 @@ class CheckInRepository {
     final latitude =
         (item['latitude'] ?? item['location']?['latitude'] as num?)?.toDouble();
     final longitude =
-        (item['longitude'] ?? item['location']?['longitude'] as num?)?.toDouble();
+        (item['longitude'] ?? item['location']?['longitude'] as num?)
+            ?.toDouble();
     return CheckInModel(
       id: item['id']?.toString() ?? item['_id']?.toString() ?? _uuid.v4(),
       userId: item['userId']?.toString() ?? item['user']?.toString() ?? '',
@@ -320,9 +377,41 @@ class CheckInRepository {
   }
 
   bool _hasLocalEquivalent(CheckInModel candidate) {
-    final candidateKey = _historyKey(_checkinModelToApiMap(candidate));
+    final candidateKey = _historyKey(checkinModelToApiMap(candidate));
     return hive
         .getAllCheckIns()
-        .any((item) => _historyKey(_checkinModelToApiMap(item)) == candidateKey);
+        .any((item) => _historyKey(checkinModelToApiMap(item)) == candidateKey);
+  }
+
+  Future<void> _saveHistoryCache(List<Map<String, dynamic>> history) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_historyCacheKey, jsonEncode(history));
+  }
+
+  Future<void> _setLatestHistoryCreatedAt(
+    String? latestCreatedAt,
+    List<Map<String, dynamic>> history,
+  ) async {
+    final resolved = latestCreatedAt ?? _findLatestHistoryTimestamp(history);
+    if (resolved == null || resolved.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _historyMetaKey,
+      jsonEncode({'latestCreatedAt': resolved}),
+    );
+  }
+
+  String? _findLatestHistoryTimestamp(List<Map<String, dynamic>> history) {
+    if (history.isEmpty) return null;
+    return history
+        .map(_parseCheckinTime)
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (latest, current) {
+      if (latest == null || current.isAfter(latest)) {
+        return current;
+      }
+      return latest;
+    })?.toIso8601String();
   }
 }

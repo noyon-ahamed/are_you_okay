@@ -19,12 +19,18 @@ class EditProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
+    with RestorationMixin {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _addressController;
-  String? _selectedBloodGroup;
+  final RestorableTextEditingController _nameController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _emailController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _addressController =
+      RestorableTextEditingController();
+  final RestorableStringN _selectedBloodGroupValue = RestorableStringN(null);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
 
   final List<String> _bloodGroups = [
     'A+',
@@ -40,6 +46,45 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   String? _existingImageUrl;
   final ImagePicker _picker = ImagePicker();
 
+  @override
+  String? get restorationId => 'edit_profile_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+    final authState = ref.read(authProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
+    if (_nameController.value.text.isEmpty) {
+      _nameController.value.text = user?.name ?? '';
+    }
+    if (_emailController.value.text.isEmpty) {
+      _emailController.value.text = user?.email ?? '';
+    }
+    if (_addressController.value.text.isEmpty) {
+      _addressController.value.text = user?.address ?? '';
+    }
+    _selectedBloodGroupValue.value ??= user?.bloodGroup;
+    _existingImageUrl = user?.profilePicture;
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_nameController, 'name');
+    registerForRestoration(_emailController, 'email');
+    registerForRestoration(_addressController, 'address');
+    registerForRestoration(_selectedBloodGroupValue, 'blood_group');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -50,22 +95,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    final authState = ref.read(authProvider);
-    final user = authState is AuthAuthenticated ? authState.user : null;
-    _nameController = TextEditingController(text: user?.name ?? '');
-    _emailController = TextEditingController(text: user?.email ?? '');
-    _addressController = TextEditingController(text: user?.address ?? '');
-    _selectedBloodGroup = user?.bloodGroup;
-    _existingImageUrl = user?.profilePicture;
-  }
-
-  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _addressController.dispose();
+    _selectedBloodGroupValue.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -78,6 +114,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         title: Text(s.profileEdit),
       ),
       body: SingleChildScrollView(
+        key: const PageStorageKey('edit_profile_scroll'),
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -122,7 +160,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 24),
 
               CustomTextField(
-                controller: _nameController,
+                controller: _nameController.value,
                 label: s.profileFullName,
                 hint: s.profileNameHint,
                 prefixIcon: Icons.person_outline,
@@ -136,7 +174,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 16),
 
               CustomTextField(
-                controller: _emailController,
+                controller: _emailController.value,
                 label: s.profileEmailOpt,
                 hint: s.profileEmailHint,
                 prefixIcon: Icons.email_outlined,
@@ -145,7 +183,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 16),
 
               CustomTextField(
-                controller: _addressController,
+                controller: _addressController.value,
                 label: s.profileAddress,
                 hint: s.profileAddressHint,
                 prefixIcon: Icons.location_on_outlined,
@@ -164,7 +202,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _selectedBloodGroup,
+                initialValue: _selectedBloodGroupValue.value,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.surface,
@@ -182,7 +220,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
-                    _selectedBloodGroup = value;
+                    _selectedBloodGroupValue.value = value;
                   });
                 },
               ),
@@ -274,10 +312,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
         // Update profile on backend
         await ref.read(authProvider.notifier).updateProfile(
-              name: _nameController.text.trim(),
+              name: _nameController.value.text.trim(),
               phone: null, // phone is read-only on this screen
-              address: _addressController.text.trim(),
-              bloodGroup: _selectedBloodGroup,
+              address: _addressController.value.text.trim(),
+              bloodGroup: _selectedBloodGroupValue.value,
               profilePicture: base64Image,
             );
 

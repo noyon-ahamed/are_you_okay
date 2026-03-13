@@ -49,6 +49,9 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     try {
       await AuthApiService().updateNotificationPreferences(
         notificationEnabled: state.notificationsEnabled,
+        smsAlerts: state.smsAlerts,
+        wellnessReminders: state.wellnessReminders,
+        emergencyAlerts: state.emergencyAlerts,
       );
     } catch (_) {}
   }
@@ -65,6 +68,9 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     try {
       await AuthApiService().updateNotificationPreferences(
         notificationEnabled: newValue,
+        smsAlerts: state.smsAlerts,
+        wellnessReminders: state.wellnessReminders,
+        emergencyAlerts: state.emergencyAlerts,
         earthquakeCountry: state.earthquakeCountry,
       );
     } catch (_) {}
@@ -80,6 +86,57 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
       // Notifications turned OFF → cancel all notifications and background task
       await notifService.cancelAllNotifications();
       await BackgroundService.cancelAllTasks();
+    }
+  }
+
+  Future<void> setNotificationPreferences({
+    bool? pushNotifications,
+    bool? smsAlerts,
+    bool? wellnessReminders,
+    bool? emergencyAlerts,
+  }) async {
+    final nextState = state.copyWith(
+      notificationsEnabled: pushNotifications ?? state.notificationsEnabled,
+      smsAlerts: smsAlerts ?? state.smsAlerts,
+      wellnessReminders: wellnessReminders ?? state.wellnessReminders,
+      emergencyAlerts: emergencyAlerts ?? state.emergencyAlerts,
+      updatedAt: DateTime.now(),
+    );
+
+    final previousPush = state.notificationsEnabled;
+    final previousWellness = state.wellnessReminders;
+    state = nextState;
+    await _hiveService.saveSettings(state);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', state.notificationsEnabled);
+
+    try {
+      await AuthApiService().updateNotificationPreferences(
+        notificationEnabled: state.notificationsEnabled,
+        smsAlerts: state.smsAlerts,
+        wellnessReminders: state.wellnessReminders,
+        emergencyAlerts: state.emergencyAlerts,
+        earthquakeCountry: state.earthquakeCountry,
+      );
+    } catch (_) {}
+
+    final notifService = LocalNotificationService();
+    await notifService.initialize(onNotificationTap: (_) {});
+
+    if (previousPush != state.notificationsEnabled ||
+        previousWellness != state.wellnessReminders) {
+      if (state.notificationsEnabled && state.wellnessReminders) {
+        await BackgroundService.registerPeriodicTask();
+        await BackgroundService.runImmediateReminderCheck();
+      } else {
+        await notifService.cancelCheckinReminders();
+      }
+
+      if (!state.notificationsEnabled) {
+        await notifService.cancelAllNotifications();
+        await BackgroundService.cancelAllTasks();
+      }
     }
   }
 

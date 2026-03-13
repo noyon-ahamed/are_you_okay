@@ -170,6 +170,9 @@ class HiveService {
   Future<void> saveSettings(SettingsModel settings) async {
     final map = {
       'notificationsEnabled': settings.notificationsEnabled,
+      'smsAlerts': settings.smsAlerts,
+      'wellnessReminders': settings.wellnessReminders,
+      'emergencyAlerts': settings.emergencyAlerts,
       'locationEnabled': settings.locationEnabled,
       'checkinIntervalDays': settings.checkinIntervalDays,
       'language': settings.language,
@@ -188,6 +191,9 @@ class HiveService {
         final map = jsonDecode(jsonString);
         return SettingsModel(
           notificationsEnabled: map['notificationsEnabled'] ?? true,
+          smsAlerts: map['smsAlerts'] ?? true,
+          wellnessReminders: map['wellnessReminders'] ?? true,
+          emergencyAlerts: map['emergencyAlerts'] ?? true,
           locationEnabled: map['locationEnabled'] ?? true,
           checkinIntervalDays: map['checkinIntervalDays'] ?? 3,
           language: map['language'] ?? 'en',

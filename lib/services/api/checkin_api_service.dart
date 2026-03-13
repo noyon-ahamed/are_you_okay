@@ -66,7 +66,8 @@ class CheckinApiService {
     } on DioException catch (e) {
       if (e.response?.statusCode == 400) {
         // Already checked in today
-        throw Exception(e.response?.data['error'] ?? 'Already checked in today');
+        throw Exception(
+            e.response?.data['error'] ?? 'Already checked in today');
       }
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
@@ -91,14 +92,20 @@ class CheckinApiService {
   Future<Map<String, dynamic>> getHistory({
     int limit = 30,
     int skip = 0,
+    String? latestCreatedAt,
   }) async {
     try {
+      final queryParameters = <String, dynamic>{
+        'limit': limit,
+        'skip': skip,
+      };
+      if (latestCreatedAt != null && latestCreatedAt.isNotEmpty) {
+        queryParameters['latestCreatedAt'] = latestCreatedAt;
+      }
+
       final response = await _dio.get(
         '$baseUrl/checkin/history',
-        queryParameters: {
-          'limit': limit,
-          'skip': skip,
-        },
+        queryParameters: queryParameters,
       );
 
       if (response.data['success'] == true) {
@@ -178,6 +185,7 @@ class CheckinApiService {
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
   }
+
   Future<Map<String, dynamic>> setCheckInInterval(int interval) async {
     try {
       final response = await _dio.post(

@@ -18,20 +18,122 @@ import '../../../core/localization/app_strings.dart';
 
 final moodApiProvider = Provider((ref) => MoodApiService());
 
-final moodStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  return await ref.watch(moodApiProvider).getStats(days: 30);
+class MoodStatsNotifier
+    extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
+  MoodStatsNotifier(this._api) : super(const AsyncLoading()) {
+    _bootstrap();
+  }
+
+  final MoodApiService _api;
+  Future<void>? _fetchInFlight;
+
+  Future<void> _bootstrap() async {
+    final cached = await _api.getCachedStats();
+    if (cached != null) {
+      state = AsyncData(cached);
+    }
+    await fetch(silent: cached != null);
+  }
+
+  Future<void> fetch({bool silent = true}) async {
+    if (_fetchInFlight != null) {
+      return _fetchInFlight!;
+    }
+
+    final future = _fetchStats(silent: silent);
+    _fetchInFlight = future;
+    try {
+      await future;
+    } finally {
+      _fetchInFlight = null;
+    }
+  }
+
+  Future<void> _fetchStats({required bool silent}) async {
+    if (!silent || !state.hasValue) {
+      state = const AsyncLoading();
+    }
+
+    try {
+      state = AsyncData(await _api.getStats(days: 30));
+    } catch (e, st) {
+      if (!silent || !state.hasValue) {
+        state = AsyncError(e, st);
+      }
+    }
+  }
+}
+
+class MoodHistoryNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
+  MoodHistoryNotifier(this._api) : super(const AsyncLoading()) {
+    _bootstrap();
+  }
+
+  final MoodApiService _api;
+  Future<void>? _fetchInFlight;
+
+  Future<void> _bootstrap() async {
+    final cached = await _api.getCachedHistory();
+    final cachedHistory = _extractHistory(cached);
+    if (cachedHistory.isNotEmpty) {
+      state = AsyncData(cachedHistory);
+    }
+    await fetch(silent: cachedHistory.isNotEmpty);
+  }
+
+  Future<void> fetch({bool silent = true}) async {
+    if (_fetchInFlight != null) {
+      return _fetchInFlight!;
+    }
+
+    final future = _fetchHistory(silent: silent);
+    _fetchInFlight = future;
+    try {
+      await future;
+    } finally {
+      _fetchInFlight = null;
+    }
+  }
+
+  Future<void> _fetchHistory({required bool silent}) async {
+    if (!silent || !state.hasValue) {
+      state = const AsyncLoading();
+    }
+
+    try {
+      final latestCreatedAt = await _api.getLatestHistoryCreatedAt();
+      final result = await _api.getHistory(
+        limit: 50,
+        latestCreatedAt: latestCreatedAt,
+      );
+      state = AsyncData(_extractHistory(result));
+    } catch (e, st) {
+      if (!silent || !state.hasValue) {
+        state = AsyncError(e, st);
+      }
+    }
+  }
+
+  List<dynamic> _extractHistory(Map<String, dynamic>? result) {
+    if (result == null) return <dynamic>[];
+    final historyData = result['moods'] ?? result['history'] ?? result['data'];
+    if (historyData is List) {
+      return historyData;
+    }
+    return <dynamic>[];
+  }
+}
+
+final moodStatsProvider =
+    StateNotifierProvider<MoodStatsNotifier, AsyncValue<Map<String, dynamic>>>(
+        (ref) {
+  return MoodStatsNotifier(ref.watch(moodApiProvider));
 });
 
-final moodHistoryProvider = FutureProvider<List<dynamic>>((ref) async {
-  final result = await ref.watch(moodApiProvider).getHistory(limit: 50);
-  debugPrint('Mood History API Response: $result');
-
-  final dynamic historyData =
-      result['moods'] ?? result['history'] ?? result['data'];
-  if (historyData != null && historyData is List) {
-    return historyData;
-  }
-  return <dynamic>[];
+final moodHistoryProvider =
+    StateNotifierProvider<MoodHistoryNotifier, AsyncValue<List<dynamic>>>(
+        (ref) {
+  return MoodHistoryNotifier(ref.watch(moodApiProvider));
 });
 
 // --- Screen --- //
@@ -43,20 +145,49 @@ class MoodHistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<MoodHistoryScreen> createState() => _MoodHistoryScreenState();
 }
 
-class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
-  int _filterDays = 0; // 0 means 'All Time', 7, 14, etc.
+class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen>
+    with RestorationMixin {
+  final RestorableInt _filterDays = RestorableInt(0);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
 
   // Local cache for last loaded data
   List<dynamic>? _cachedHistory;
   Map<String, dynamic>? _cachedStats;
 
   @override
+  String? get restorationId => 'mood_history_screen';
+
+  @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(moodStatsProvider);
-      ref.invalidate(moodHistoryProvider);
+      ref.read(moodStatsProvider.notifier).fetch(silent: true);
+      ref.read(moodHistoryProvider.notifier).fetch(silent: true);
     });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_filterDays, 'filter_days');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _filterDays.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -72,7 +203,7 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
             icon: const Icon(Icons.filter_list),
             onSelected: (value) {
               setState(() {
-                _filterDays = value;
+                _filterDays.value = value;
               });
             },
             itemBuilder: (context) => [
@@ -84,6 +215,8 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
         ],
       ),
       body: CustomScrollView(
+        key: const PageStorageKey('mood_history_scroll'),
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         slivers: [
           // 1. Statistics Section
@@ -333,8 +466,8 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen> {
   Widget _buildHistoryList(List<dynamic> allHistory, bool isDark,
       BuildContext context, AppStrings s) {
     List<dynamic> history = allHistory;
-    if (_filterDays > 0) {
-      final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
+    if (_filterDays.value > 0) {
+      final cutoff = DateTime.now().subtract(Duration(days: _filterDays.value));
       history = allHistory.where((item) {
         if (item['timestamp'] != null) {
           final date = DateTime.tryParse(item['timestamp'].toString());

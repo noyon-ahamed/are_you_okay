@@ -23,7 +23,12 @@ class SOSScreen extends ConsumerStatefulWidget {
 }
 
 class _SOSScreenState extends ConsumerState<SOSScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RestorationMixin {
+  final RestorableBool _needPoliceState = RestorableBool(false);
+  final RestorableBool _needFireState = RestorableBool(false);
+  final RestorableBool _needAmbulanceState = RestorableBool(false);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   late AnimationController _pulseController;
   late AnimationController _countdownController;
   late Animation<double> _pulseAnim;
@@ -42,8 +47,15 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   bool _needAmbulance = false;
 
   @override
+  String? get restorationId => 'sos_screen';
+
+  @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -60,7 +72,28 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_needPoliceState, 'need_police');
+    registerForRestoration(_needFireState, 'need_fire');
+    registerForRestoration(_needAmbulanceState, 'need_ambulance');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    _needPolice = _needPoliceState.value;
+    _needFire = _needFireState.value;
+    _needAmbulance = _needAmbulanceState.value;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _needPoliceState.dispose();
+    _needFireState.dispose();
+    _needAmbulanceState.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     _pulseController.dispose();
     _countdownController.dispose();
     _countdownTimer?.cancel();
@@ -254,6 +287,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
+              key: const PageStorageKey('sos_scroll'),
+              controller: _scrollController,
               padding: const EdgeInsets.only(bottom: 20),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -394,12 +429,27 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
             spacing: 8,
             runSpacing: 4,
             children: [
-              _buildCheckbox(s.sosPolice, _needPolice,
-                  (v) => setState(() => _needPolice = v!)),
               _buildCheckbox(
-                  s.sosFire, _needFire, (v) => setState(() => _needFire = v!)),
-              _buildCheckbox(s.sosAmbulance, _needAmbulance,
-                  (v) => setState(() => _needAmbulance = v!)),
+                  s.sosPolice,
+                  _needPolice,
+                  (v) => setState(() {
+                        _needPolice = v!;
+                        _needPoliceState.value = v;
+                      })),
+              _buildCheckbox(
+                  s.sosFire,
+                  _needFire,
+                  (v) => setState(() {
+                        _needFire = v!;
+                        _needFireState.value = v;
+                      })),
+              _buildCheckbox(
+                  s.sosAmbulance,
+                  _needAmbulance,
+                  (v) => setState(() {
+                        _needAmbulance = v!;
+                        _needAmbulanceState.value = v;
+                      })),
             ],
           ),
         ],

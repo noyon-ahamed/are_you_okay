@@ -18,11 +18,20 @@ class FakeCallScreen extends ConsumerStatefulWidget {
   ConsumerState<FakeCallScreen> createState() => _FakeCallScreenState();
 }
 
-class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
+class _FakeCallScreenState extends ConsumerState<FakeCallScreen>
+    with RestorationMixin {
   // Call state
   _CallState _callState = _CallState.setup;
 
   // Caller presets
+  final RestorableInt _selectedPresetState = RestorableInt(0);
+  final RestorableInt _delaySecondsState = RestorableInt(5);
+  final RestorableTextEditingController _nameController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _numberController =
+      RestorableTextEditingController();
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   int _selectedPreset = 0;
   List<_CallerPreset> _getPresets(AppStrings s) => [
         _CallerPreset(
@@ -52,10 +61,6 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
             color: const Color(0xFF607D8B)),
       ];
 
-  // Custom name controller
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _numberController = TextEditingController();
-
   // Timer
   Timer? _delayTimer;
   int _delaySeconds = 5;
@@ -67,13 +72,42 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
   StreamSubscription<CallEvent?>? _callkitEventSubscription;
 
   @override
+  String? get restorationId => 'fake_call_screen';
+
+  @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     final s = ref.read(stringsProvider);
     final presets = _getPresets(s);
-    _nameController.text = presets[_selectedPreset].name;
-    _numberController.text = presets[_selectedPreset].number;
+    _selectedPreset = _selectedPresetState.value;
+    _delaySeconds = _delaySecondsState.value;
+    if (_nameController.value.text.isEmpty) {
+      _nameController.value.text = presets[_selectedPreset].name;
+    }
+    if (_numberController.value.text.isEmpty) {
+      _numberController.value.text = presets[_selectedPreset].number;
+    }
     _listenToCallKitEvents();
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_selectedPresetState, 'selected_preset');
+    registerForRestoration(_delaySecondsState, 'delay_seconds');
+    registerForRestoration(_nameController, 'caller_name');
+    registerForRestoration(_numberController, 'caller_number');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    _selectedPreset = _selectedPresetState.value;
+    _delaySeconds = _delaySecondsState.value;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
   }
 
   void _listenToCallKitEvents() {
@@ -105,6 +139,10 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
     _delayTimer?.cancel();
     _nameController.dispose();
     _numberController.dispose();
+    _selectedPresetState.dispose();
+    _delaySecondsState.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     _callkitEventSubscription?.cancel();
     super.dispose();
   }
@@ -210,12 +248,16 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
   }
 
   String _currentCallerName(AppStrings s) {
-    if (_nameController.text.isNotEmpty) return _nameController.text;
+    if (_nameController.value.text.isNotEmpty) {
+      return _nameController.value.text;
+    }
     return _getPresets(s)[_selectedPreset].name;
   }
 
   String _currentCallerNumber(AppStrings s) {
-    if (_numberController.text.isNotEmpty) return _numberController.text;
+    if (_numberController.value.text.isNotEmpty) {
+      return _numberController.value.text;
+    }
     return _getPresets(s)[_selectedPreset].number;
   }
 
@@ -236,6 +278,8 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(s.fcTitle)),
       body: SingleChildScrollView(
+        key: const PageStorageKey('fake_call_setup_scroll'),
+        controller: _scrollController,
         padding: const EdgeInsets.all(20),
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -257,8 +301,9 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
                     onTap: () {
                       setState(() {
                         _selectedPreset = i;
-                        _nameController.text = presets[i].name;
-                        _numberController.text = presets[i].number;
+                        _selectedPresetState.value = i;
+                        _nameController.value.text = presets[i].name;
+                        _numberController.value.text = presets[i].number;
                       });
                     },
                     child: AnimatedContainer(
@@ -313,7 +358,7 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextField(
-              controller: _nameController,
+              controller: _nameController.value,
               decoration: InputDecoration(
                 labelText: s.fcCallerName,
                 prefixIcon: const Icon(Icons.person_outline),
@@ -321,7 +366,7 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _numberController,
+              controller: _numberController.value,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
                 labelText: s.fcCallerNumber,
@@ -350,7 +395,10 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen> {
               divisions: 57,
               activeColor: AppColors.primary,
               label: '$_delaySeconds ${s.fcSecondsLiteral}',
-              onChanged: (val) => setState(() => _delaySeconds = val.round()),
+              onChanged: (val) => setState(() {
+                _delaySeconds = val.round();
+                _delaySecondsState.value = _delaySeconds;
+              }),
             ),
 
             const SizedBox(height: 32),

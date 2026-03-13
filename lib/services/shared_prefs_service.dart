@@ -89,6 +89,14 @@ class SharedPrefsService {
     await _prefs?.setBool(AppConstants.keyNotificationsEnabled, enabled);
   }
 
+  String? get lastRoute {
+    return _prefs?.getString('last_route');
+  }
+
+  Future<void> setLastRoute(String route) async {
+    await _prefs?.setString('last_route', route);
+  }
+
   // ==================== User Session ====================
 
   Future<void> setUserId(String uid) async {

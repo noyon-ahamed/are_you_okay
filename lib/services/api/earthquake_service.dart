@@ -13,7 +13,7 @@ final earthquakeServiceProvider =
     Provider<EarthquakeService>((ref) => EarthquakeService());
 
 class EarthquakeService {
-  static const String _cacheKey = 'earthquake_latest_cache_v1';
+  static const String _cacheKeyPrefix = 'earthquake_latest_cache_v2';
   final Dio _dio;
   final String _baseUrl = AppConstants.apiBaseUrl;
 
@@ -67,19 +67,32 @@ class EarthquakeService {
 
       if (response.data['success'] == true) {
         final data = response.data['data'] as Map<String, dynamic>? ?? {};
-        await _saveCache(data);
+        await _saveCache(
+          data,
+          lat: lat,
+          lng: lng,
+          country: country,
+        );
         return data;
       } else {
         throw Exception('Failed to fetch earthquakes');
       }
     } on DioException catch (e) {
-      final cached = await getCachedEarthquakes();
+      final cached = await getCachedEarthquakes(
+        lat: lat,
+        lng: lng,
+        country: country,
+      );
       if (cached != null) {
         return cached;
       }
       throw Exception(e.response?.data['error'] ?? 'Network error');
     } catch (e) {
-      final cached = await getCachedEarthquakes();
+      final cached = await getCachedEarthquakes(
+        lat: lat,
+        lng: lng,
+        country: country,
+      );
       if (cached != null) {
         return cached;
       }
@@ -87,9 +100,14 @@ class EarthquakeService {
     }
   }
 
-  Future<Map<String, dynamic>?> getCachedEarthquakes() async {
+  Future<Map<String, dynamic>?> getCachedEarthquakes({
+    double? lat,
+    double? lng,
+    String? country,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_cacheKey);
+    final raw =
+        prefs.getString(_cacheKeyFor(lat: lat, lng: lng, country: country));
     if (raw == null || raw.isEmpty) return null;
 
     try {
@@ -103,15 +121,31 @@ class EarthquakeService {
     }
   }
 
-  Future<void> _saveCache(Map<String, dynamic> data) async {
+  Future<void> _saveCache(
+    Map<String, dynamic> data, {
+    double? lat,
+    double? lng,
+    String? country,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      _cacheKey,
+      _cacheKeyFor(lat: lat, lng: lng, country: country),
       jsonEncode({
         'cachedAt': DateTime.now().toIso8601String(),
         'data': data,
       }),
     );
+  }
+
+  String _cacheKeyFor({
+    double? lat,
+    double? lng,
+    String? country,
+  }) {
+    final normalizedCountry = (country ?? '').trim().toLowerCase();
+    final latKey = lat != null ? (lat * 10).round() / 10 : 'none';
+    final lngKey = lng != null ? (lng * 10).round() / 10 : 'none';
+    return '$_cacheKeyPrefix:$normalizedCountry:$latKey:$lngKey';
   }
 
   /// Trigger manual earthquake data fetch

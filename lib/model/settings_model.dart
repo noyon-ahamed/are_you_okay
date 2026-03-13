@@ -1,5 +1,8 @@
 class SettingsModel {
   final bool notificationsEnabled;
+  final bool smsAlerts;
+  final bool wellnessReminders;
+  final bool emergencyAlerts;
   final bool locationEnabled;
   final int checkinIntervalDays;
   final String language;
@@ -10,6 +13,9 @@ class SettingsModel {
 
   const SettingsModel({
     this.notificationsEnabled = true,
+    this.smsAlerts = true,
+    this.wellnessReminders = true,
+    this.emergencyAlerts = true,
     this.locationEnabled = true,
     this.checkinIntervalDays = 3, // default: 3 days
     this.language = 'en',
@@ -21,6 +27,9 @@ class SettingsModel {
 
   SettingsModel copyWith({
     bool? notificationsEnabled,
+    bool? smsAlerts,
+    bool? wellnessReminders,
+    bool? emergencyAlerts,
     bool? locationEnabled,
     int? checkinIntervalDays,
     String? language,
@@ -31,6 +40,9 @@ class SettingsModel {
   }) {
     return SettingsModel(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      smsAlerts: smsAlerts ?? this.smsAlerts,
+      wellnessReminders: wellnessReminders ?? this.wellnessReminders,
+      emergencyAlerts: emergencyAlerts ?? this.emergencyAlerts,
       locationEnabled: locationEnabled ?? this.locationEnabled,
       checkinIntervalDays: checkinIntervalDays ?? this.checkinIntervalDays,
       language: language ?? this.language,

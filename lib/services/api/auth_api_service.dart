@@ -188,6 +188,9 @@ class AuthApiService {
 
   Future<void> updateNotificationPreferences({
     bool? notificationEnabled,
+    bool? smsAlerts,
+    bool? wellnessReminders,
+    bool? emergencyAlerts,
     List<String>? reminderTimes,
     String? timezone,
     String? language,
@@ -200,6 +203,9 @@ class AuthApiService {
         data: {
           if (notificationEnabled != null)
             'notificationEnabled': notificationEnabled,
+          if (smsAlerts != null) 'smsAlerts': smsAlerts,
+          if (wellnessReminders != null) 'wellnessReminders': wellnessReminders,
+          if (emergencyAlerts != null) 'emergencyAlerts': emergencyAlerts,
           if (reminderTimes != null) 'reminderTimes': reminderTimes,
           if (timezone != null) 'timezone': timezone,
           if (language != null) 'language': language,

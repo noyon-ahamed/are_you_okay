@@ -14,16 +14,26 @@ class AIChatScreen extends ConsumerStatefulWidget {
   ConsumerState<AIChatScreen> createState() => _AIChatScreenState();
 }
 
-class _AIChatScreenState extends ConsumerState<AIChatScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+class _AIChatScreenState extends ConsumerState<AIChatScreen>
+    with RestorationMixin {
+  final RestorableTextEditingController _messageController =
+      RestorableTextEditingController();
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   final List<_ChatMessage> _messages = [];
   bool _isTyping = false;
   late GeminiAIService _aiService;
 
   @override
+  String? get restorationId => 'ai_chat_screen';
+
+  @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     _aiService = ref.read(aiServiceProvider);
     final s = ref.read(stringsProvider);
     // Welcome message
@@ -35,8 +45,20 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_messageController, 'message');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
+    _scrollOffset.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -54,7 +76,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Future<void> _sendMessage([String? text]) async {
-    final msgText = text ?? _messageController.text.trim();
+    final msgText = text ?? _messageController.value.text.trim();
     if (msgText.isEmpty) return;
 
     // Check connectivity before sending
@@ -90,7 +112,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         isUser: true,
         timestamp: DateTime.now(),
       ));
-      _messageController.clear();
+      _messageController.value.clear();
       _isTyping = true;
     });
     _scrollToBottom();
@@ -206,6 +228,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           // Messages
           Expanded(
             child: ListView.builder(
+              key: const PageStorageKey('ai_chat_messages'),
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               itemCount: _messages.length + (_isTyping ? 1 : 0),
@@ -405,7 +428,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         children: [
           Expanded(
             child: TextField(
-              controller: _messageController,
+              controller: _messageController.value,
               maxLines: 4,
               minLines: 1,
               textInputAction: TextInputAction.send,

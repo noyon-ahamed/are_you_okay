@@ -42,20 +42,27 @@ class NotificationApiService {
   Future<Map<String, dynamic>> getNotifications({
     int limit = 50,
     int skip = 0,
+    String? latestCreatedAt,
   }) async {
     try {
+      final queryParameters = <String, dynamic>{
+        'limit': limit,
+        'skip': skip,
+      };
+      if (latestCreatedAt != null && latestCreatedAt.isNotEmpty) {
+        queryParameters['latestCreatedAt'] = latestCreatedAt;
+      }
+
       final response = await _dio.get(
         '$baseUrl/notification',
-        queryParameters: {
-          'limit': limit,
-          'skip': skip,
-        },
+        queryParameters: queryParameters,
       );
 
       if (response.data['success'] == true) {
         return response.data;
       } else {
-        throw Exception(response.data['error'] ?? 'Failed to fetch notifications');
+        throw Exception(
+            response.data['error'] ?? 'Failed to fetch notifications');
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['error'] ?? 'Network error');

@@ -199,10 +199,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       current.copyWith(
         notificationsEnabled: remoteSettings['notificationEnabled'] as bool? ??
             current.notificationsEnabled,
+        smsAlerts: remoteSettings['smsAlerts'] as bool? ?? current.smsAlerts,
+        wellnessReminders: remoteSettings['wellnessReminders'] as bool? ??
+            current.wellnessReminders,
+        emergencyAlerts: remoteSettings['emergencyAlerts'] as bool? ??
+            current.emergencyAlerts,
         language: remoteSettings['language']?.toString() ?? current.language,
-        earthquakeCountry:
-            remoteSettings['earthquakeCountry']?.toString() ??
-                current.earthquakeCountry,
+        earthquakeCountry: remoteSettings['earthquakeCountry']?.toString() ??
+            current.earthquakeCountry,
       ),
     );
   }

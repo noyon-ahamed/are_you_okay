@@ -17,15 +17,44 @@ class CheckinHistoryScreen extends ConsumerStatefulWidget {
       _CheckinHistoryScreenState();
 }
 
-class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
-  int _filterDays = 0;
+class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen>
+    with RestorationMixin {
+  final RestorableInt _filterDays = RestorableInt(0);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
+
+  @override
+  String? get restorationId => 'checkin_history_screen';
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(checkinHistoryFromBackendProvider);
+      ref.read(checkinHistoryFromBackendProvider.notifier).fetch(silent: true);
     });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_filterDays, 'filter_days');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _filterDays.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -43,7 +72,7 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
             icon: const Icon(Icons.filter_list),
             onSelected: (value) {
               setState(() {
-                _filterDays = value;
+                _filterDays.value = value;
               });
             },
             itemBuilder: (context) => [
@@ -75,8 +104,9 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
               Text('${s.chErrorPrefix} $error', textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () =>
-                    ref.invalidate(checkinHistoryFromBackendProvider),
+                onPressed: () => ref
+                    .read(checkinHistoryFromBackendProvider.notifier)
+                    .fetch(silent: false),
                 child: Text(s.retry),
               ),
             ],
@@ -84,8 +114,9 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
         ),
         data: (checkins) {
           List<Map<String, dynamic>> filtered = checkins;
-          if (_filterDays > 0) {
-            final cutoff = DateTime.now().subtract(Duration(days: _filterDays));
+          if (_filterDays.value > 0) {
+            final cutoff =
+                DateTime.now().subtract(Duration(days: _filterDays.value));
             filtered = checkins.where((c) {
               final timestamp = _parseTimestamp(c);
               return timestamp != null && timestamp.isAfter(cutoff);
@@ -102,7 +133,9 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(checkinHistoryFromBackendProvider);
+              await ref
+                  .read(checkinHistoryFromBackendProvider.notifier)
+                  .fetch(silent: true);
             },
             child: _buildHistoryList(
                 context, filtered, isDark, statusData.streak, s),
@@ -137,6 +170,8 @@ class _CheckinHistoryScreenState extends ConsumerState<CheckinHistoryScreen> {
     final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return CustomScrollView(
+      key: const PageStorageKey('checkin_history_scroll'),
+      controller: _scrollController,
       physics:
           const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       slivers: [

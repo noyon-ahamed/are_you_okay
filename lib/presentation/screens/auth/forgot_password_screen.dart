@@ -16,21 +16,56 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
       _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
+    with RestorationMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final RestorableTextEditingController _emailController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _otpController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _newPasswordController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _confirmPasswordController =
+      RestorableTextEditingController();
+  final RestorableBool _obscurePassword = RestorableBool(true);
+  final RestorableBool _obscureConfirm = RestorableBool(true);
+  final RestorableInt _currentStep = RestorableInt(0);
+  final RestorableStringN _resetToken = RestorableStringN(null);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   final _authService = AuthApiService();
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
 
-  // 0 = enter email, 1 = enter OTP, 2 = enter new password
-  int _currentStep = 0;
-  String? _resetToken;
+  @override
+  String? get restorationId => 'forgot_password_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_emailController, 'email');
+    registerForRestoration(_otpController, 'otp');
+    registerForRestoration(_newPasswordController, 'new_password');
+    registerForRestoration(_confirmPasswordController, 'confirm_password');
+    registerForRestoration(_obscurePassword, 'obscure_password');
+    registerForRestoration(_obscureConfirm, 'obscure_confirm');
+    registerForRestoration(_currentStep, 'current_step');
+    registerForRestoration(_resetToken, 'reset_token');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -38,6 +73,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     _otpController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _obscurePassword.dispose();
+    _obscureConfirm.dispose();
+    _currentStep.dispose();
+    _resetToken.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -47,12 +88,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.forgotPassword(_emailController.text.trim());
+      await _authService.forgotPassword(_emailController.value.text.trim());
 
       if (mounted) {
         final s = ref.read(stringsProvider);
         _showSuccess(s.forgotOtpSent);
-        setState(() => _currentStep = 1);
+        setState(() => _currentStep.value = 1);
       }
     } catch (e) {
       if (mounted) {
@@ -66,7 +107,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _verifyOtp() async {
-    if (_otpController.text.trim().length != 6) {
+    if (_otpController.value.text.trim().length != 6) {
       final s = ref.read(stringsProvider);
       _showError(s.forgotOtpHint);
       return;
@@ -76,16 +117,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     try {
       final token = await _authService.verifyOtp(
-        email: _emailController.text.trim(),
-        otp: _otpController.text.trim(),
+        email: _emailController.value.text.trim(),
+        otp: _otpController.value.text.trim(),
       );
 
       if (mounted) {
         final s = ref.read(stringsProvider);
         _showSuccess(s.forgotOtpVerified);
         setState(() {
-          _resetToken = token;
-          _currentStep = 2;
+          _resetToken.value = token;
+          _currentStep.value = 2;
         });
       }
     } catch (e) {
@@ -106,7 +147,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_resetToken == null) {
+    if (_resetToken.value == null) {
       final s = ref.read(stringsProvider);
       _showError(
           s.isBangla ? 'OTP যাচাই প্রয়োজন' : 'OTP verification required');
@@ -117,8 +158,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     try {
       await _authService.resetPassword(
-        token: _resetToken!,
-        newPassword: _newPasswordController.text,
+        token: _resetToken.value!,
+        newPassword: _newPasswordController.value.text,
       );
 
       if (mounted) {
@@ -177,6 +218,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('forgot_password_scroll'),
+          controller: _scrollController,
           padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
@@ -194,9 +237,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 24),
 
                 Text(
-                  _currentStep == 0
+                  _currentStep.value == 0
                       ? s.forgotTitle
-                      : _currentStep == 1
+                      : _currentStep.value == 1
                           ? s.forgotVerifyOTP
                           : s.forgotNewPassword,
                   style: const TextStyle(
@@ -210,9 +253,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 8),
 
                 Text(
-                  _currentStep == 0
+                  _currentStep.value == 0
                       ? s.forgotSubtitle
-                      : _currentStep == 1
+                      : _currentStep.value == 1
                           ? s.forgotOTPSubtitle
                           : s.forgotNewPassSubtitle,
                   style: const TextStyle(
@@ -230,11 +273,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(3, (index) {
                     return Container(
-                      width: index == _currentStep ? 32 : 12,
+                      width: index == _currentStep.value ? 32 : 12,
                       height: 8,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color: index <= _currentStep
+                        color: index <= _currentStep.value
                             ? AppColors.primary
                             // ignore: deprecated_member_use
                             : AppColors.primary.withOpacity(0.2),
@@ -247,9 +290,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 32),
 
                 // Step 0: Email
-                if (_currentStep == 0) ...[
+                if (_currentStep.value == 0) ...[
                   CustomTextField(
-                    controller: _emailController,
+                    controller: _emailController.value,
                     label: s.regEmail,
                     hint: 'your@email.com',
                     keyboardType: TextInputType.emailAddress,
@@ -277,9 +320,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ],
 
                 // Step 1: OTP
-                if (_currentStep == 1) ...[
+                if (_currentStep.value == 1) ...[
                   Text(
-                    _emailController.text.trim(),
+                    _emailController.value.text.trim(),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -289,7 +332,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
-                    controller: _otpController,
+                    controller: _otpController.value,
                     label: s.forgotOtpCode,
                     hint: s.forgotOtpHint,
                     keyboardType: TextInputType.number,
@@ -311,7 +354,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     onPressed: _isLoading
                         ? null
                         : () {
-                            _otpController.clear();
+                            _otpController.value.clear();
                             _sendOtp();
                           },
                     child: Text(
@@ -322,19 +365,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ],
 
                 // Step 2: New Password
-                if (_currentStep == 2) ...[
+                if (_currentStep.value == 2) ...[
                   CustomTextField(
-                    controller: _newPasswordController,
+                    controller: _newPasswordController.value,
                     label: s.forgotNewPassword,
                     hint: '••••••••',
-                    obscureText: _obscurePassword,
+                    obscureText: _obscurePassword.value,
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
+                      icon: Icon(_obscurePassword.value
                           ? Icons.visibility_off
                           : Icons.visibility),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(() =>
+                          _obscurePassword.value = !_obscurePassword.value),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -348,20 +391,20 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
-                    controller: _confirmPasswordController,
+                    controller: _confirmPasswordController.value,
                     label: s.regConfirmPass,
                     hint: '••••••••',
-                    obscureText: _obscureConfirm,
+                    obscureText: _obscureConfirm.value,
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm
+                      icon: Icon(_obscureConfirm.value
                           ? Icons.visibility_off
                           : Icons.visibility),
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
+                      onPressed: () => setState(
+                          () => _obscureConfirm.value = !_obscureConfirm.value),
                     ),
                     validator: (value) {
-                      if (value != _newPasswordController.text) {
+                      if (value != _newPasswordController.value.text) {
                         return s.validationPassMatch;
                       }
                       return null;

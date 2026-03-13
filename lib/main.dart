@@ -152,6 +152,9 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
 
       await AuthApiService().updateNotificationPreferences(
         notificationEnabled: notificationsEnabled,
+        smsAlerts: ref.read(settingsProvider).smsAlerts,
+        wellnessReminders: ref.read(settingsProvider).wellnessReminders,
+        emergencyAlerts: ref.read(settingsProvider).emergencyAlerts,
         reminderTimes: AppConstants.defaultReminderTimes,
         timezone: timezone,
         language: language,
@@ -264,6 +267,7 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     return MaterialApp.router(
       title: 'Are You Okay',
       debugShowCheckedModeBanner: false,
+      restorationScopeId: 'app',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,

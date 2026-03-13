@@ -388,8 +388,8 @@ class AppStrings {
       isBangla ? 'কোনো সাম্প্রতিক ভূমিকম্প নেই' : 'No recent earthquakes';
   String get earthquakeNearbyStat => isBangla ? 'কাছাকাছি' : 'Nearby';
   String get earthquakeTabNear => isBangla ? 'আপনার কাছে' : 'Near You';
-  String get earthquakeTabNearWithRadius =>
-      isBangla ? 'আপনার কাছে (100km)' : 'Near You (100 km)';
+  String earthquakeTabNearWithRadius([int radiusKm = 3000]) =>
+      isBangla ? 'আপনার কাছে ($radiusKm km)' : 'Near You ($radiusKm km)';
   String get earthquakeTabGlobal =>
       isBangla ? 'শীর্ষ ৫ বৈশ্বিক' : 'Top 5 Global';
   String get earthquakeMaxMag => isBangla ? 'সর্বোচ্চ মাত্রা' : 'Max Magnitude';

@@ -13,6 +13,7 @@ import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/profile/edit_profile_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
+import '../../presentation/screens/settings/notification_settings_screen.dart';
 import '../../presentation/screens/settings/about_app_screen.dart';
 import '../../presentation/screens/settings/privacy_policy_screen.dart';
 import '../../presentation/screens/contacts/emergency_contacts_screen.dart';
@@ -42,6 +43,7 @@ class Routes {
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
   static const String settings = '/settings';
+  static const String notificationSettings = '/settings/notifications';
   static const String aboutApp = '/settings/about';
   static const String privacyPolicy = '/settings/privacy';
   static const String contacts = '/contacts';
@@ -89,6 +91,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.login,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'login_page',
           child: const LoginScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
@@ -99,6 +102,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.register,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'register_page',
           child: const RegisterScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
@@ -116,6 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.forgotPassword,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'forgot_password_page',
           child: const ForgotPasswordScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
@@ -133,6 +138,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.home,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'home_page',
           child: const HomeScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
@@ -143,6 +149,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.aiChat,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'ai_chat_page',
           child: const AIChatScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
@@ -158,44 +165,79 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.earthquake,
-        builder: (context, state) => const EarthquakeScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'earthquake_page',
+          child: EarthquakeScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.moodHistory,
-        builder: (context, state) => const MoodHistoryScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'mood_history_page',
+          child: MoodHistoryScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.fakeCall,
-        builder: (context, state) => const FakeCallScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'fake_call_page',
+          child: FakeCallScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.profile,
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'profile_page',
+          child: ProfileScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.editProfile,
-        builder: (context, state) => const EditProfileScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'edit_profile_page',
+          child: EditProfileScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.settings,
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'settings_page',
+          child: SettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.notificationSettings,
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'notification_settings_page',
+          child: NotificationSettingsScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.aboutApp,
-        builder: (context, state) => const AboutAppScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'about_app_page',
+          child: AboutAppScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.privacyPolicy,
-        builder: (context, state) => const PrivacyPolicyScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'privacy_policy_page',
+          child: PrivacyPolicyScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.contacts,
-        builder: (context, state) => const EmergencyContactsScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'contacts_page',
+          child: EmergencyContactsScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.addContact,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'add_contact_page',
           child: const AddContactScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
@@ -213,6 +255,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.sos,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
+          restorationId: 'sos_page',
           child: const SOSScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
@@ -221,11 +264,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.history,
-        builder: (context, state) => const CheckinHistoryScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'history_page',
+          child: CheckinHistoryScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.notifications,
-        builder: (context, state) => const NotificationScreen(),
+        pageBuilder: (context, state) => const MaterialPage(
+          restorationId: 'notifications_page',
+          child: NotificationScreen(),
+        ),
       ),
     ],
     redirect: (context, state) {
@@ -241,6 +290,24 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final isAuthenticated = authState is AuthAuthenticated;
       final isLoading = authState is AuthLoading || authState is AuthInitial;
+      const restorableRoutes = <String>{
+        Routes.home,
+        Routes.aiChat,
+        Routes.earthquake,
+        Routes.fakeCall,
+        Routes.profile,
+        Routes.editProfile,
+        Routes.settings,
+        Routes.notificationSettings,
+        Routes.aboutApp,
+        Routes.privacyPolicy,
+        Routes.contacts,
+        Routes.addContact,
+        Routes.sos,
+        Routes.history,
+        Routes.moodHistory,
+        Routes.notifications,
+      };
 
       if (currentPath == Routes.onboarding) {
         if (isAuthenticated) return Routes.home;
@@ -268,11 +335,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (isAuthenticated && (isAuthPage || currentPath == Routes.splash)) {
-        return Routes.home;
+        return sharedPrefs.lastRoute != null &&
+                restorableRoutes.contains(sharedPrefs.lastRoute)
+            ? sharedPrefs.lastRoute
+            : Routes.home;
       }
 
       if (!isAuthenticated && currentPath == Routes.splash) {
         return isFirstLaunch ? Routes.onboarding : Routes.login;
+      }
+
+      if (isAuthenticated && restorableRoutes.contains(currentPath)) {
+        sharedPrefs.setLastRoute(currentPath);
       }
 
       return null;

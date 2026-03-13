@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 const String _kMoodHistoryCache = 'mood_history_cache';
 const String _kMoodStatsCache = 'mood_stats_cache';
+const String _kMoodHistoryMeta = 'mood_history_cache_meta';
 
 /// MoodApiService
 /// Handles mood tracking API calls
@@ -75,22 +76,28 @@ class MoodApiService {
   Future<Map<String, dynamic>> getHistory({
     int limit = 30,
     int skip = 0,
+    String? latestCreatedAt,
   }) async {
     try {
+      final queryParameters = <String, dynamic>{
+        'limit': limit,
+        'skip': skip,
+      };
+      if (latestCreatedAt != null && latestCreatedAt.isNotEmpty) {
+        queryParameters['latestCreatedAt'] = latestCreatedAt;
+      }
+
       final response = await _dio.get(
         '$baseUrl/mood/history',
-        queryParameters: {
-          'limit': limit,
-          'skip': skip,
-        },
+        queryParameters: queryParameters,
       );
 
       if (response.data['success'] == true) {
-        // Persist to local cache
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_kMoodHistoryCache, jsonEncode(response.data));
+        final mergedResponse = await _mergeAndPersistHistoryCache(
+          response.data as Map<String, dynamic>,
+        );
         debugPrint('Mood history cached to disk');
-        return response.data;
+        return mergedResponse;
       } else {
         throw Exception(
             response.data['error'] ?? 'Failed to fetch mood history');
@@ -105,6 +112,35 @@ class MoodApiService {
         return jsonDecode(cached) as Map<String, dynamic>;
       }
       throw Exception('Network error');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCachedHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_kMoodHistoryCache);
+    if (cached == null || cached.isEmpty) return null;
+
+    try {
+      return jsonDecode(cached) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> getLatestHistoryCreatedAt() async {
+    final cached = await getCachedHistory();
+    final moods = _extractMoodList(cached);
+    if (moods.isEmpty) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kMoodHistoryMeta);
+    if (raw == null || raw.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded['latestCreatedAt']?.toString();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -134,5 +170,100 @@ class MoodApiService {
       }
       throw Exception('Network error');
     }
+  }
+
+  Future<Map<String, dynamic>?> getCachedStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_kMoodStatsCache);
+    if (cached == null || cached.isEmpty) return null;
+
+    try {
+      return jsonDecode(cached) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _mergeAndPersistHistoryCache(
+    Map<String, dynamic> responseData,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = await getCachedHistory();
+    final existingMoods = _extractMoodList(existing);
+    final incomingMoods = _extractMoodList(responseData);
+
+    final mergedMoods = _mergeMoodLists(incomingMoods, existingMoods);
+    final mergedResponse = <String, dynamic>{
+      ...responseData,
+      'moods': mergedMoods,
+    };
+
+    await prefs.setString(_kMoodHistoryCache, jsonEncode(mergedResponse));
+    final latestCreatedAt =
+        responseData['sync']?['latestCreatedAt']?.toString() ??
+            _findLatestMoodTimestamp(mergedMoods);
+    if (latestCreatedAt != null && latestCreatedAt.isNotEmpty) {
+      await prefs.setString(
+        _kMoodHistoryMeta,
+        jsonEncode({'latestCreatedAt': latestCreatedAt}),
+      );
+    }
+
+    return mergedResponse;
+  }
+
+  List<Map<String, dynamic>> _extractMoodList(Map<String, dynamic>? data) {
+    final moods = data?['moods'];
+    if (moods is! List) return <Map<String, dynamic>>[];
+    return moods
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _mergeMoodLists(
+    List<Map<String, dynamic>> incoming,
+    List<Map<String, dynamic>> existing,
+  ) {
+    final merged = <Map<String, dynamic>>[];
+    final seen = <String>{};
+
+    for (final item in [...incoming, ...existing]) {
+      final normalized = Map<String, dynamic>.from(item);
+      final id = normalized['_id']?.toString() ?? normalized['id']?.toString();
+      final timestamp = normalized['timestamp']?.toString() ?? '';
+      final key = id != null && id.isNotEmpty
+          ? 'id:$id'
+          : 'ts:$timestamp|${normalized['mood']}|${normalized['note']}';
+      if (seen.add(key)) {
+        merged.add(normalized);
+      }
+    }
+
+    merged.sort((a, b) {
+      final aTs = DateTime.tryParse(a['timestamp']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bTs = DateTime.tryParse(b['timestamp']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bTs.compareTo(aTs);
+    });
+    return merged;
+  }
+
+  String? _findLatestMoodTimestamp(List<Map<String, dynamic>> moods) {
+    if (moods.isEmpty) return null;
+    return moods
+        .map((item) => item['timestamp']?.toString())
+        .whereType<String>()
+        .fold<String?>(null, (latest, current) {
+      if (latest == null) return current;
+      final latestDate = DateTime.tryParse(latest);
+      final currentDate = DateTime.tryParse(current);
+      if (currentDate == null) return latest;
+      if (latestDate == null || currentDate.isAfter(latestDate)) {
+        return current;
+      }
+      return latest;
+    });
   }
 }

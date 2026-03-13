@@ -24,7 +24,11 @@ class EarthquakeScreen extends ConsumerStatefulWidget {
   ConsumerState<EarthquakeScreen> createState() => _EarthquakeScreenState();
 }
 
-class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
+class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
+    with RestorationMixin, SingleTickerProviderStateMixin {
+  static const int _nearbyRadiusKm = 3000;
+  final RestorableInt _selectedTab = RestorableInt(0);
+  late final TabController _tabController;
   bool _isLoading = true;
   bool _showingCachedData = false;
   String? _error;
@@ -35,17 +39,58 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   final Set<String> _shownDangerAlerts = <String>{};
 
   @override
+  String? get restorationId => 'earthquake_screen';
+
+  @override
   void initState() {
     super.initState();
-    _loadCachedEarthquakeData();
-    _fetchEarthquakeData();
+    _tabController = TabController(length: 3, vsync: this)
+      ..addListener(() {
+        if (!_tabController.indexIsChanging) {
+          _selectedTab.value = _tabController.index;
+        }
+      });
+    _bootstrapEarthquakeData();
   }
 
-  Future<void> _loadCachedEarthquakeData() async {
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_selectedTab, 'selected_tab');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_tabController.index != _selectedTab.value) {
+        _tabController.index = _selectedTab.value;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectedTab.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  bool get _hasVisibleData =>
+      _localQuakes.isNotEmpty ||
+      _countryQuakes.isNotEmpty ||
+      _globalQuakes.isNotEmpty;
+
+  Future<void> _bootstrapEarthquakeData() async {
     final earthquakeService = ref.read(earthquakeServiceProvider);
-    final cached = await earthquakeService.getCachedEarthquakes();
-    if (!mounted || cached == null) return;
-    _applyEarthquakeResponse(cached, allowCachedState: true);
+    final sessionOverride = ref.read(earthquakeCountryOverrideProvider);
+    final selectedCountry =
+        sessionOverride ?? ref.read(settingsProvider).earthquakeCountry.trim();
+    final lastKnownLocation =
+        await ref.read(locationServiceProvider).getLastKnownLocation();
+    final cached = await earthquakeService.getCachedEarthquakes(
+      lat: lastKnownLocation?.latitude,
+      lng: lastKnownLocation?.longitude,
+      country: selectedCountry,
+    );
+    if (mounted && cached != null) {
+      _applyEarthquakeResponse(cached, allowCachedState: true);
+    }
+    await _fetchEarthquakeData();
   }
 
   Future<void> _fetchEarthquakeData() async {
@@ -54,9 +99,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
     var selectedCountry =
         sessionOverride ?? ref.read(settingsProvider).earthquakeCountry.trim();
     final locationService = ref.read(locationServiceProvider);
-    final hasVisibleData = _localQuakes.isNotEmpty ||
-        _countryQuakes.isNotEmpty ||
-        _globalQuakes.isNotEmpty;
+    final hasVisibleData = _hasVisibleData;
 
     // Check connectivity first
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -64,7 +107,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = 'offline';
+          if (!hasVisibleData) {
+            _error = 'offline';
+          }
         });
       }
       return;
@@ -91,7 +136,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         if (!mounted) return;
         setState(() {
           _isLoading = false;
-          _error = 'location_required';
+          if (!hasVisibleData) {
+            _error = 'location_required';
+          }
         });
         return;
       }
@@ -112,7 +159,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         if (!mounted) return;
         setState(() {
           _isLoading = false;
-          _error = 'location_required';
+          if (!hasVisibleData) {
+            _error = 'location_required';
+          }
         });
         return;
       }
@@ -125,7 +174,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _error = 'location_required';
+            if (!hasVisibleData) {
+              _error = 'location_required';
+            }
           });
         }
         return;
@@ -215,7 +266,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
+          if (!hasVisibleData) {
+            _error = e.toString();
+          }
         });
       }
     }
@@ -230,6 +283,13 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   }) {
     final parsedLocal =
         _parseQuakes(responseData['localAlerts'] as List?, lat, lng);
+    parsedLocal.sort((a, b) {
+      final aDistance = a.distanceKm ?? double.infinity;
+      final bDistance = b.distanceKm ?? double.infinity;
+      final distanceCompare = aDistance.compareTo(bDistance);
+      if (distanceCompare != 0) return distanceCompare;
+      return b.timestamp.compareTo(a.timestamp);
+    });
     final parsedCountry =
         _parseQuakes(responseData['countryAlerts'] as List?, lat, lng);
     final parsedGlobal =
@@ -467,83 +527,82 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
 
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            s.earthquakeTitle,
-            style: const TextStyle(fontFamily: 'HindSiliguri'),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _fetchEarthquakeData,
-            ),
-          ],
-          bottom: TabBar(
-            indicatorColor: AppColors.primary,
-            labelStyle: const TextStyle(
-                fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
-            unselectedLabelStyle: const TextStyle(fontFamily: 'HindSiliguri'),
-            tabs: [
-              Tab(
-                text: _selectedCountry.isEmpty
-                    ? (s.isBangla ? 'দেশ' : 'Country')
-                    : _selectedCountry,
-              ),
-              Tab(text: s.earthquakeTabNearWithRadius),
-              Tab(text: s.earthquakeTabGlobal),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          s.earthquakeTitle,
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
-        body: _isLoading
-            ? _buildLoadingList()
-            : _error != null
-                ? _buildErrorView()
-                : TabBarView(
-                    children: [
-                      RefreshIndicator(
-                        onRefresh: _fetchEarthquakeData,
-                        child: _buildTabContent(
-                          context,
-                          _countryQuakes,
-                          s,
-                          false,
-                          headerMessage: s.isBangla
-                              ? '$_selectedCountry দেশের সাম্প্রতিক ভূমিকম্প'
-                              : 'Recent earthquakes in $_selectedCountry',
-                        ),
-                      ),
-                      // TAB 1: Near Me
-                      RefreshIndicator(
-                        onRefresh: _fetchEarthquakeData,
-                        child: _buildTabContent(
-                          context,
-                          _localQuakes,
-                          s,
-                          true,
-                          headerMessage: s.isBangla
-                              ? 'আপনার কাছাকাছি ভূমিকম্প আগে দেখানো হচ্ছে'
-                              : 'Closest earthquakes are shown first',
-                        ),
-                      ),
-                      // TAB 2: Global
-                      RefreshIndicator(
-                        onRefresh: _fetchEarthquakeData,
-                        child: _buildTabContent(
-                          context,
-                          _globalQuakes,
-                          s,
-                          false,
-                          headerMessage: s.isBangla
-                              ? 'বিশ্বজুড়ে বড় ভূমিকম্প'
-                              : 'Major earthquakes worldwide',
-                        ),
-                      ),
-                    ],
-                  ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchEarthquakeData,
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: AppColors.primary,
+          labelStyle: const TextStyle(
+              fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontFamily: 'HindSiliguri'),
+          tabs: [
+            Tab(
+              text: _selectedCountry.isEmpty
+                  ? (s.isBangla ? 'দেশ' : 'Country')
+                  : _selectedCountry,
+            ),
+            Tab(text: s.earthquakeTabNearWithRadius(_nearbyRadiusKm)),
+            Tab(text: s.earthquakeTabGlobal),
+          ],
+        ),
       ),
+      body: _isLoading
+          ? _buildLoadingList()
+          : _error != null
+              ? _buildErrorView()
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _fetchEarthquakeData,
+                      child: _buildTabContent(
+                        context,
+                        _countryQuakes,
+                        s,
+                        false,
+                        headerMessage: s.isBangla
+                            ? '$_selectedCountry দেশের সাম্প্রতিক ভূমিকম্প'
+                            : 'Recent earthquakes in $_selectedCountry',
+                      ),
+                    ),
+                    // TAB 1: Near Me
+                    RefreshIndicator(
+                      onRefresh: _fetchEarthquakeData,
+                      child: _buildTabContent(
+                        context,
+                        _localQuakes,
+                        s,
+                        true,
+                        headerMessage: s.isBangla
+                            ? '$_nearbyRadiusKm কিমির মধ্যে থাকা ভূমিকম্প কাছেরটি আগে দেখানো হচ্ছে'
+                            : 'Showing earthquakes within $_nearbyRadiusKm km, closest first',
+                      ),
+                    ),
+                    // TAB 2: Global
+                    RefreshIndicator(
+                      onRefresh: _fetchEarthquakeData,
+                      child: _buildTabContent(
+                        context,
+                        _globalQuakes,
+                        s,
+                        false,
+                        headerMessage: s.isBangla
+                            ? 'বিশ্বজুড়ে বড় ভূমিকম্প'
+                            : 'Major earthquakes worldwide',
+                      ),
+                    ),
+                  ],
+                ),
     );
   }
 

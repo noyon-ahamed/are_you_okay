@@ -245,6 +245,59 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
   }
 }
 
+class CheckInHistoryNotifier
+    extends StateNotifier<AsyncValue<List<Map<String, dynamic>>>> {
+  final CheckInRepository _repository;
+
+  CheckInHistoryNotifier(this._repository) : super(const AsyncLoading()) {
+    _bootstrap();
+  }
+
+  Future<void>? _fetchInFlight;
+
+  Future<void> _bootstrap() async {
+    final cachedHistory = await _repository.getCachedHistory();
+    final localHistory = _repository
+        .getAllCheckIns()
+        .map((item) => _repository.checkinModelToApiMap(item))
+        .toList();
+    final merged = _repository.mergeHistory(cachedHistory, localHistory);
+    if (merged.isNotEmpty) {
+      state = AsyncData(merged);
+    }
+    await fetch(silent: merged.isNotEmpty);
+  }
+
+  Future<void> fetch({bool silent = true}) async {
+    if (_fetchInFlight != null) {
+      return _fetchInFlight!;
+    }
+
+    final future = _fetchHistory(silent: silent);
+    _fetchInFlight = future;
+    try {
+      await future;
+    } finally {
+      _fetchInFlight = null;
+    }
+  }
+
+  Future<void> _fetchHistory({required bool silent}) async {
+    if (!silent || !state.hasValue) {
+      state = const AsyncLoading();
+    }
+
+    try {
+      final history = await _repository.fetchHistory(limit: 100, skip: 0);
+      state = AsyncData(history);
+    } catch (e, st) {
+      if (!silent || !state.hasValue) {
+        state = AsyncError(e, st);
+      }
+    }
+  }
+}
+
 // ==================== Providers ====================
 
 final checkinProvider =
@@ -263,11 +316,10 @@ final checkinHistoryProvider = Provider<List<CheckInModel>>((ref) {
   return repository.getAllCheckIns();
 });
 
-// Provider for check-in history from BACKEND API
-final checkinHistoryFromBackendProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final repository = ref.watch(checkinRepositoryProvider);
-  return await repository.fetchHistory(limit: 100, skip: 0);
+// Provider for check-in history with persistent cached-first loading
+final checkinHistoryFromBackendProvider = StateNotifierProvider<
+    CheckInHistoryNotifier, AsyncValue<List<Map<String, dynamic>>>>((ref) {
+  return CheckInHistoryNotifier(ref.watch(checkinRepositoryProvider));
 });
 
 // Provider for user stats from backend

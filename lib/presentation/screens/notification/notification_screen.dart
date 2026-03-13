@@ -14,38 +14,66 @@ import '../../../../provider/language_provider.dart';
 // Create a Notifier for notifications for silent refresh
 class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
   NotificationsNotifier() : super(const AsyncLoading()) {
-    fetch();
+    _bootstrap();
+  }
+
+  Future<void>? _fetchInFlight;
+  final LocalNotificationHistoryService _historyService =
+      LocalNotificationHistoryService();
+
+  Future<void> _bootstrap() async {
+    final cachedNotifications = await _historyService.getMergedNotifications();
+    if (cachedNotifications.isNotEmpty) {
+      state = AsyncData(cachedNotifications);
+    }
+    await fetch(silent: cachedNotifications.isNotEmpty);
   }
 
   Future<void> fetch({bool silent = true}) async {
+    if (_fetchInFlight != null) {
+      return _fetchInFlight!;
+    }
+
+    final future = _fetchNotifications(silent: silent);
+    _fetchInFlight = future;
+    try {
+      await future;
+    } finally {
+      _fetchInFlight = null;
+    }
+  }
+
+  Future<void> _fetchNotifications({required bool silent}) async {
     if (!silent || !state.hasValue) {
       state = const AsyncLoading();
     }
     try {
       final api = NotificationApiService();
-      List<dynamic> remoteNotifications = <dynamic>[];
+      List<Map<String, dynamic>> remoteNotifications = <Map<String, dynamic>>[];
+      var remoteFetchSucceeded = false;
       try {
-        final data = await api.getNotifications();
-        remoteNotifications = data['notifications'] as List<dynamic>? ?? [];
+        final latestCreatedAt =
+            await _historyService.getLatestRemoteCreatedAt();
+        final data = await api.getNotifications(
+          latestCreatedAt: latestCreatedAt,
+        );
+        remoteNotifications = (data['notifications'] as List<dynamic>? ?? [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        await _historyService.cacheRemoteNotifications(remoteNotifications);
+        await _historyService.setLatestRemoteCreatedAt(
+          data['sync']?['latestCreatedAt']?.toString(),
+        );
+        remoteFetchSucceeded = true;
       } catch (_) {
-        remoteNotifications = <dynamic>[];
+        remoteNotifications = <Map<String, dynamic>>[];
       }
 
-      final localNotifications =
-          await LocalNotificationHistoryService().getNotifications();
-      final merged = <Map<String, dynamic>>[
-        ...localNotifications.map((item) => Map<String, dynamic>.from(item)),
-        ...remoteNotifications.map((item) => Map<String, dynamic>.from(item)),
-      ];
-      merged.sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      });
-
-      state = AsyncData(merged);
+      final merged = await _historyService.getMergedNotifications();
+      if (merged.isNotEmpty || remoteFetchSucceeded) {
+        state = AsyncData(merged);
+      }
     } catch (e, st) {
       if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
@@ -111,14 +139,41 @@ class NotificationScreen extends ConsumerStatefulWidget {
   ConsumerState<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class _NotificationScreenState extends ConsumerState<NotificationScreen> {
+class _NotificationScreenState extends ConsumerState<NotificationScreen>
+    with RestorationMixin {
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
+
+  @override
+  String? get restorationId => 'notification_screen';
+
   @override
   void initState() {
     super.initState();
-    // Silently refresh on open
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationsProvider.notifier).fetch(silent: true);
     });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollOffset.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -163,6 +218,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             }
 
             return ListView.builder(
+              key: const PageStorageKey('notifications_scroll'),
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: notifications.length,
               itemBuilder: (context, index) {

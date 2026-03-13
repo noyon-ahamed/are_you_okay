@@ -17,18 +17,51 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with RestorationMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final RestorableTextEditingController _emailController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _passwordController =
+      RestorableTextEditingController();
+  final RestorableBool _obscurePassword = RestorableBool(true);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
+
+  @override
+  String? get restorationId => 'login_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_emailController, 'email');
+    registerForRestoration(_passwordController, 'password');
+    registerForRestoration(_obscurePassword, 'obscure_password');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _obscurePassword.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -47,8 +80,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       await ref.read(authProvider.notifier).login(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: _emailController.value.text.trim(),
+            password: _passwordController.value.text,
           );
 
       if (mounted) {
@@ -124,6 +157,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('login_scroll'),
+          controller: _scrollController,
           padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
@@ -182,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 // Email field
                 CustomTextField(
-                  controller: _emailController,
+                  controller: _emailController.value,
                   label: s.loginEmail,
                   hint: 'your@email.com',
                   keyboardType: TextInputType.emailAddress,
@@ -202,19 +237,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 // Password field
                 CustomTextField(
-                  controller: _passwordController,
+                  controller: _passwordController.value,
                   label: s.loginPassword,
                   hint: '••••••••',
-                  obscureText: _obscurePassword,
+                  obscureText: _obscurePassword.value,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
+                      _obscurePassword.value
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
                     onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
+                      setState(() =>
+                          _obscurePassword.value = !_obscurePassword.value);
                     },
                   ),
                   validator: (value) {

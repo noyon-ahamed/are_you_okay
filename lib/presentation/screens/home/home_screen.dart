@@ -31,7 +31,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, RestorationMixin {
+  final RestorableInt _selectedMoodState = RestorableInt(-1);
+  final RestorableInt _bottomNavIndexState = RestorableInt(0);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   late AnimationController _pulseController;
   late AnimationController _ringController;
   late Animation<double> _pulseAnimation;
@@ -53,9 +57,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Duration _timeRemaining = const Duration(hours: 24);
 
   @override
+  String? get restorationId => 'home_screen';
+
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
 
     // Pulse animation for check-in button
     _pulseController = AnimationController(
@@ -95,6 +106,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_selectedMoodState, 'selected_mood');
+    registerForRestoration(_bottomNavIndexState, 'bottom_nav_index');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    _selectedMood = _selectedMoodState.value;
+    _bottomNavIndex = _bottomNavIndexState.value;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Refresh profile data automatically when app comes to foreground
@@ -119,6 +144,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _selectedMoodState.dispose();
+    _bottomNavIndexState.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     _pulseController.dispose();
     _ringController.dispose();
     _countdownTimer?.cancel();
@@ -149,6 +178,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             : AppDecorations.subtleGradientLight(),
         child: SafeArea(
           child: SingleChildScrollView(
+            key: const PageStorageKey('home_scroll'),
+            controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -316,7 +347,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             animation: _pulseAnimation,
             builder: (context, child) {
               return Transform.scale(
-                scale: (isLoading || hasCheckedIn) ? 1.0 : _pulseAnimation.value,
+                scale:
+                    (isLoading || hasCheckedIn) ? 1.0 : _pulseAnimation.value,
                 child: child,
               );
             },
@@ -356,7 +388,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         return CustomPaint(
                           size: const Size(180, 180),
                           painter: _SafetyRingPainter(
-                            progress: hasCheckedIn ? 1.0 : (1.0 - urgencyPercent),
+                            progress:
+                                hasCheckedIn ? 1.0 : (1.0 - urgencyPercent),
                             color:
                                 hasCheckedIn ? AppColors.success : urgencyColor,
                             rotation: _ringAnimation.value,
@@ -891,7 +924,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return GestureDetector(
       onTap: () {
         if (index == 0) return; // Already on home
-        setState(() => _bottomNavIndex = index);
+        setState(() {
+          _bottomNavIndex = index;
+          _bottomNavIndexState.value = index;
+        });
 
         String? route;
         switch (index) {
@@ -908,7 +944,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (route != null) {
           context.push(route).then((_) {
             // Reset to home when returning
-            if (mounted) setState(() => _bottomNavIndex = 0);
+            if (mounted) {
+              setState(() {
+                _bottomNavIndex = 0;
+                _bottomNavIndexState.value = 0;
+              });
+            }
           });
         }
       },
@@ -1108,7 +1149,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onMoodSelected(int index) {
-    setState(() => _selectedMood = index);
+    setState(() {
+      _selectedMood = index;
+      _selectedMoodState.value = index;
+    });
   }
 
   /// Save mood — tries backend first, falls back to local storage for offline support
@@ -1152,7 +1196,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             duration: const Duration(seconds: 2),
           ),
         );
-        setState(() => _selectedMood = -1);
+        setState(() {
+          _selectedMood = -1;
+          _selectedMoodState.value = -1;
+        });
       }
     } on Exception catch (e) {
       debugPrint('Failed to save mood online: $e');
@@ -1189,7 +1236,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 backgroundColor: AppColors.success,
               ),
             );
-            setState(() => _selectedMood = -1);
+            setState(() {
+              _selectedMood = -1;
+              _selectedMoodState.value = -1;
+            });
           }
         } catch (_) {
           if (mounted) {

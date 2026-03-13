@@ -15,18 +15,55 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen>
+    with RestorationMixin {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final RestorableTextEditingController _nameController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _emailController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _phoneController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _passwordController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _confirmPasswordController =
+      RestorableTextEditingController();
+  final RestorableBool _obscurePassword = RestorableBool(true);
+  final RestorableBool _obscureConfirmPassword = RestorableBool(true);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
   final _authService = AuthApiService();
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+
+  @override
+  String? get restorationId => 'register_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_nameController, 'name');
+    registerForRestoration(_emailController, 'email');
+    registerForRestoration(_phoneController, 'phone');
+    registerForRestoration(_passwordController, 'password');
+    registerForRestoration(_confirmPasswordController, 'confirm_password');
+    registerForRestoration(_obscurePassword, 'obscure_password');
+    registerForRestoration(_obscureConfirmPassword, 'obscure_confirm_password');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -35,6 +72,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _obscurePassword.dispose();
+    _obscureConfirmPassword.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -45,11 +86,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       await _authService.register(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
+        email: _emailController.value.text.trim(),
+        password: _passwordController.value.text,
+        name: _nameController.value.text.trim(),
+        phone: _phoneController.value.text.trim().isNotEmpty
+            ? _phoneController.value.text.trim()
             : null,
       );
 
@@ -91,6 +132,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('register_scroll'),
+          controller: _scrollController,
           padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
@@ -101,7 +144,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Name field
                 CustomTextField(
-                  controller: _nameController,
+                  controller: _nameController.value,
                   label: s.regName,
                   hint: s.isBangla ? 'আপনার নাম' : 'Your name',
                   prefixIcon: Icons.person_outline,
@@ -117,7 +160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Email field
                 CustomTextField(
-                  controller: _emailController,
+                  controller: _emailController.value,
                   label: s.regEmail,
                   hint: 'your@email.com',
                   keyboardType: TextInputType.emailAddress,
@@ -137,7 +180,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Phone field (optional)
                 CustomTextField(
-                  controller: _phoneController,
+                  controller: _phoneController.value,
                   label:
                       '${s.regPhone} (${s.isBangla ? 'ঐচ্ছিক' : 'Optional'})',
                   hint: '01XXXXXXXXX',
@@ -149,20 +192,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Password field
                 CustomTextField(
-                  controller: _passwordController,
+                  controller: _passwordController.value,
                   label: s.regPassword,
                   hint:
                       s.isBangla ? 'কমপক্ষে ৬ অক্ষর' : 'At least 6 characters',
-                  obscureText: _obscurePassword,
+                  obscureText: _obscurePassword.value,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
+                      _obscurePassword.value
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
                     onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
+                      setState(() =>
+                          _obscurePassword.value = !_obscurePassword.value);
                     },
                   ),
                   validator: (value) {
@@ -180,27 +224,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // Confirm password field
                 CustomTextField(
-                  controller: _confirmPasswordController,
+                  controller: _confirmPasswordController.value,
                   label: s.regConfirmPass,
                   hint: '••••••••',
-                  obscureText: _obscureConfirmPassword,
+                  obscureText: _obscureConfirmPassword.value,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword
+                      _obscureConfirmPassword.value
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
                     onPressed: () {
-                      setState(() =>
-                          _obscureConfirmPassword = !_obscureConfirmPassword);
+                      setState(() => _obscureConfirmPassword.value =
+                          !_obscureConfirmPassword.value);
                     },
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return '${s.regConfirmPass} ${s.validationRequired}';
                     }
-                    if (value != _passwordController.text) {
+                    if (value != _passwordController.value.text) {
                       return s.validationPassMatch;
                     }
                     return null;

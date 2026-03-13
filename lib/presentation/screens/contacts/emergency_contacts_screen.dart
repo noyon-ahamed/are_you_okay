@@ -20,14 +20,41 @@ class EmergencyContactsScreen extends ConsumerStatefulWidget {
 }
 
 class _EmergencyContactsScreenState
-    extends ConsumerState<EmergencyContactsScreen> {
+    extends ConsumerState<EmergencyContactsScreen> with RestorationMixin {
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
+
+  @override
+  String? get restorationId => 'emergency_contacts_screen';
+
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
     // Silently refresh contacts in background to check for multi-device sync
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(contactProvider.notifier).loadContacts(silent: true);
     });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollOffset.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -95,6 +122,8 @@ class _EmergencyContactsScreenState
         state is ContactLoaded ? state.contacts : <EmergencyContactModel>[];
 
     return ReorderableListView.builder(
+      key: const PageStorageKey('contacts_scroll'),
+      scrollController: _scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
       itemCount: contacts.length,
       onReorder: (oldIndex, newIndex) {

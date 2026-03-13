@@ -18,9 +18,32 @@ class OnboardingScreen extends ConsumerStatefulWidget {
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
-  final PageController _pageController = PageController();
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
+    with RestorationMixin {
+  final RestorableInt _currentPageState = RestorableInt(0);
+  late final PageController _pageController;
   int _currentPage = 0;
+
+  @override
+  String? get restorationId => 'onboarding_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentPageState.value);
+    _currentPage = _currentPageState.value;
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_currentPageState, 'current_page');
+    _currentPage = _currentPageState.value;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(_currentPageState.value);
+      }
+    });
+  }
 
   List<_OnboardingItem> _getItems(AppStrings s) {
     return [
@@ -50,6 +73,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   void dispose() {
+    _currentPageState.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -108,7 +132,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   controller: _pageController,
                   itemCount: items.length,
                   onPageChanged: (index) {
-                    setState(() => _currentPage = index);
+                    setState(() {
+                      _currentPage = index;
+                      _currentPageState.value = index;
+                    });
                   },
                   itemBuilder: (context, index) {
                     return _buildPageItem(context, items[index], isDark, s);

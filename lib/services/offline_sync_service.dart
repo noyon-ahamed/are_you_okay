@@ -240,7 +240,7 @@ class OfflineSyncService {
             mood: mood['mood'] as String,
             note: mood['note'] as String?,
           );
-          await moodLocal.markMoodAsSynced(mood['id'] as String);
+          await moodLocal.deleteMood(mood['id'] as String);
           debugPrint('Synced mood: ${mood['id']}');
         } catch (e) {
           debugPrint('Failed to sync mood ${mood['id']}: $e');

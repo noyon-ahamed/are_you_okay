@@ -15,20 +15,59 @@ class AddContactScreen extends ConsumerStatefulWidget {
   ConsumerState<AddContactScreen> createState() => _AddContactScreenState();
 }
 
-class _AddContactScreenState extends ConsumerState<AddContactScreen> {
+class _AddContactScreenState extends ConsumerState<AddContactScreen>
+    with RestorationMixin {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _relationshipController = TextEditingController();
-  int _selectedPriority = 1;
-  bool _notifyViaSMS = true;
-  bool _notifyViaApp = true;
+  final RestorableTextEditingController _nameController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _phoneController =
+      RestorableTextEditingController();
+  final RestorableTextEditingController _relationshipController =
+      RestorableTextEditingController();
+  final RestorableInt _selectedPriority = RestorableInt(1);
+  final RestorableBool _notifyViaSMS = RestorableBool(true);
+  final RestorableBool _notifyViaApp = RestorableBool(true);
+  final RestorableDouble _scrollOffset = RestorableDouble(0);
+  late final ScrollController _scrollController;
+
+  @override
+  String? get restorationId => 'add_contact_screen';
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()
+      ..addListener(() {
+        _scrollOffset.value = _scrollController.offset;
+      });
+  }
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_nameController, 'name');
+    registerForRestoration(_phoneController, 'phone');
+    registerForRestoration(_relationshipController, 'relationship');
+    registerForRestoration(_selectedPriority, 'priority');
+    registerForRestoration(_notifyViaSMS, 'notify_sms');
+    registerForRestoration(_notifyViaApp, 'notify_app');
+    registerForRestoration(_scrollOffset, 'scroll_offset');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset.value);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
     _relationshipController.dispose();
+    _selectedPriority.dispose();
+    _notifyViaSMS.dispose();
+    _notifyViaApp.dispose();
+    _scrollOffset.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -40,6 +79,8 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
         title: Text(s.contactsNewContact),
       ),
       body: SingleChildScrollView(
+        key: const PageStorageKey('add_contact_scroll'),
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -47,7 +88,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CustomTextField(
-                controller: _nameController,
+                controller: _nameController.value,
                 label: s.contactsName,
                 hint: s.contactsNameHint,
                 prefixIcon: Icons.person_outline,
@@ -61,7 +102,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 16),
 
               CustomTextField(
-                controller: _phoneController,
+                controller: _phoneController.value,
                 label: s.contactsPhone,
                 hint: s.contactsPhoneHint,
                 prefixIcon: Icons.phone_outlined,
@@ -79,7 +120,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 16),
 
               CustomTextField(
-                controller: _relationshipController,
+                controller: _relationshipController.value,
                 label: s.contactsRelation,
                 hint: s.contactsRelationHint,
                 prefixIcon: Icons.people_outline,
@@ -105,9 +146,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [1, 2, 3, 4, 5].map((p) {
-                  final isSelected = _selectedPriority == p;
+                  final isSelected = _selectedPriority.value == p;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedPriority = p),
+                    onTap: () => setState(() => _selectedPriority.value = p),
                     child: Container(
                       width: 50,
                       height: 50,
@@ -157,15 +198,17 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
               const SizedBox(height: 8),
               SwitchListTile(
                 title: Text(s.contactsNotifySMS),
-                value: _notifyViaSMS,
-                onChanged: (value) => setState(() => _notifyViaSMS = value),
+                value: _notifyViaSMS.value,
+                onChanged: (value) =>
+                    setState(() => _notifyViaSMS.value = value),
                 activeThumbColor: AppColors.primary,
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
                 title: Text(s.contactsNotifyApp),
-                value: _notifyViaApp,
-                onChanged: (value) => setState(() => _notifyViaApp = value),
+                value: _notifyViaApp.value,
+                onChanged: (value) =>
+                    setState(() => _notifyViaApp.value = value),
                 activeThumbColor: AppColors.primary,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -186,12 +229,12 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
     final s = ref.read(stringsProvider);
     if (_formKey.currentState!.validate()) {
       await ref.read(contactProvider.notifier).addContact(
-            name: _nameController.text,
-            phoneNumber: _phoneController.text,
-            relationship: _relationshipController.text,
-            priority: _selectedPriority,
-            notifyViaSMS: _notifyViaSMS,
-            notifyViaApp: _notifyViaApp,
+            name: _nameController.value.text,
+            phoneNumber: _phoneController.value.text,
+            relationship: _relationshipController.value.text,
+            priority: _selectedPriority.value,
+            notifyViaSMS: _notifyViaSMS.value,
+            notifyViaApp: _notifyViaApp.value,
           );
 
       if (mounted) {
