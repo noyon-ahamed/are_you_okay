@@ -21,6 +21,8 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -31,15 +33,20 @@ class EmptyStateWidget extends StatelessWidget {
               icon,
               size: 80,
               // ignore: deprecated_member_use
-              color: AppColors.textSecondary.withOpacity(0.5),
+              color: (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary)
+                  // ignore: deprecated_member_use
+                  .withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color:
+                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -47,9 +54,11 @@ class EmptyStateWidget extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 description!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),

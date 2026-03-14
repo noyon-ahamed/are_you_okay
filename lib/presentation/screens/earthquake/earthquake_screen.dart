@@ -541,6 +541,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: AppColors.primary,
           labelStyle: const TextStyle(
               fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
@@ -713,9 +715,9 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
   ) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF795548),
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceVariantDark : const Color(0xFF795548),
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -906,7 +908,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${quake.distanceKm!.toStringAsFixed(0)} ${s.earthquakeAway}',
+                              '${quake.distanceKm!.toStringAsFixed(1)} ${s.earthquakeAway}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Theme.of(context)
@@ -1007,7 +1009,11 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
             const SizedBox(height: 12),
             Text(
               s.earthquakeEmpty,
-              style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 16),
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
           ],
         ),

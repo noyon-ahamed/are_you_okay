@@ -11,7 +11,7 @@ class ConfigApiService {
   Future<Map<String, dynamic>> getConfig() async {
     try {
       final response = await _dio.get('$baseUrl/config');
-      
+
       if (response.data['success'] == true) {
         return response.data['data'];
       } else {

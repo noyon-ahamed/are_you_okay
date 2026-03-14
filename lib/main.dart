@@ -19,6 +19,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'provider/language_provider.dart';
+import 'provider/auth_provider.dart';
 import 'provider/settings_provider.dart';
 import 'services/api/auth_api_service.dart';
 import 'services/hive_service.dart';
@@ -117,10 +118,9 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       debugPrint('Firebase initialization warning: $e');
     }
 
-    unawaited(_initializeBackgroundReminderFlow());
     _listenToCallKitEvents();
     unawaited(_checkActiveCalls());
-
+ 
     final bool isSimulator = Platform.isIOS &&
         Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
     if (!isSimulator) {
@@ -128,18 +128,6 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     }
   }
 
-  Future<void> _initializeBackgroundReminderFlow() async {
-    try {
-      final notifService = LocalNotificationService();
-      await notifService.initialize(
-        onNotificationTap: NotificationNavigationService.handlePayload,
-      );
-      await notifService.cancelDailyReminders();
-      await notifService.cancelCheckinReminders();
-    } catch (e) {
-      debugPrint('Error scheduling startup reminders: $e');
-    }
-  }
 
   Future<void> _syncNotificationPreferences() async {
     try {
@@ -192,6 +180,8 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkActiveCalls();
+      // Proactively refresh profile on resume to detect multi-device logout
+      ref.read(authProvider.notifier).refreshProfile();
     }
   }
 

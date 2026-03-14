@@ -195,7 +195,7 @@ class AppStrings {
 
   String get settingsDataExport => isBangla ? 'ডেটা এক্সপোর্ট' : 'Data Export';
   String get settingsDataExportDesc =>
-      isBangla ? 'মুড ইতিহাস CSV ডাউনলোড' : 'Download mood history CSV';
+      isBangla ? 'ইতিহাস ডাউনলোড' : 'Download history';
 
   String get settingsClearCache => isBangla ? 'ক্যাশ পরিষ্কার' : 'Clear Cache';
   String get settingsClearCacheDesc =>
@@ -203,14 +203,19 @@ class AppStrings {
 
   String get settingsAboutApp => isBangla ? 'অ্যাপ সম্পর্কে' : 'About App';
   String get settingsPrivacy => isBangla ? 'গোপনীয়তা নীতি' : 'Privacy Policy';
+  String get settingsDeleteAccount =>
+      isBangla ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account';
+  String get settingsDeleteAccountDesc => isBangla
+      ? 'আপনার সব তথ্য চিরতরে মুছে ফেলুন'
+      : 'Permanently delete your account';
 
   String get aboutAppContent => isBangla
-      ? 'Are You Okay? - একটি আধুনিক মানসিক ও শারীরিক স্বাস্থ্য ট্র্যাকিং অ্যাপ্লিকেশন।\n\nএটি আপনাকে প্রতিদিন নিয়মিত চেক-ইন করতে, মেজাজ বা মুড ট্র্যাক করতে এবং যেকোনো অবহেলিত বা জরুরি অবস্থায় আপনার প্রিয়জন ও জরুরি পরিষেবাগুলোর সাথে এক ক্লিকে যোগাযোগ করতে সাহায্য করে। আমাদের লক্ষ্য হলো, একটি নিরাপদ এবং স্বাস্থ্যকর জীবনযাপনের জন্য আপনার নিত্যদিনের সঙ্গী হওয়া।'
-      : 'Are You Okay? is a modern mental and physical health tracking app.\n\nIt allows you to check-in daily, track your mood, and instantly reach out to your loved ones and emergency services in critical situations. Our goal is to be your everyday companion for a safer and healthier life.';
+      ? 'Are You Okay? - আপনার অল-ইন-ওয়ান সুরক্ষা এবং সুস্বাস্থ্য সঙ্গী।\n\nপ্রধান বৈশিষ্ট্যসমূহ:\n• নিয়মিত সুরক্ষা চেক-ইন এবং স্ট্রিক ট্র্যাকিং\n• তাৎক্ষণিক SOS অ্যালার্ট ও লোকেশন শেয়ারিং\n• AI স্বাস্থ্য সহকারী (মানসিক ও শারীরিক পরামর্শ)\n• মেজাজ এবং মানসিক স্বাস্থ্যের বিস্তারিত ইতিহাস\n• রিয়েল-টাইম ভূমিকম্প সতর্কতা (USGS ডেটা)\n• ফেক কল (অসুরক্ষিত পরিস্থিতিতে আত্মরক্ষার জন্য)\n• প্রফেশনাল হেলথ রিপোর্ট (PDF) এক্সপোর্ট\n\nআমাদের লক্ষ্য হলো আধুনিক টেকনোলজির মাধ্যমে আপনার এবং আপনার প্রিয়জনদের জীবনকে নিরাপদ ও সহজ করা।'
+      : 'Are You Okay? - Your all-in-one safety and wellness companion.\n\nKey Features:\n• Regular Safety Check-ins & Streak Tracking\n• Instant SOS Alerts & Location Sharing\n• AI Health Assistant (Mental & Physical advice)\n• Detailed Mood & Mental Health History\n• Real-time Earthquake Alerts (USGS Data)\n• Fake Call (For safety in uncomfortable situations)\n• Professional Health Reports (PDF) Export\n\nOur mission is to use modern technology to keep you and your loved ones safe and healthy every day.';
 
   String get privacyPolicyContent => isBangla
-      ? 'আপনার তথ্যের গোপনীয়তা আমাদের কাছে সর্বোচ্চ অগ্রাধিকার।\n\n১. ডেটা সংগ্রহ: চেক-ইন, মেজাজ এবং কন্টাক্ট ইনফরমেশন আপনার ডিভাইসে এবং আমাদের সুরক্ষিত ডেটাবেসে এনক্রিপ্ট করে রাখা হয়।\n২. নিরাপদ ব্যবহার: আপনার কোনো ব্যক্তিগত ডেটা থার্ড-পার্টি বা তৃতীয় কোনো পক্ষের কাছে বিক্রি বা শেয়ার করা হয় না।\n৩. লোকেশন এক্সেস: জরুরি SOS সার্ভিস ব্যবহারের সময় আপনার অনুমতি সাপেক্ষে লোকেশন ব্যবহার করা হয়।\n৪. নিয়ন্ত্রণ: আপনি যেকোনো সময় "ডেটা সাফ করুন" অপশন ব্যবহার করে আপনার সব তথ্য মুছে ফেলতে পারবেন।'
-      : 'Your privacy is our utmost priority.\n\n1. Data Collection: Check-ins, moods, and contacts are stored securely and encrypted.\n2. Safe Usage: Your personal data is never sold or shared with third parties.\n3. Location Access: Location is only used during Emergency SOS with your permission.\n4. Control: You can delete all your data anytime using the "Clear Data" option.';
+      ? 'আপনার তথ্যের গোপনীয়তা এবং নিরাপত্তা আমাদের কাছে সর্বোচ্চ অগ্রাধিকার।\n\n১. ডেটা সংগ্রহ: আপনার প্রোফাইল, চেক-ইন, মুড এবং AI চ্যাট হিস্ট্রি আমাদের এনক্রিপ্টেড সার্ভারে সুরক্ষিত থাকে।\n২. লোকেশন এক্সেস: শুধুমাত্র SOS অ্যালার্ট এবং ভূমিকম্প সতর্কতার নির্ভুলতার জন্য আপনার অনুমতি সাপেক্ষে লোকেশন ব্যবহার করা হয়।\n৩. নিরাপদ ব্যবহার: আমরা কখনই আপনার ব্যক্তিগত তথ্য তৃতীয় পক্ষের কাছে বিক্রি বা শেয়ার করি না।\n৪. ডেটা নিয়ন্ত্রণ: আপনি যেকোনো সময় লোকাল ক্যাশ সাফ করতে পারেন অথবা "Account Delete" অপশন ব্যবহার করে সার্ভার থেকে আপনার সমস্ত তথ্য চিরতরে মুছে ফেলতে পারেন।\n৫. নিরাপত্তা: আপনার সমস্ত সেনসিটিভ ডেটা ইন্ডাস্ট্রি-স্ট্যান্ডার্ড এনক্রিপশন প্রোটোকল দ্বারা সুরক্ষিত।'
+      : 'Your privacy and security are our highest priorities.\n\n1. Data Collection: Your profile, check-ins, moods, and AI chat history are securely stored on our encrypted servers.\n2. Location Usage: Location data is only accessed with your permission for SOS alerts and accurate earthquake warnings.\n3. Safe Usage: We never sell or share your personal information with third parties.\n4. Data Control: You can clear local cache anytime or use the "Delete Account" option to permanently wipe all your data from our servers.\n5. Security: All sensitive data is protected using industry-standard encryption protocols.';
 
   String get settingsTheme => isBangla ? 'থিম' : 'Theme';
   String get settingsThemeLight => isBangla ? 'হালকা' : 'Light';
@@ -245,11 +250,24 @@ class AppStrings {
       ? 'ভাষা নির্বাচন করুন / Select Language'
       : 'Select Language / ভাষা নির্বাচন করুন';
 
+  String get settingsVoiceSOS => isBangla ? 'ভয়েস SOS (চিৎকার শনাক্তকরণ)' : 'Voice SOS (Scream Detection)';
+  String get settingsVoiceSOSDesc => isBangla 
+      ? 'খুব জোরে চিৎকার করলে এটি অটোমেটিক SOS অ্যালার্ট চালু করবে' 
+      : 'Triggers SOS automatically if a loud scream is detected';
+  String get settingsVoiceSOSPermission => isBangla
+      ? 'এই ফিচারের জন্য মাইক্রোফোন পারমিশন প্রয়োজন'
+      : 'Microphone permission is required for this feature';
+
   // Dialog Actions
   String get dialogCancel => isBangla ? 'বাতিল' : 'Cancel';
   String get dialogClose => isBangla ? 'বন্ধ করুন' : 'Close';
   String get dialogClear => isBangla ? 'পরিষ্কার করুন' : 'Clear';
   String get dialogLogout => isBangla ? 'লগআউট' : 'Logout';
+  String get settingsDeleteAccountConfirm =>
+      isBangla ? 'অ্যাকাউন্ট মুছুন' : 'Delete Account';
+  String get settingsDeleteAccountWarning => isBangla
+      ? 'আপনি কি নিশ্চিত? আপনার সব ডেটা চিরতরে মুছে যাবে এবং এটি ফিরে পাওয়া সম্ভব নয়।'
+      : 'Are you sure? All your data will be permanently deleted and this cannot be undone.';
 
   // ===================== SOS =====================
   String get sosTitle => isBangla ? 'জরুরি SOS' : 'Emergency SOS';
@@ -426,6 +444,9 @@ class AppStrings {
   String get loginWrongPassword => isBangla
       ? 'আপনার পাসওয়ার্ড ভুল হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
       : 'Incorrect password. Please try again.';
+  String get loginUserNotFound => isBangla
+      ? 'এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে সঠিক ইমেইল দিন বা রেজিস্টার করুন।'
+      : 'No account found with this email. Please check your email or register.';
   String get loginNoAccount =>
       isBangla ? 'অ্যাকাউন্ট নেই? রেজিস্ট্রেশন করুন' : 'No account? Register';
   String get loginForgotPass =>

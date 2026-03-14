@@ -83,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             email: _emailController.value.text.trim(),
             password: _passwordController.value.text,
           );
-
+ 
       if (mounted) {
         final authState = ref.read(authProvider);
         if (authState is AuthAuthenticated) {
@@ -92,17 +92,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           _showError(authState.message);
         }
       }
-    } on DioException catch (e) {
-      if (mounted) {
-        if (e.response?.statusCode == 401) {
-          _showError('INVALID_CREDENTIALS');
-        } else {
-          _showError(e.message ?? e.toString());
-        }
-      }
     } catch (e) {
       if (mounted) {
-        _showError(e.toString());
+        String msg = e.toString();
+        // Extract message from DioException or common Exception
+        if (e is DioException) {
+          msg = e.response?.data['errorCode'] ?? e.response?.data['error'] ?? e.message ?? 'Network error';
+        } else {
+          msg = msg.replaceAll('Exception: ', '');
+        }
+        _showError(msg);
       }
     } finally {
       if (mounted) {
@@ -122,6 +121,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             message.toLowerCase().contains('password')) ||
         message.contains('INVALID_CREDENTIALS')) {
       message = s.loginWrongPassword;
+    } else if (message == 'USER_NOT_FOUND' || message.contains('USER_NOT_FOUND')) {
+      message = s.loginUserNotFound;
     } else if (message.contains('SocketException') ||
         message.contains('Failed host lookup') ||
         message.contains('No Internet') ||
@@ -154,6 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -196,19 +198,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                 Text(
                   s.appName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   s.loginSubtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: AppColors.textSecondary,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -293,7 +295,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   children: [
                     Text(
                       s.isBangla ? 'অ্যাকাউন্ট নেই? ' : 'No account? ',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ),
                     ),
                     TextButton(
                       onPressed: () => context.push('/register'),

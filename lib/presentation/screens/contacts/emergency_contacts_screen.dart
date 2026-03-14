@@ -10,6 +10,7 @@ import '../../../core/localization/app_strings.dart';
 
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/custom_text_field.dart';
 
 class EmergencyContactsScreen extends ConsumerStatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -314,84 +315,91 @@ class _EmergencyContactsScreenState
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              s.contactsAdd,
-              style: const TextStyle(
-                fontFamily: 'HindSiliguri',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                s.contactsAdd,
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: s.contactsName,
-                prefixIcon: const Icon(Icons.person_outline),
+              const SizedBox(height: 20),
+              CustomTextField(
+                controller: nameController,
+                label: s.contactsName,
+                prefixIcon: Icons.person_outline,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: s.contactsPhone,
-                prefixIcon: const Icon(Icons.phone_outlined),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: phoneController,
+                label: s.contactsPhone,
+                prefixIcon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: relationController,
-              decoration: InputDecoration(
-                labelText: s.contactsRelation,
-                prefixIcon: const Icon(Icons.family_restroom_outlined),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: relationController,
+                label: s.contactsRelation,
+                prefixIcon: Icons.family_restroom_outlined,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: s.contactsEmailMissedAlert,
-                prefixIcon: const Icon(Icons.email_outlined),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: emailController,
+                label: s.contactsEmailMissedAlert,
+                prefixIcon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
               ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.isNotEmpty &&
-                      phoneController.text.isNotEmpty) {
-                    ref.read(contactProvider.notifier).addContact(
-                          name: nameController.text.trim(),
-                          phoneNumber: phoneController.text.trim(),
-                          email: emailController.text.trim().isNotEmpty
-                              ? emailController.text.trim()
-                              : null,
-                          relationship: relationController.text.trim(),
-                        );
-                    Navigator.pop(context);
-                  }
-                },
-                child: Text(s.save,
-                    style: const TextStyle(fontFamily: 'HindSiliguri')),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (nameController.text.isNotEmpty &&
+                        phoneController.text.isNotEmpty) {
+                      ref.read(contactProvider.notifier).addContact(
+                            name: nameController.text.trim(),
+                            phoneNumber: phoneController.text.trim(),
+                            email: emailController.text.trim().isNotEmpty
+                                ? emailController.text.trim()
+                                : null,
+                            relationship: relationController.text.trim(),
+                          );
+                      Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(s.save,
+                      style: const TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.bold,
+                      )),
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 

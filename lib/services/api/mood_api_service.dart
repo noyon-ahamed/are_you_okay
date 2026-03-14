@@ -6,7 +6,8 @@ import '../../core/constants/app_constants.dart';
 import '../auth/token_storage_service.dart';
 import '../shared_prefs_service.dart';
 import '../../routes/app_router.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../provider/auth_provider.dart';
 
 const String _kMoodHistoryCache = 'mood_history_cache';
 const String _kMoodStatsCache = 'mood_stats_cache';
@@ -33,10 +34,13 @@ class MoodApiService {
         },
         onError: (error, handler) async {
           if (error.response?.statusCode == 401) {
-            await SharedPrefsService().logout();
-            await TokenStorageService.clearAll();
-            if (rootNavigatorKey.currentContext != null) {
-              rootNavigatorKey.currentContext!.go(Routes.login);
+            final context = rootNavigatorKey.currentContext;
+            if (context != null) {
+              final container = ProviderScope.containerOf(context);
+              await container.read(authProvider.notifier).logout();
+            } else {
+              await SharedPrefsService().logout();
+              await TokenStorageService.clearAll();
             }
           }
           return handler.next(error);

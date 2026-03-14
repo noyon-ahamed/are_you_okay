@@ -179,6 +179,7 @@ class HiveService {
       'earthquakeCountry': settings.earthquakeCountry,
       'themeIsDark': settings.themeIsDark,
       'biometricEnabled': settings.biometricEnabled,
+      'voiceSOSEnabled': settings.voiceSOSEnabled,
       'updatedAt': settings.updatedAt?.toIso8601String(),
     };
     await _settingsBox.put('settings', jsonEncode(map));
@@ -200,6 +201,7 @@ class HiveService {
           earthquakeCountry: map['earthquakeCountry'] ?? '',
           themeIsDark: map['themeIsDark'] ?? false,
           biometricEnabled: map['biometricEnabled'] ?? false,
+          voiceSOSEnabled: map['voiceSOSEnabled'] ?? true,
           updatedAt: map['updatedAt'] != null
               ? DateTime.parse(map['updatedAt'])
               : null,

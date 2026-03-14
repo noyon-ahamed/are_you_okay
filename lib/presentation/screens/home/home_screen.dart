@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -22,6 +23,8 @@ import '../../../services/notification_navigation_service.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
 import '../../../services/shared_prefs_service.dart';
+import '../../../services/voice_detector_service.dart';
+import '../../../provider/settings_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -98,6 +101,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // Fetch check-in status from server
       ref.read(checkinStatusProvider.notifier).fetchStatus();
       _handlePendingReminderAction();
+
+      // Initialize Voice SOS if enabled
+      _initVoiceSOS();
+
+      // Request permissions after login
+      _requestPermissions();
     });
     pendingNotificationAction.addListener(_handlePendingReminderAction);
 
@@ -141,6 +150,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  void _initVoiceSOS() {
+    final settings = ref.read(settingsProvider);
+    final voiceService = ref.read(voiceDetectorServiceProvider);
+
+    voiceService.onScreamDetected = () {
+      if (mounted) {
+        // Trigger SOS
+        context.push(Routes.sos);
+      }
+    };
+
+    if (settings.voiceSOSEnabled) {
+      voiceService.startListening();
+    }
+  }
+
+  Future<void> _requestPermissions() async {
+    // We delay slightly to let the home screen settle
+    await Future.delayed(const Duration(milliseconds: 1200));
+
+    try {
+      final notifService = LocalNotificationService();
+      await notifService.initialize(
+        onNotificationTap: NotificationNavigationService.handlePayload,
+      );
+      // Cancel any old reminders that might be stuck
+      await notifService.cancelDailyReminders();
+      await notifService.cancelCheckinReminders();
+    } catch (e) {
+      debugPrint('Error initializing local notifications in HomeScreen: $e');
+    }
+
+    final status = await [
+      Permission.location,
+      Permission.notification,
+      Permission.microphone,
+    ].request();
+
+    // If microphone permission is denied, ensure Voice SOS is off
+    if (status[Permission.microphone] != PermissionStatus.granted) {
+      final settings = ref.read(settingsProvider);
+      if (settings.voiceSOSEnabled) {
+        // ignore: unused_result
+        ref.read(settingsProvider.notifier).updateSettings(
+              settings.copyWith(voiceSOSEnabled: false),
+            );
+      }
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -155,6 +214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _timeRemainingNotifier.dispose();
     pendingNotificationAction.removeListener(_handlePendingReminderAction);
     ref.read(shakeDetectorProvider).stopListening();
+    ref.read(voiceDetectorServiceProvider).stopListening();
     super.dispose();
   }
 
@@ -170,6 +230,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (authState is AuthAuthenticated) {
       userName = authState.user.name;
     }
+
+    // React to Voice SOS toggle
+    ref.listen(settingsProvider.select((s) => s.voiceSOSEnabled), (prev, next) {
+      final voiceService = ref.read(voiceDetectorServiceProvider);
+      if (next) {
+        voiceService.startListening();
+      } else {
+        voiceService.stopListening();
+      }
+    });
 
     return Scaffold(
       body: Container(
@@ -892,11 +962,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildBottomNav(bool isDark, AppStrings s) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            // ignore: deprecated_member_use
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -958,8 +1027,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              // ignore: deprecated_member_use
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),

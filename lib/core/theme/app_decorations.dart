@@ -28,16 +28,14 @@ class AppDecorations {
   /// Dark glass card decoration
   static BoxDecoration darkGlassCard({
     double borderRadius = 20,
-    double opacity = 0.15,
+    double opacity = 0.2, // Slightly more opaque for better contrast
   }) {
     return BoxDecoration(
-      // ignore: deprecated_member_use
-      color: Colors.black.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
-        // ignore: deprecated_member_use
-        color: Colors.white.withOpacity(0.1),
-        width: 1,
+        color: Colors.white.withValues(alpha: 0.12),
+        width: 1.5,
       ),
     );
   }
@@ -88,8 +86,11 @@ class AppDecorations {
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFF1A2F28), Color(0xFF121212)],
-        stops: [0.0, 0.5],
+        colors: [
+          Color(0xFF0F241F), // Deep Forest Green top
+          Color(0xFF0A1210), // Midnight Green bottom
+        ],
+        stops: [0.0, 0.7],
       ),
     );
   }
@@ -140,14 +141,12 @@ class AppDecorations {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? const Color(0xFF141F1C) : Colors.white,
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
         color: isDark
-            // ignore: deprecated_member_use
-            ? Colors.white.withOpacity(0.08)
-            // ignore: deprecated_member_use
-            : Colors.black.withOpacity(0.05),
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.black.withValues(alpha: 0.05),
       ),
       boxShadow: isDark ? [] : softShadow,
     );
@@ -160,22 +159,19 @@ class AppDecorations {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? const Color(0xFF1B2925) : Colors.white,
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
         color: isDark
-            // ignore: deprecated_member_use
-            ? Colors.white.withOpacity(0.08)
-            // ignore: deprecated_member_use
-            : Colors.black.withOpacity(0.05),
+            ? Colors.white.withValues(alpha: 0.15)
+            : Colors.black.withValues(alpha: 0.05),
       ),
       boxShadow: isDark
           ? [
               BoxShadow(
-                // ignore: deprecated_member_use
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ]
           : mediumShadow,

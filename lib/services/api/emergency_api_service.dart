@@ -156,7 +156,8 @@ class EmergencyApiService {
         if (response.data['success'] != true) {
           throw Exception(response.data['error'] ?? 'Failed to sync contact');
         }
-        final synced = Map<String, dynamic>.from(response.data['contact'] ?? {});
+        final synced =
+            Map<String, dynamic>.from(response.data['contact'] ?? {});
 
         final pendingId = contact['id']?.toString();
         if (pendingId != null && pendingId.isNotEmpty) {

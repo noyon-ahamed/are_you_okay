@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/user_model.dart';
 import '../repository/auth_repository.dart';
-import '../services/api/auth_api_service.dart';
 import '../services/socket_service.dart';
 import '../services/hive_service.dart';
+import '../provider/language_provider.dart';
+import '../services/api/auth_api_service.dart';
 
 abstract class AuthState {
   const AuthState();
@@ -35,8 +37,9 @@ class AuthError extends AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final SocketService _socketService;
-
-  AuthNotifier(this._authRepository, this._socketService)
+  final Ref _ref;
+ 
+  AuthNotifier(this._authRepository, this._socketService, this._ref)
       : super(const AuthInitial()) {
     checkAuthStatus();
   }
@@ -75,6 +78,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (e) {
       debugPrint('Failed to background sync profile: $e');
+      if (e is DioException) {
+        if (e.response?.statusCode == 401 && state is AuthAuthenticated) {
+          debugPrint('Detected invalid session via background sync. Logging out.');
+          logout();
+        }
+      }
     }
   }
 
@@ -85,7 +94,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await _authRepository.login(email: email, password: password);
       state = AuthAuthenticated(user);
       _socketService.init();
-      _syncProfileQuietly();
+      // Small delay so the token is fully persisted before background sync
+      Future.delayed(const Duration(milliseconds: 500), _syncProfileQuietly);
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -107,7 +117,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       state = AuthAuthenticated(user);
       _socketService.init();
-      _syncProfileQuietly();
+      Future.delayed(const Duration(milliseconds: 500), _syncProfileQuietly);
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -118,6 +128,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await _authRepository.logout();
       _socketService.disconnect();
+      // Ensure language resets to English for the next user/session
+      await _ref.read(languageProvider.notifier).setLanguage('en');
       state = const AuthUnauthenticated();
     } catch (e) {
       state = AuthError(e.toString());
@@ -172,6 +184,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    state = const AuthLoading();
+    try {
+      final api = AuthApiService();
+      await api.deleteAccount();
+      await _authRepository.logout(); // Reuse logout to clear tokens/Hive
+      _socketService.disconnect();
+      // Ensure language resets to English for the next session
+      await _ref.read(languageProvider.notifier).setLanguage('en');
+      state = const AuthUnauthenticated();
+    } catch (e) {
+      state = AuthError(e.toString());
+      rethrow;
+    }
+  }
+
   Future<void> refreshProfile() async {
     try {
       final api = AuthApiService();
@@ -186,6 +214,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (e) {
       debugPrint('Failed to refresh profile: $e');
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          debugPrint('Detected invalid session via profile refresh. Logging out.');
+          logout();
+        }
+      }
     }
   }
 
@@ -216,6 +250,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     ref.watch(authRepositoryProvider),
     ref.watch(socketServiceProvider),
+    ref,
   );
 });
 

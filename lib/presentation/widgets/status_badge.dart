@@ -22,11 +22,11 @@ class StatusBadge extends StatelessWidget {
           padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         // ignore: deprecated_member_use
-        color: _getColor().withOpacity(0.12),
+        color: _getColor(Theme.of(context).brightness == Brightness.dark).withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           // ignore: deprecated_member_use
-          color: _getColor().withOpacity(0.3),
+          color: _getColor(Theme.of(context).brightness == Brightness.dark).withOpacity(0.3),
           width: 1,
         ),
       ),
@@ -37,7 +37,7 @@ class StatusBadge extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: _getColor(),
+              color: _getColor(Theme.of(context).brightness == Brightness.dark),
               shape: BoxShape.circle,
             ),
           ),
@@ -45,7 +45,7 @@ class StatusBadge extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: _getColor(),
+              color: _getColor(Theme.of(context).brightness == Brightness.dark),
               fontWeight: FontWeight.w600,
               fontSize: fontSize,
               fontFamily: 'HindSiliguri',
@@ -56,7 +56,7 @@ class StatusBadge extends StatelessWidget {
     );
   }
 
-  Color _getColor() {
+  Color _getColor(bool isDark) {
     switch (type) {
       case StatusType.safe:
         return const Color(0xFF4CAF50);
@@ -65,7 +65,7 @@ class StatusBadge extends StatelessWidget {
       case StatusType.danger:
         return const Color(0xFFF44336);
       case StatusType.offline:
-        return const Color(0xFF757575);
+        return isDark ? const Color(0xFFBDBDBD) : const Color(0xFF757575);
       case StatusType.info:
         return const Color(0xFF2196F3);
       case StatusType.premium:

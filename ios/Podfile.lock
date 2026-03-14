@@ -1,4 +1,6 @@
 PODS:
+  - audio_streamer (0.0.1):
+    - Flutter
   - connectivity_plus (0.0.1):
     - Flutter
     - ReachabilitySwift
@@ -119,6 +121,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - audio_streamer (from `.symlinks/plugins/audio_streamer/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
@@ -160,6 +163,8 @@ SPEC REPOS:
     - ReachabilitySwift
 
 EXTERNAL SOURCES:
+  audio_streamer:
+    :path: ".symlinks/plugins/audio_streamer/ios"
   connectivity_plus:
     :path: ".symlinks/plugins/connectivity_plus/ios"
   firebase_core:
@@ -208,6 +213,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/workmanager_apple/ios"
 
 SPEC CHECKSUMS:
+  audio_streamer: 2e472b9f81cec5e381c4cf7667afa3055dcb45a4
   connectivity_plus: 481668c94744c30c53b8895afb39159d1e619bdf
   CryptoSwift: e64e11850ede528a02a0f3e768cec8e9d92ecb90
   Firebase: 065f2bb395062046623036d8e6dc857bc2521d56

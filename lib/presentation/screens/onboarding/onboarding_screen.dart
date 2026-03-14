@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../../../core/localization/app_strings.dart';
@@ -30,8 +29,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _currentPageState.value);
-    _currentPage = _currentPageState.value;
+    _pageController = PageController(initialPage: 0);
+    _currentPage = 0;
   }
 
   @override
@@ -336,11 +335,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                         bottom: 22,
                         child: Text(
                           s.onbSafetyOneTap,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'HindSiliguri',
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
-                            color: AppColors.textPrimary,
+                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                             height: 1.4,
                           ),
                         ),
@@ -375,12 +374,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   }
 
   Future<void> _completeOnboarding() async {
-    await [
-      Permission.location,
-      Permission.notification,
-      Permission.microphone,
-    ].request();
-
     await ref.read(sharedPrefsServiceProvider).setFirstLaunchComplete();
 
     if (mounted) {

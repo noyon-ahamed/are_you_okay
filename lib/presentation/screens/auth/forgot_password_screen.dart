@@ -212,6 +212,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: Text(s.forgotTitle),
@@ -242,10 +243,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                       : _currentStep.value == 1
                           ? s.forgotVerifyOTP
                           : s.forgotNewPassword,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -258,9 +259,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                       : _currentStep.value == 1
                           ? s.forgotOTPSubtitle
                           : s.forgotNewPassSubtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                     fontFamily: 'HindSiliguri',
                   ),
                   textAlign: TextAlign.center,
@@ -430,7 +431,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                   children: [
                     Text(
                       s.forgotRemembered,
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ),
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),

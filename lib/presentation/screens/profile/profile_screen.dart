@@ -11,11 +11,18 @@ import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../routes/app_router.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final s = ref.watch(stringsProvider);
@@ -129,8 +136,7 @@ class ProfileScreen extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              // ignore: deprecated_member_use
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -152,7 +158,7 @@ class ProfileScreen extends ConsumerWidget {
                                     Container(
                                         width: 1,
                                         height: 12,
-                                        color: Colors.white30),
+                                        color: Colors.white.withValues(alpha: 0.2)),
                                     const SizedBox(width: 8),
                                   ]
                                 ],
@@ -207,6 +213,10 @@ class ProfileScreen extends ConsumerWidget {
                     // Quick Settings
                     _buildQuickSettings(context, isDark, s),
                     const SizedBox(height: 32),
+
+                    // Delete Account Button
+                    _buildDeleteAccountButton(context, s),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -496,5 +506,98 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildDeleteAccountButton(BuildContext context, AppStrings s) {
+    return Center(
+      child: TextButton.icon(
+        onPressed: _isDeleting ? null : _showDeleteConfirmation,
+        icon: _isDeleting 
+            ? const SizedBox(
+                width: 18, 
+                height: 18, 
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent)
+              )
+            : const Icon(Icons.delete_forever, color: Colors.redAccent),
+        label: Text(
+          s.settingsDeleteAccount,
+          style: const TextStyle(
+            color: Colors.redAccent,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'HindSiliguri',
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.2)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    final s = ref.read(stringsProvider);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(s.settingsDeleteAccountConfirm,
+            style: const TextStyle(
+                fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold)),
+        content: Text(s.settingsDeleteAccountWarning,
+            style: const TextStyle(fontFamily: 'HindSiliguri')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(s.dialogCancel,
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(s.confirm,
+                style: const TextStyle(fontFamily: 'HindSiliguri')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    final s = ref.read(stringsProvider);
+    setState(() => _isDeleting = true);
+    try {
+      await ref.read(authProvider.notifier).deleteAccount();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.isBangla
+                ? 'আপনার অ্যাকাউন্টটি মুছে ফেলা হয়েছে'
+                : 'Your account has been deleted'),
+            backgroundColor: Colors.black87,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
   }
 }

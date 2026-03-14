@@ -81,16 +81,6 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen>
       ..addListener(() {
         _scrollOffset.value = _scrollController.offset;
       });
-    final s = ref.read(stringsProvider);
-    final presets = _getPresets(s);
-    _selectedPreset = _selectedPresetState.value;
-    _delaySeconds = _delaySecondsState.value;
-    if (_nameController.value.text.isEmpty) {
-      _nameController.value.text = presets[_selectedPreset].name;
-    }
-    if (_numberController.value.text.isEmpty) {
-      _numberController.value.text = presets[_selectedPreset].number;
-    }
     _listenToCallKitEvents();
   }
 
@@ -101,8 +91,23 @@ class _FakeCallScreenState extends ConsumerState<FakeCallScreen>
     registerForRestoration(_nameController, 'caller_name');
     registerForRestoration(_numberController, 'caller_number');
     registerForRestoration(_scrollOffset, 'scroll_offset');
-    _selectedPreset = _selectedPresetState.value;
-    _delaySeconds = _delaySecondsState.value;
+    
+    if (initialRestore) {
+      final s = ref.read(stringsProvider);
+      final presets = _getPresets(s);
+      _selectedPreset = _selectedPresetState.value;
+      _delaySeconds = _delaySecondsState.value;
+      if (_nameController.value.text.isEmpty) {
+        _nameController.value.text = presets[_selectedPreset].name;
+      }
+      if (_numberController.value.text.isEmpty) {
+        _numberController.value.text = presets[_selectedPreset].number;
+      }
+    } else {
+      _selectedPreset = _selectedPresetState.value;
+      _delaySeconds = _delaySecondsState.value;
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollOffset.value);

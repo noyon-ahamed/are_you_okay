@@ -74,6 +74,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: Text(s.contactsNewContact),
@@ -136,10 +137,10 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
               // Priority
               Text(
                 s.contactsPriorityLevel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -154,13 +155,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
                       height: 50,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color:
-                            isSelected ? AppColors.primary : AppColors.surface,
+                        color: isSelected
+                            ? AppColors.primary
+                            : (isDark ? AppColors.surfaceVariantDark : AppColors.surface),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
                               ? AppColors.primary
-                              : AppColors.divider,
+                              : (isDark ? AppColors.borderDark : AppColors.divider),
                         ),
                       ),
                       child: Text(
@@ -168,8 +170,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color:
-                              isSelected ? Colors.white : AppColors.textPrimary,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
                         ),
                       ),
                     ),
@@ -179,9 +182,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
               const SizedBox(height: 8),
               Text(
                 s.contactsPriorityDesc,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 24),
@@ -189,10 +192,10 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
               // Notification Methods
               Text(
                 s.contactsNotifType,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),

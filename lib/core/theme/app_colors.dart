@@ -54,14 +54,19 @@ class AppColors {
   static const Color textTertiary = Color(0xFF9E9E9E);
   static const Color textDisabled = Color(0xFFBDBDBD);
 
-  // Dark Mode Colors
-  static const Color backgroundDark = Color(0xFF121212);
-  static const Color surfaceDark = Color(0xFF1E1E1E);
-  static const Color surfaceVariantDark = Color(0xFF2C2C2C);
+  // Dark Mode Colors - Premium Midnight Green Palette
+  static const Color backgroundDark = Color(0xFF0A1210); // Deep Midnight Green
+  static const Color surfaceDark = Color(0xFF141F1C);    // Dark Forest Surface
+  static const Color surfaceVariantDark = Color(0xFF1B2925); // Lighter Forest
   
-  static const Color textPrimaryDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryDark = Color(0xFFB3B3B3);
-  static const Color textTertiaryDark = Color(0xFF808080);
+  static const Color textPrimaryDark = Color(0xFFF2F4F3);   // Soft Off-White
+  static const Color textSecondaryDark = Color(0xFF94A39E); // Muted Sage
+  static const Color textTertiaryDark = Color(0xFF5C6B66);  // Deep Sage
+  static const Color textDisabledDark = Color(0xFF3D4A46);
+
+  // Premium Dark Mode Accents
+  static const Color premiumGreen = Color(0xFF1DB954);      // Vibrant Safety Green
+  static const Color glassAccent = Color(0x1AFFFFFF);      // Standard Glass
 
   // Borders & Dividers
   static const Color border = Color(0xFFE0E0E0);

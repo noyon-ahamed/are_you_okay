@@ -72,7 +72,9 @@ class RouterNotifier extends ChangeNotifier {
 final routerNotifierProvider = Provider((ref) => RouterNotifier(ref));
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final notifier = ref.watch(routerNotifierProvider);
+  // Use read here to prevent the entire router from being recreated
+  // when the notifier changes. GoRouter handles updates via refreshListenable.
+  final notifier = ref.read(routerNotifierProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -284,72 +286,45 @@ final routerProvider = Provider<GoRouter>((ref) {
       final currentPath = state.uri.path;
       final isFirstLaunch = sharedPrefs.isFirstLaunch;
 
+      debugPrint(
+          'Router Redirect: path=$currentPath, splash=$isSplashComplete, auth=${authState.runtimeType}, first=$isFirstLaunch');
+
       if (!isSplashComplete) {
         return Routes.splash;
       }
 
       final isAuthenticated = authState is AuthAuthenticated;
-      final isLoading = authState is AuthLoading || authState is AuthInitial;
-      const restorableRoutes = <String>{
-        Routes.home,
-        Routes.aiChat,
-        Routes.earthquake,
-        Routes.fakeCall,
-        Routes.profile,
-        Routes.editProfile,
-        Routes.settings,
-        Routes.notificationSettings,
-        Routes.aboutApp,
-        Routes.privacyPolicy,
-        Routes.contacts,
-        Routes.addContact,
-        Routes.sos,
-        Routes.history,
-        Routes.moodHistory,
-        Routes.notifications,
-      };
 
-      if (currentPath == Routes.onboarding) {
-        if (isAuthenticated) return Routes.home;
-        return isFirstLaunch ? null : Routes.login;
+      // Authenticated users
+      if (isAuthenticated) {
+        final isAuthOrOnboardingPage = currentPath == Routes.login ||
+            currentPath == Routes.register ||
+            currentPath == Routes.forgotPassword ||
+            currentPath == Routes.onboarding;
+
+        if (isAuthOrOnboardingPage || currentPath == Routes.splash) {
+          return Routes.home;
+        }
+        return null;
       }
 
-      final authPages = [
-        Routes.login,
-        Routes.register,
-        Routes.forgotPassword,
-      ];
-      final isAuthPage = authPages.contains(currentPath);
-
-      if (isLoading) {
-        if (isAuthPage) return null;
-        return Routes.login;
-      }
-
-      if (!isAuthenticated && isFirstLaunch) {
-        return Routes.onboarding;
-      }
-
-      if (!isAuthenticated && !isAuthPage && currentPath != Routes.splash) {
-        return Routes.login;
-      }
-
-      if (isAuthenticated && (isAuthPage || currentPath == Routes.splash)) {
-        return sharedPrefs.lastRoute != null &&
-                restorableRoutes.contains(sharedPrefs.lastRoute)
-            ? sharedPrefs.lastRoute
-            : Routes.home;
-      }
-
-      if (!isAuthenticated && currentPath == Routes.splash) {
+      // Unauthenticated users
+      // From splash, decide where to go
+      if (currentPath == Routes.splash) {
         return isFirstLaunch ? Routes.onboarding : Routes.login;
       }
 
-      if (isAuthenticated && restorableRoutes.contains(currentPath)) {
-        sharedPrefs.setLastRoute(currentPath);
+      // If we are on onboarding or auth pages, stay there
+      final isAuthPage = currentPath == Routes.login ||
+          currentPath == Routes.register ||
+          currentPath == Routes.forgotPassword;
+
+      if (currentPath == Routes.onboarding || isAuthPage) {
+        return null;
       }
 
-      return null;
+      // Redirect any other protected pages to login
+      return Routes.login;
     },
   );
 });

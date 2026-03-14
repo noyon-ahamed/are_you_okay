@@ -6,8 +6,6 @@ import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 import '../auth/token_storage_service.dart';
-import '../../routes/app_router.dart';
-import 'package:go_router/go_router.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -29,13 +27,10 @@ class AuthApiService {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            await SharedPrefsService().logout();
-            await TokenStorageService.clearAll();
-            if (rootNavigatorKey.currentContext != null) {
-              rootNavigatorKey.currentContext!.go(Routes.login);
-            }
-          }
+          // Note: 401 handling for AuthApiService is done in AuthProvider
+          // (_syncProfileQuietly and refreshProfile) which check the auth
+          // state before logging out. Do NOT auto-logout here to avoid
+          // race conditions during login/token-save flow.
           return handler.next(error);
         },
       ),
@@ -304,6 +299,19 @@ class AuthApiService {
 
       if (response.data['success'] != true) {
         throw Exception(response.data['error'] ?? 'Failed to verify email');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
+  /// Delete user account
+  Future<void> deleteAccount() async {
+    try {
+      final response = await _dio.delete('$baseUrl/auth/account');
+
+      if (response.data['success'] != true) {
+        throw Exception(response.data['error'] ?? 'Failed to delete account');
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['error'] ?? 'Network error');

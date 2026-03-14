@@ -150,6 +150,11 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     await _hiveService.saveSettings(state);
   }
 
+  Future<void> toggleVoiceSOS() async {
+    state = state.copyWith(voiceSOSEnabled: !state.voiceSOSEnabled);
+    await _hiveService.saveSettings(state);
+  }
+
   Future<void> updateSettings(SettingsModel settings) async {
     state = settings;
     await _hiveService.saveSettings(state);

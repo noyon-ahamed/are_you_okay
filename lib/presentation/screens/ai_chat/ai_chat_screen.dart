@@ -120,24 +120,28 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
     try {
       final response = await _aiService.sendMessage(msgText);
 
-      setState(() {
-        _isTyping = false;
-        _messages.add(_ChatMessage(
-          text: response,
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
-      });
+      if (mounted) {
+        setState(() {
+          _isTyping = false;
+          _messages.add(_ChatMessage(
+            text: response,
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isTyping = false;
-        _messages.add(_ChatMessage(
-          text: s.aiChatError,
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
-      });
+      if (mounted) {
+        setState(() {
+          _isTyping = false;
+          _messages.add(_ChatMessage(
+            text: s.aiChatError,
+            isUser: false,
+            timestamp: DateTime.now(),
+            isError: true,
+          ));
+        });
+      }
     }
     _scrollToBottom();
   }
@@ -311,11 +315,9 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
                 color: message.isUser
                     ? AppColors.primary
                     : message.isError
-                        // ignore: deprecated_member_use
-                        ? AppColors.error.withOpacity(0.1)
+                        ? AppColors.error.withValues(alpha: 0.1)
                         : (isDark
-                            // ignore: deprecated_member_use
-                            ? Colors.white.withOpacity(0.08)
+                            ? AppColors.surfaceVariantDark
                             : const Color(0xFFF0F0F0)),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
@@ -366,8 +368,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isDark
-                  // ignore: deprecated_member_use
-                  ? Colors.white.withOpacity(0.08)
+                  ? AppColors.surfaceVariantDark
                   : const Color(0xFFF0F0F0),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(18),
@@ -414,11 +415,10 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
         bottom: MediaQuery.of(context).padding.bottom + 8,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            // ignore: deprecated_member_use
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -440,10 +440,8 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
                 ),
-                filled: true,
                 fillColor: isDark
-                    // ignore: deprecated_member_use
-                    ? Colors.white.withOpacity(0.06)
+                    ? AppColors.surfaceVariantDark
                     : const Color(0xFFF5F5F5),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

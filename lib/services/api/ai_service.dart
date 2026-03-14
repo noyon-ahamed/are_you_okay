@@ -47,13 +47,6 @@ class GeminiAIService {
   }
 }
 
-
-
-
-
-
-
-
 // import 'package:flutter/foundation.dart';
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:google_generative_ai/google_generative_ai.dart';
@@ -71,7 +64,7 @@ class GeminiAIService {
 //     _model = GenerativeModel(
 //       // model: 'gemini-1.5-flash',
 //       model: 'llama-3.1-8b-instant',
-    
+
 //       apiKey: _apiKey,
 //       systemInstruction: Content.system(
 //         'তুমি একজন বাংলাদেশি স্বাস্থ্য সহকারী AI। তোমার নাম "স্বাস্থ্য সহকারী"।\n'

@@ -58,16 +58,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
       });
     final authState = ref.read(authProvider);
     final user = authState is AuthAuthenticated ? authState.user : null;
-    if (_nameController.value.text.isEmpty) {
-      _nameController.value.text = user?.name ?? '';
-    }
-    if (_emailController.value.text.isEmpty) {
-      _emailController.value.text = user?.email ?? '';
-    }
-    if (_addressController.value.text.isEmpty) {
-      _addressController.value.text = user?.address ?? '';
-    }
-    _selectedBloodGroupValue.value ??= user?.bloodGroup;
     _existingImageUrl = user?.profilePicture;
   }
 
@@ -78,6 +68,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
     registerForRestoration(_addressController, 'address');
     registerForRestoration(_selectedBloodGroupValue, 'blood_group');
     registerForRestoration(_scrollOffset, 'scroll_offset');
+
+    if (initialRestore) {
+      final authState = ref.read(authProvider);
+      final user = authState is AuthAuthenticated ? authState.user : null;
+      if (_nameController.value.text.isEmpty) {
+        _nameController.value.text = user?.name ?? '';
+      }
+      if (_emailController.value.text.isEmpty) {
+        _emailController.value.text = user?.email ?? '';
+      }
+      if (_addressController.value.text.isEmpty) {
+        _addressController.value.text = user?.address ?? '';
+      }
+      _selectedBloodGroupValue.value ??= user?.bloodGroup;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollOffset.value);
@@ -108,6 +113,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -194,18 +200,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
               // Blood Group
               Text(
                 s.profileBloodGroup,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: _selectedBloodGroupValue.value,
+                dropdownColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surface,
+                  fillColor: isDark ? AppColors.surfaceDark : AppColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -264,6 +275,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
                 isLoading: _isSaving,
                 onPressed: _saveProfile,
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -272,6 +284,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
   }
 
   bool _isSaving = false;
+
 
   Future<void> _saveProfile() async {
     final s = ref.read(stringsProvider);

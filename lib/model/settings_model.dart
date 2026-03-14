@@ -9,6 +9,7 @@ class SettingsModel {
   final String earthquakeCountry;
   final bool themeIsDark;
   final bool biometricEnabled;
+  final bool voiceSOSEnabled;
   final DateTime? updatedAt;
 
   const SettingsModel({
@@ -22,6 +23,7 @@ class SettingsModel {
     this.earthquakeCountry = '',
     this.themeIsDark = false,
     this.biometricEnabled = false,
+    this.voiceSOSEnabled = true,
     this.updatedAt,
   });
 
@@ -36,6 +38,7 @@ class SettingsModel {
     String? earthquakeCountry,
     bool? themeIsDark,
     bool? biometricEnabled,
+    bool? voiceSOSEnabled,
     DateTime? updatedAt,
   }) {
     return SettingsModel(
@@ -49,6 +52,7 @@ class SettingsModel {
       earthquakeCountry: earthquakeCountry ?? this.earthquakeCountry,
       themeIsDark: themeIsDark ?? this.themeIsDark,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
+      voiceSOSEnabled: voiceSOSEnabled ?? this.voiceSOSEnabled,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

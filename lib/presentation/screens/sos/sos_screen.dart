@@ -14,6 +14,7 @@ import '../../../services/location_service.dart';
 import '../../../services/socket_service.dart';
 import '../../../services/api/emergency_api_service.dart';
 import '../../../provider/language_provider.dart';
+import '../../../provider/settings_provider.dart';
 
 class SOSScreen extends ConsumerStatefulWidget {
   const SOSScreen({super.key});
@@ -142,16 +143,19 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     HapticFeedback.heavyImpact();
 
     // Get location
-    try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
+    final settings = ref.read(settingsProvider);
+    if (settings.locationEnabled) {
+      try {
+        final permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          await Geolocator.requestPermission();
+        }
+        _currentPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+      } catch (e) {
+        // Continue without location
       }
-      _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-    } catch (e) {
-      // Continue without location
     }
 
     // Get real contacts
@@ -167,15 +171,17 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           _currentPosition!.latitude, _currentPosition!.longitude);
     }
 
-    // Stream updates
+    // Stream updates if enabled
     _locationSubscription?.cancel();
-    _locationSubscription =
-        locationService.getLocationStream().listen((position) {
-      if (mounted) {
-        setState(() => _currentPosition = position);
-      }
-      socketService.emitLocationUpdate(position.latitude, position.longitude);
-    });
+    if (settings.locationEnabled) {
+      _locationSubscription =
+          locationService.getLocationStream().listen((position) {
+        if (mounted) {
+          setState(() => _currentPosition = position);
+        }
+        socketService.emitLocationUpdate(position.latitude, position.longitude);
+      });
+    }
 
     // Prepare selected services
     final selectedServices = <String>[];
@@ -277,7 +283,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     return Scaffold(
       backgroundColor: _isActivated
           ? const Color(0xFFD32F2F)
-          : (isDark ? AppColors.backgroundDark : AppColors.background),
+          : Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(s.sosTitle),
         backgroundColor: Colors.transparent,
@@ -301,7 +307,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                             ? _buildCountdownView()
                             : _isActivated
                                 ? _buildActivatedView()
-                                : _buildSOSButton(),
+                                : _buildSOSButton(isDark),
                       ),
                     ),
 
@@ -326,7 +332,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
     );
   }
 
-  Widget _buildSOSButton() {
+  Widget _buildSOSButton(bool isDark) {
     final s = ref.watch(stringsProvider);
     final buttonSize = MediaQuery.of(context).size.width < 390 ? 184.0 : 200.0;
 
@@ -363,14 +369,12 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      // ignore: deprecated_member_use
-                      color: const Color(0xFFF44336).withOpacity(0.4),
+                      color: const Color(0xFFF44336).withValues(alpha: isDark ? 0.25 : 0.4),
                       blurRadius: 30,
                       offset: const Offset(0, 10),
                     ),
                     BoxShadow(
-                      // ignore: deprecated_member_use
-                      color: const Color(0xFFF44336).withOpacity(0.2),
+                      color: const Color(0xFFF44336).withValues(alpha: isDark ? 0.15 : 0.2),
                       blurRadius: 60,
                       offset: const Offset(0, 5),
                     ),
@@ -563,8 +567,7 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
-            // ignore: deprecated_member_use
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.85),
             fontFamily: 'HindSiliguri',
           ),
         ),

@@ -46,16 +46,18 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
           Text(
             label!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -73,19 +75,22 @@ class CustomTextField extends StatelessWidget {
           onTap: onTap,
           inputFormatters: inputFormatters,
           textInputAction: textInputAction,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
-            color: AppColors.textPrimary,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           ),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ),
             errorText: errorText,
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon, color: AppColors.primary)
                 : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: AppColors.surface,
+            fillColor: isDark ? AppColors.surfaceDark : AppColors.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.divider),

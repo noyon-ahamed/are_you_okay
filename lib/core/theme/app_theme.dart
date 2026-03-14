@@ -263,26 +263,26 @@ class AppTheme {
         brightness: Brightness.dark,
         colorScheme: const ColorScheme.dark(
           primary: AppColors.primaryLight,
-          onPrimary: Colors.black,
+          onPrimary: Colors.white,
           primaryContainer: AppColors.primaryDark,
-          onPrimaryContainer: AppColors.primaryLight,
-          secondary: AppColors.secondaryLight,
-          onSecondary: Colors.black,
+          onPrimaryContainer: Colors.white,
+          secondary: AppColors.secondary,
+          onSecondary: Colors.white,
           secondaryContainer: AppColors.secondaryDark,
-          onSecondaryContainer: AppColors.secondaryLight,
-          tertiary: AppColors.accentLight,
-          onTertiary: Colors.black,
+          onSecondaryContainer: Colors.white,
+          tertiary: AppColors.accent,
+          onTertiary: Colors.white,
           error: AppColors.errorLight,
-          onError: Colors.black,
+          onError: Colors.white,
           errorContainer: AppColors.errorDark,
-          onErrorContainer: AppColors.errorLight,
+          onErrorContainer: Colors.white,
           surface: AppColors.surfaceDark,
           onSurface: AppColors.textPrimaryDark,
           surfaceContainerHighest: AppColors.surfaceVariantDark,
           onSurfaceVariant: AppColors.textSecondaryDark,
           outline: AppColors.borderDark,
           outlineVariant: AppColors.dividerDark,
-          shadow: Colors.black54,
+          shadow: Colors.black,
           scrim: AppColors.scrim,
         ),
         textTheme: TextTheme(
@@ -345,14 +345,48 @@ class AppTheme {
           systemOverlayStyle: SystemUiOverlayStyle.light,
         ),
         cardTheme: CardThemeData(
-          elevation: 2,
+          elevation: 0,
           color: AppColors.surfaceDark,
-          shadowColor: Colors.black45,
+          shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
+        
+        // Input Theme for Dark Mode
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.surfaceVariantDark,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+          ),
+          labelStyle: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+          hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
+        ),
+
+        // Navigation Bar Theme
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: AppColors.backgroundDark,
+          selectedItemColor: AppColors.primaryLight,
+          unselectedItemColor: AppColors.textTertiaryDark,
+          elevation: 0,
+        ),
+
         scaffoldBackgroundColor: AppColors.backgroundDark,
       );
 }

@@ -68,7 +68,7 @@ dependencies:
   flutter_phone_direct_caller: ^2.1.1
   
   # Audio/Voice
-  # record: 5.1.0
+  noise_meter: ^5.0.2
   
   # Background tasks
   workmanager: ^0.9.0

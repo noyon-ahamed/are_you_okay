@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/earthquake_countries.dart';
@@ -22,6 +23,7 @@ import '../../../provider/checkin_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
 import '../../../services/shared_prefs_service.dart';
+import '../../../services/auth/token_storage_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../services/location_service.dart';
@@ -174,6 +176,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               value: settings.locationEnabled,
               onChanged: (_) {
                 ref.read(settingsProvider.notifier).toggleLocation();
+              },
+            ),
+            _buildDivider(),
+            _buildSwitchTile(
+              icon: Icons.mic_rounded,
+              iconColor: const Color(0xFFE91E63),
+              title: s.settingsVoiceSOS,
+              subtitle: s.settingsVoiceSOSDesc,
+              value: settings.voiceSOSEnabled,
+              onChanged: (val) async {
+                if (val) {
+                  final status = await Permission.microphone.request();
+                  if (status.isGranted) {
+                    ref.read(settingsProvider.notifier).toggleVoiceSOS();
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(s.settingsVoiceSOSPermission)),
+                      );
+                    }
+                  }
+                } else {
+                  ref.read(settingsProvider.notifier).toggleVoiceSOS();
+                }
               },
             ),
             // _buildDivider(),
@@ -572,7 +598,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 height: MediaQuery.of(context).size.height * 0.82,
                 decoration: BoxDecoration(
                   color: isDark
-                      ? const Color(0xFF171717)
+                      ? AppColors.backgroundDark
                       : const Color(0xFFF8F7F3),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(28)),
@@ -624,7 +650,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: isDark
-                                ? const [Color(0xFF1B2B25), Color(0xFF1E1E1E)]
+                                ? [AppColors.surfaceVariantDark, AppColors.surfaceDark]
                                 : const [Color(0xFFE7F4EE), Color(0xFFF8F7F3)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -1242,7 +1268,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
     try {
       final dio = Dio();
-      final token = await SharedPrefsService.getToken() ?? '';
+      final token = await TokenStorageService.getToken() ?? '';
+
       // 1. Fetch Mood Data
       final moodResponse = await dio.get(
         '${AppConstants.apiBaseUrl}/mood/export',
@@ -1318,7 +1345,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       // Generate PDF
       final pdf = pw.Document();
 
-      // --- MOOD PAGE ---
+      // --- SUMMARY COVER PAGE ---
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Center(
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text('Are You Okay?',
+                      style: pw.TextStyle(
+                          fontSize: 40,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900)),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                      s.isBangla
+                          ? 'ব্যক্তিগত স্বাস্থ্য প্রতিবেদন'
+                          : 'Personal Health Report',
+                      style:
+                          const pw.TextStyle(fontSize: 24, color: PdfColors.grey700)),
+                  pw.SizedBox(height: 40),
+                  pw.Text(
+                      '${s.isBangla ? 'তারিখ' : 'Date'}: ${DateTime.now().toString().split(' ')[0]}',
+                      style: const pw.TextStyle(fontSize: 14)),
+                  pw.Divider(
+                      thickness: 2,
+                      color: PdfColors.blue900,
+                      indent: 100,
+                      endIndent: 100),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+      // --- MOOD HISTORY PAGE ---
       if (moodTableData.isNotEmpty) {
         final moodHeaders = moodTableData.first;
         final moodRows = moodTableData.length > 1
@@ -1333,24 +1397,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               return [
                 pw.Header(
                   level: 0,
-                  child: pw.Text('Mood History Report',
+                  child: pw.Text(s.isBangla ? 'মেজাজের ইতিহাস' : 'Mood History',
                       style: pw.TextStyle(
-                          fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue800)),
                 ),
                 pw.SizedBox(height: 10),
-                pw.Text('Total mood entries: ${moodRows.length}',
-                    style: const pw.TextStyle(
-                        fontSize: 12, color: PdfColors.grey600)),
-                pw.SizedBox(height: 20),
                 pw.TableHelper.fromTextArray(
                   context: context,
                   headers: moodHeaders,
                   data: moodRows,
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  headerStyle: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                   headerDecoration:
-                      const pw.BoxDecoration(color: PdfColors.grey300),
+                      const pw.BoxDecoration(color: PdfColors.blue700),
                   cellAlignment: pw.Alignment.centerLeft,
                   cellPadding: const pw.EdgeInsets.all(6),
+                  rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+                  cellDecoration: (index, data, rowNum) {
+                    if (rowNum % 2 == 0) {
+                      return const pw.BoxDecoration(color: PdfColors.grey100);
+                    }
+                    return const pw.BoxDecoration();
+                  },
                 ),
               ];
             },
@@ -1358,7 +1428,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         );
       }
 
-      // --- CHECK-IN PAGE ---
+      // --- CHECK-IN HISTORY PAGE ---
       if (checkinTableData != null && checkinTableData.isNotEmpty) {
         final checkinHeaders = checkinTableData.first;
         final checkinRows = checkinTableData.length > 1
@@ -1373,24 +1443,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               return [
                 pw.Header(
                   level: 0,
-                  child: pw.Text('Check-in History Report',
+                  child: pw.Text(
+                      s.isBangla ? 'চেক-ইন ইতিহাস' : 'Check-in History',
                       style: pw.TextStyle(
-                          fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.green800)),
                 ),
                 pw.SizedBox(height: 10),
-                pw.Text('Total check-in entries: ${checkinRows.length}',
-                    style: const pw.TextStyle(
-                        fontSize: 12, color: PdfColors.grey600)),
-                pw.SizedBox(height: 20),
                 pw.TableHelper.fromTextArray(
                   context: context,
                   headers: checkinHeaders,
                   data: checkinRows,
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  headerStyle: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                   headerDecoration:
-                      const pw.BoxDecoration(color: PdfColors.blue100),
+                      const pw.BoxDecoration(color: PdfColors.green700),
                   cellAlignment: pw.Alignment.centerLeft,
                   cellPadding: const pw.EdgeInsets.all(6),
+                  rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+                  cellDecoration: (index, data, rowNum) {
+                    if (rowNum % 2 == 0) {
+                      return const pw.BoxDecoration(color: PdfColors.grey100);
+                    }
+                    return const pw.BoxDecoration();
+                  },
                 ),
               ];
             },
@@ -1401,12 +1478,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       // Check if any data was added to the PDF
       if (moodTableData.isEmpty &&
           (checkinTableData == null || checkinTableData.isEmpty)) {
-        throw Exception('No mood or check-in data found to export');
+        throw Exception(
+            s.isBangla ? 'কোনো তথ্য পাওয়া যায়নি' : 'No data found to export');
       }
 
       // Save PDF to temp directory
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/are_you_okay_report.pdf');
+      final file = File('${dir.path}/Health_Report.pdf');
       await file.writeAsBytes(await pdf.save());
 
       if (mounted) {
