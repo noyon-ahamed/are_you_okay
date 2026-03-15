@@ -15,6 +15,7 @@ import 'background_service.dart';
 import 'local_notification_history_service.dart';
 import 'notification_navigation_service.dart';
 import 'notification_service.dart';
+import '../provider/language_provider.dart';
 
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
   return OfflineSyncService(ref);
@@ -116,11 +117,11 @@ class OfflineSyncService {
         await notificationService.initialize(
           onNotificationTap: NotificationNavigationService.handlePayload,
         );
+        final s = ref.read(stringsProvider);
         await notificationService.showNotification(
           id: 888,
-          title: '🚨 চেক-ইন মিস করেছেন!',
-          body:
-              'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন যাতে আপনার জরুরি যোগাযোগদের সতর্ক করা না হয়।',
+          title: s.notifMissedCheckinTitle,
+          body: s.notifMissedCheckinBody,
           payload: payload,
           channelId: 'emergency_alerts',
           priority: Priority.max,
@@ -129,10 +130,9 @@ class OfflineSyncService {
         await LocalNotificationHistoryService().saveNotification({
           '_id':
               'missed-${now.year}-${now.month}-${now.day}-${deadline.millisecondsSinceEpoch}',
-          'title': '🚨 চেক-ইন মিস করেছেন!',
+          'title': s.notifMissedCheckinTitle,
           'title_en': 'Check-in missed',
-          'body':
-              'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন।',
+          'body': s.notifMissedCheckinHistory,
           'type': 'reminder',
           'payload': payload,
           'createdAt': now.toIso8601String(),
@@ -153,10 +153,9 @@ class OfflineSyncService {
             '${AppConstants.apiBaseUrl}/notification',
             options: Options(headers: {'Authorization': 'Bearer $token'}),
             data: {
-              'title': 'চেক-ইন ডেডলাইন পার হয়েছে',
+              'title': s.notifMissedDeadlineTitle,
               'title_en': 'Check-in Deadline Missed',
-              'body':
-                  'আপনি অনেকক্ষণ ধরে অ্যাপে আসেননি। অনুগ্রহ করে চেক-ইন করুন।',
+              'body': s.notifMissedDeadlineBody,
               'type': 'alert'
             },
           ).catchError((_) => Response(
@@ -209,6 +208,18 @@ class OfflineSyncService {
         moodCleared = true;
       } catch (e) {
         debugPrint('Server mood clear failed: $e');
+      }
+
+      try {
+        await dio
+            .delete(
+              '${AppConstants.apiBaseUrl}/notification',
+              options: Options(headers: {'Authorization': 'Bearer $token'}),
+            )
+            .timeout(const Duration(seconds: 10));
+        debugPrint('Server notifications cleared ✓');
+      } catch (e) {
+        debugPrint('Server notification clear failed (possibly empty): $e');
       }
 
       if (checkinCleared && moodCleared) {

@@ -1,11 +1,13 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages
 import 'package:timezone/timezone.dart' as tz;
 // ignore: depend_on_referenced_packages
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:io';
+import '../core/localization/app_strings.dart';
 
 /// Local Notification Service
 /// Handles local notifications including scheduled reminders
@@ -105,45 +107,51 @@ class LocalNotificationService {
 
   /// Create Android notification channels
   Future<void> _createAndroidChannels() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lang = prefs.getString('language') ?? 'en';
+    final s = AppStrings(lang: lang);
+
     // Emergency channel
-    const emergencyChannel = AndroidNotificationChannel(
+    final emergencyChannel = AndroidNotificationChannel(
       'emergency_alerts',
-      'জরুরি সতর্কতা',
-      description: 'জরুরি সতর্কতা এবং SOS বিজ্ঞপ্তি',
+      s.channelEmergencyTitle,
+      description: s.channelEmergencyDesc,
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
       enableLights: true,
-      ledColor: Color(0xFFDC143C),
+      ledColor: const Color(0xFFDC143C),
+      showBadge: true,
     );
 
     // Check-in reminders channel
-    const reminderChannel = AndroidNotificationChannel(
+    final reminderChannel = AndroidNotificationChannel(
       'checkin_reminders',
-      'চেক-ইন রিমাইন্ডার',
-      description: 'চেক-ইন করার জন্য রিমাইন্ডার',
+      s.channelCheckinTitle,
+      description: s.channelCheckinDesc,
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
+      showBadge: true,
     );
 
     // Seismic Alerts channel (for close earthquakes)
-    const seismicChannel = AndroidNotificationChannel(
+    final seismicChannel = AndroidNotificationChannel(
       'seismic_alerts',
-      'ভূমিকম্প সাইরেন',
-      description: 'কাছাকাছি ভূমিকম্পের জন্য সাইরেন সতর্কতা',
+      s.channelEarthquakeTitle,
+      description: s.channelEarthquakeDesc,
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
       enableLights: true,
-      ledColor: Color(0xFFDC143C),
+      ledColor: const Color(0xFFDC143C),
     );
 
     // Info channel
-    const infoChannel = AndroidNotificationChannel(
+    final infoChannel = AndroidNotificationChannel(
       'info_updates',
-      'তথ্য আপডেট',
-      description: 'সাধারণ তথ্য এবং আপডেট',
+      s.channelGeneralTitle,
+      description: s.channelGeneralDesc,
       importance: Importance.low,
       playSound: false,
     );
@@ -183,13 +191,18 @@ class LocalNotificationService {
                 : Importance.high,
         priority:
             (channelId == 'emergency_alerts' || channelId == 'seismic_alerts')
-                ? Priority.high
-                : Priority.defaultPriority,
+                ? Priority.max
+                : Priority.high,
         playSound: true,
         enableVibration: true,
         fullScreenIntent:
             channelId == 'emergency_alerts' || channelId == 'seismic_alerts',
         icon: 'ic_notification',
+        visibility: NotificationVisibility.public,
+        showWhen: true,
+        category: channelId == 'emergency_alerts' || channelId == 'seismic_alerts'
+            ? AndroidNotificationCategory.alarm
+            : AndroidNotificationCategory.reminder,
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -245,6 +258,9 @@ class LocalNotificationService {
         enableVibration: true,
         icon: 'ic_notification',
         color: const Color(0xFFDC143C),
+        visibility: NotificationVisibility.public,
+        showWhen: true,
+        category: AndroidNotificationCategory.reminder,
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -308,6 +324,9 @@ class LocalNotificationService {
         enableVibration: true,
         icon: 'ic_notification',
         color: const Color(0xFFDC143C),
+        visibility: NotificationVisibility.public,
+        showWhen: true,
+        category: AndroidNotificationCategory.reminder,
       );
 
       const iosDetails = DarwinNotificationDetails(

@@ -1145,8 +1145,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _performCheckin() async {
     final s = ref.read(stringsProvider);
     String? notes;
-    if (_selectedMood != -1 && _selectedMood < AppConstants.moodLabels.length) {
-      final moodLabel = AppConstants.moodLabels[_selectedMood];
+    if (_selectedMood != -1 && _selectedMood < s.moodLabels.length) {
+      final moodLabel = s.moodLabels[_selectedMood];
       notes = 'Mood: $moodLabel';
     }
 
@@ -1237,7 +1237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final moodKey = moodKeys[_selectedMood];
     final noteText = _moodNoteController.text.trim();
     final note =
-        noteText.isNotEmpty ? noteText : AppConstants.moodLabels[_selectedMood];
+        noteText.isNotEmpty ? noteText : s.moodLabels[_selectedMood];
 
     try {
       // Check connectivity first

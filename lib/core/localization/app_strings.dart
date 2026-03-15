@@ -227,8 +227,8 @@ class AppStrings {
       isBangla ? 'আপনি কি লগআউট করতে চান?' : 'Do you want to logout?';
   String get settingsClearData => isBangla ? 'ডেটা সাফ করুন' : 'Clear Data';
   String get settingsClearDataConfirm => isBangla
-      ? 'চেক-ইন, মুড এবং কন্টাক্ট ক্যাশ মুছে যাবে। আপনার অ্যাকাউন্ট নিরাপদ থাকবে।'
-      : 'Check-in, mood, and contact cache will be deleted. Your account is safe.';
+      ? 'চেক-ইন, মুড, কন্টাক্ট এবং নোটিফিকেশন ক্যাশ মুছে যাবে। আপনার অ্যাকাউন্ট নিরাপদ থাকবে।'
+      : 'Check-in, mood, contacts, and notification cache will be deleted. Your account is safe.';
   String get settingsClearDataSuccess =>
       isBangla ? 'স্থানীয় ডেটা মুছে ফেলা হয়েছে।' : 'Local data cleared.';
   String get settingsClearDataOfflineNote => isBangla
@@ -418,6 +418,18 @@ class AppStrings {
   String get earthquakeCachedData => isBangla
       ? 'নতুন ডাটা আনার সময় আপাতত সর্বশেষ সংরক্ষিত ভূমিকম্প তথ্য দেখানো হচ্ছে।'
       : 'Showing the last saved earthquake data while refreshing.';
+  String get earthquakeLocTitle => isBangla ? 'লোকেশন চালু করুন' : 'Turn on location';
+  String get earthquakeLocBody => isBangla
+      ? 'ভূমিকম্প স্ক্রিন দেখতে হলে লোকেশন অন এবং পারমিশন দেয়া লাগবে। এতে আপনার দেশ, Near You, আর সতর্কবার্তা ঠিকমতো কাজ করবে।'
+      : 'Earthquake alerts need location access to show your country, Near You data, and send accurate alerts.';
+  String get earthquakeTabCountry => isBangla ? 'দেশ' : 'Country';
+  String earthquakeCountryRecent(String country) => isBangla
+      ? '$country দেশের সাম্প্রতিক ভূমিকম্প'
+      : 'Recent earthquakes in $country';
+  String earthquakeNearMeRecent(int radius) => isBangla
+      ? '$radius কিমির মধ্যে থাকা ভূমিকম্প কাছেরটি আগে দেখানো হচ্ছে'
+      : 'Showing earthquakes within $radius km, closest first';
+  String get earthquakeGlobalRecent => isBangla ? 'বিশ্বজুড়ে বড় ভূমিকম্প' : 'Major earthquakes worldwide';
 
   // ===================== Toast Messages =====================
   String get toastCheckinSuccess =>
@@ -662,4 +674,48 @@ class AppStrings {
 
   // ===================== Splash =====================
   String get splashLoading => isBangla ? 'লোড হচ্ছে...' : 'Loading...';
+
+  // ===================== Extra / Missing =====================
+  String get commonOptional => isBangla ? 'ঐচ্ছিক' : 'Optional';
+  String get regNameHint => isBangla ? 'আপনার নাম' : 'Your name';
+  String get regPassHint =>
+      isBangla ? 'কমপক্ষে ৬ অক্ষর' : 'At least 6 characters';
+  String get loginNoAccountText =>
+      isBangla ? 'অ্যাকাউন্ট নেই? ' : 'No account? ';
+  String get regHaveAccountText =>
+      isBangla ? 'অ্যাকাউন্ট আছে? ' : 'Have account? ';
+
+  // Notification Channels
+  String get channelEmergencyTitle =>
+      isBangla ? 'জরুরি সতর্কতা' : 'Emergency Alert';
+  String get channelEmergencyDesc => isBangla
+      ? 'জরুরি সতর্কতা এবং SOS বিজ্ঞপ্তি'
+      : 'Emergency alerts and SOS notifications';
+  String get channelCheckinTitle =>
+      isBangla ? 'চেক-ইন রিমাইন্ডার' : 'Check-in Reminder';
+  String get channelCheckinDesc =>
+      isBangla ? 'চেক-ইন করার জন্য রিমাইন্ডার' : 'Reminders for checking in';
+  String get channelEarthquakeTitle =>
+      isBangla ? 'ভূমিকম্প সাইরেন' : 'Earthquake Siren';
+  String get channelEarthquakeDesc => isBangla
+      ? 'কাছাকাছি ভূমিকম্পের জন্য সাইরেন সতর্কতা'
+      : 'Siren alerts for nearby earthquakes';
+  String get channelGeneralTitle => isBangla ? 'তথ্য আপডেট' : 'Info Updates';
+  String get channelGeneralDesc =>
+      isBangla ? 'সাধারণ তথ্য এবং আপডেট' : 'General info and updates';
+
+  // Offline Sync & Background Alerts
+  String get notifMissedCheckinTitle =>
+      isBangla ? '🚨 চেক-ইন মিস করেছেন!' : '🚨 Check-in Missed!';
+  String get notifMissedCheckinBody => isBangla
+      ? 'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন যাতে আপনার জরুরি যোগাযোগদের সতর্ক করা না হয়।'
+      : 'Your check-in deadline has passed. Please check in now to avoid alerting your emergency contacts.';
+  String get notifMissedCheckinHistory => isBangla
+      ? 'আপনার চেক-ইনের সময় পার হয়ে গেছে। অনুগ্রহ করে এখনই চেক-ইন করুন।'
+      : 'Your check-in deadline has passed. Please check in now.';
+  String get notifMissedDeadlineTitle =>
+      isBangla ? 'চেক-ইন ডেডলাইন পার হয়েছে' : 'Check-in Deadline Passed';
+  String get notifMissedDeadlineBody => isBangla
+      ? 'আপনি অনেকক্ষণ ধরে অ্যাপে আসেননি। অনুগ্রহ করে চেক-ইন করুন।'
+      : 'You haven\'t used the app in a while. Please check in.';
 }

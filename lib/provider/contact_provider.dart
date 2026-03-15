@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/emergency_contact_model.dart';
 import '../repository/contact_repository.dart';
@@ -30,22 +31,35 @@ class ContactNotifier extends StateNotifier<ContactState> {
   final ContactRepository _repository;
 
   ContactNotifier(this._repository) : super(const ContactInitial()) {
-    loadContacts();
+    final localContacts = _repository.getAllContacts();
+    if (localContacts.isNotEmpty) {
+      state = ContactLoaded(localContacts);
+      // Background refresh to sync with server
+      loadContacts(silent: true);
+    } else {
+      loadContacts();
+    }
   }
 
   Future<void> loadContacts({bool silent = false}) async {
     try {
-      if (!silent || state is! ContactLoaded) {
+      // Only show loading if we don't have data yet and it's not a silent refresh
+      if (!silent && state is! ContactLoaded) {
         state = const ContactLoading();
       }
       // Fetch from backend (with 8s timeout), which also caches locally
       final contacts = await _repository
           .loadContactsFromBackend()
           .timeout(const Duration(seconds: 8));
-      state = ContactLoaded(contacts);
+      
+      if (mounted) {
+        state = ContactLoaded(contacts);
+      }
     } catch (e) {
-      // Fallback to local Hive data
-      if (!silent || state is! ContactLoaded) {
+      debugPrint('Contact loading error: $e');
+      // If we already have data (ContactLoaded), just keep it.
+      // Otherwise, try one last time to read local if we were in Loading state.
+      if (mounted && state is! ContactLoaded) {
         final localContacts = _repository.getAllContacts();
         if (localContacts.isNotEmpty) {
           state = ContactLoaded(localContacts);

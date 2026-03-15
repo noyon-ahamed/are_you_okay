@@ -325,13 +325,11 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          s.isBangla ? 'লোকেশন চালু করুন' : 'Turn on location',
+          s.earthquakeLocTitle,
           style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
         content: Text(
-          s.isBangla
-              ? 'ভূমিকম্প স্ক্রিন দেখতে হলে লোকেশন অন এবং পারমিশন দেয়া লাগবে। এতে আপনার দেশ, Near You, আর সতর্কবার্তা ঠিকমতো কাজ করবে।'
-              : 'Earthquake alerts need location access to show your country, Near You data, and send accurate alerts.',
+          s.earthquakeLocBody,
           style: const TextStyle(fontFamily: 'HindSiliguri'),
         ),
         actions: [
@@ -550,7 +548,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
           tabs: [
             Tab(
               text: _selectedCountry.isEmpty
-                  ? (s.isBangla ? 'দেশ' : 'Country')
+                  ? s.earthquakeTabCountry
                   : _selectedCountry,
             ),
             Tab(text: s.earthquakeTabNearWithRadius(_nearbyRadiusKm)),
@@ -572,9 +570,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                         _countryQuakes,
                         s,
                         false,
-                        headerMessage: s.isBangla
-                            ? '$_selectedCountry দেশের সাম্প্রতিক ভূমিকম্প'
-                            : 'Recent earthquakes in $_selectedCountry',
+                        headerMessage: s.earthquakeCountryRecent(_selectedCountry),
                       ),
                     ),
                     // TAB 1: Near Me
@@ -585,9 +581,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                         _localQuakes,
                         s,
                         true,
-                        headerMessage: s.isBangla
-                            ? '$_nearbyRadiusKm কিমির মধ্যে থাকা ভূমিকম্প কাছেরটি আগে দেখানো হচ্ছে'
-                            : 'Showing earthquakes within $_nearbyRadiusKm km, closest first',
+                        headerMessage: s.earthquakeNearMeRecent(_nearbyRadiusKm),
                       ),
                     ),
                     // TAB 2: Global
@@ -598,9 +592,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                         _globalQuakes,
                         s,
                         false,
-                        headerMessage: s.isBangla
-                            ? 'বিশ্বজুড়ে বড় ভূমিকম্প'
-                            : 'Major earthquakes worldwide',
+                        headerMessage: s.earthquakeGlobalRecent,
                       ),
                     ),
                   ],

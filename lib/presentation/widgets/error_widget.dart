@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
+import '../../provider/language_provider.dart';
 
 /// App Error Widget
 /// Displays error messages with retry option
-class AppErrorWidget extends StatelessWidget {
+class AppErrorWidget extends ConsumerWidget {
   final String message;
   final VoidCallback? onRetry;
   final IconData icon;
@@ -16,8 +18,9 @@ class AppErrorWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = ref.watch(stringsProvider);
 
     return Center(
       child: Padding(
@@ -35,7 +38,8 @@ class AppErrorWidget extends StatelessWidget {
               message,
               style: TextStyle(
                 fontSize: 16,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                color:
+                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -45,7 +49,7 @@ class AppErrorWidget extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('আবার চেষ্টা করুন'),
+                label: Text(s.retry),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

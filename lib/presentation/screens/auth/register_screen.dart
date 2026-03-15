@@ -146,7 +146,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 CustomTextField(
                   controller: _nameController.value,
                   label: s.regName,
-                  hint: s.isBangla ? 'আপনার নাম' : 'Your name',
+                  hint: s.regNameHint,
                   prefixIcon: Icons.person_outline,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -182,7 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 CustomTextField(
                   controller: _phoneController.value,
                   label:
-                      '${s.regPhone} (${s.isBangla ? 'ঐচ্ছিক' : 'Optional'})',
+                      '${s.regPhone} (${s.commonOptional})',
                   hint: '01XXXXXXXXX',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
@@ -195,7 +195,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                   controller: _passwordController.value,
                   label: s.regPassword,
                   hint:
-                      s.isBangla ? 'কমপক্ষে ৬ অক্ষর' : 'At least 6 characters',
+                      s.regPassHint,
                   obscureText: _obscurePassword.value,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(
@@ -271,7 +271,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      s.isBangla ? 'অ্যাকাউন্ট আছে? ' : 'Have account? ',
+                      s.regHaveAccountText,
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(

@@ -294,7 +294,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      s.isBangla ? 'অ্যাকাউন্ট নেই? ' : 'No account? ',
+                      s.loginNoAccountText,
                       style: TextStyle(
                         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                       ),
@@ -302,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     TextButton(
                       onPressed: () => context.push('/register'),
                       child: Text(
-                        s.isBangla ? 'রেজিস্ট্রেশন করুন' : 'Register',
+                        s.regButton,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

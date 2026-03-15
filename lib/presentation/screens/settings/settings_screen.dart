@@ -27,6 +27,7 @@ import '../../../services/auth/token_storage_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../services/location_service.dart';
+import '../../../services/notification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -958,6 +959,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
       final moodPendingBox = await Hive.openBox('mood_pending_box');
       await moodPendingBox.clear();
+
+      // NEW: Clear emergency contacts box too
+      final contactBox = await Hive.openBox(AppConstants.contactsBoxName);
+      await contactBox.clear();
+
+      // NEW: Cancel all scheduled and active local notifications
+      await LocalNotificationService().cancelAllNotifications();
 
       // 2. Clear relevant SharedPreferences keys
       final prefs = await SharedPreferences.getInstance();
