@@ -21,7 +21,15 @@ class NotificationNavigationService {
 
     final context = rootNavigatorKey.currentContext!;
     final targetRoute = route == null || route.isEmpty ? Routes.home : route;
-    context.go(targetRoute);
+    
+    if (targetRoute == Routes.home) {
+      context.go(Routes.home);
+    } else {
+      // Ensure we have a base stack (Home) before pushing the specific route
+      // This prevents the "back button gone" issue and "exit on back" problem
+      context.go(Routes.home);
+      context.push(targetRoute);
+    }
   }
 
   static Map<String, dynamic> payloadForReminder({
