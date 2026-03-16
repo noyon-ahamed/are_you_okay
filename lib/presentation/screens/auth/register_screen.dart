@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../services/api/auth_api_service.dart';
+import '../../../provider/auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../../provider/language_provider.dart';
@@ -32,9 +32,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   final RestorableBool _obscureConfirmPassword = RestorableBool(true);
   final RestorableDouble _scrollOffset = RestorableDouble(0);
   late final ScrollController _scrollController;
-  final _authService = AuthApiService();
-
   bool _isLoading = false;
+  bool _registrationDone = false;
 
   @override
   String? get restorationId => 'register_screen';
@@ -46,6 +45,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       ..addListener(() {
         _scrollOffset.value = _scrollController.offset;
       });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Listen for successful registration → navigate to login
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final authState = ref.read(authProvider);
+      if (_registrationDone && authState is AuthUnauthenticated) {
+        if (mounted) context.go('/login');
+      }
+    });
   }
 
   @override
@@ -81,31 +93,39 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isLoading) return; // Prevent multiple taps
 
     setState(() => _isLoading = true);
 
     try {
-      await _authService.register(
-        email: _emailController.value.text.trim(),
-        password: _passwordController.value.text,
-        name: _nameController.value.text.trim(),
-        phone: _phoneController.value.text.trim().isNotEmpty
-            ? _phoneController.value.text.trim()
-            : null,
-      );
+      await ref.read(authProvider.notifier).register(
+            email: _emailController.value.text.trim(),
+            password: _passwordController.value.text,
+            name: _nameController.value.text.trim(),
+            phone: _phoneController.value.text.trim().isNotEmpty
+                ? _phoneController.value.text.trim()
+                : null,
+          );
 
-      if (mounted) {
-        final s = ref.read(stringsProvider);
-        // Show success message
+      if (!mounted) return;
+
+      final authState = ref.read(authProvider);
+      if (authState is AuthUnauthenticated) {
+        // Registration successful — show SnackBar then navigate
+        _registrationDone = true;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(s.regSuccess),
+          const SnackBar(
+            content: Text('Account created successfully. Login.'),
             backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
           ),
         );
 
-        // Navigate to home
-        context.go('/home');
+        // Immediate redirection
+        if (mounted) context.go('/login');
+      } else if (authState is AuthError) {
+        throw Exception(authState.message);
       }
     } catch (e) {
       if (mounted) {
@@ -181,8 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 // Phone field (optional)
                 CustomTextField(
                   controller: _phoneController.value,
-                  label:
-                      '${s.regPhone} (${s.commonOptional})',
+                  label: '${s.regPhone} (${s.commonOptional})',
                   hint: '01XXXXXXXXX',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
@@ -194,8 +213,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 CustomTextField(
                   controller: _passwordController.value,
                   label: s.regPassword,
-                  hint:
-                      s.regPassHint,
+                  hint: s.regPassHint,
                   obscureText: _obscurePassword.value,
                   prefixIcon: Icons.lock_outline,
                   suffixIcon: IconButton(

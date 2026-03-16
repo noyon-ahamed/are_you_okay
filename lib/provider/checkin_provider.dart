@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:are_you_okay/services/auth/token_storage_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/checkin_model.dart';
@@ -122,12 +123,15 @@ class CheckInNotifier extends StateNotifier<CheckInState> {
         notes: notes,
       );
 
+      if (!mounted) return;
       state = CheckInSuccess(checkIn);
 
       // Reset to initial after a delay
       await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
       state = const CheckInInitial();
     } catch (e) {
+      if (!mounted) return;
       state = CheckInError(e.toString());
     }
   }
@@ -146,11 +150,16 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
 
   Future<void> fetchStatus() async {
     try {
-      state = state.copyWith(isLoading: true);
+      if (!mounted) return;
 
-      // Add 8-second timeout — avoids hanging on slow WiFi
+      final token = await TokenStorageService.getToken();
+      if (token == null || token.isEmpty) return;
+
+      state = state.copyWith(isLoading: true);
       final status =
           await _repository.fetchStatus().timeout(const Duration(seconds: 8));
+
+      if (!mounted) return;
 
       DateTime? lastCheckIn;
       if (status['lastCheckIn'] != null) {
@@ -172,18 +181,22 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
       final canCheckIn =
           nextCheckInTime == null || DateTime.now().isAfter(nextCheckInTime);
 
-      state = CheckInStatusData(
-        lastCheckIn: lastCheckIn,
-        hoursSinceLastCheckIn: status['hoursSinceLastCheckIn'] as int?,
-        needsCheckIn: canCheckIn,
-        canCheckIn: canCheckIn,
-        nextCheckInTime: nextCheckInTime,
-        streak: status['streak'] as int? ?? 0,
-        isAtRisk: status['isAtRisk'] as bool? ?? false,
-        isLoading: false,
-      );
+      Future.microtask(() {
+        if (!mounted) return;
+        state = CheckInStatusData(
+          lastCheckIn: lastCheckIn,
+          hoursSinceLastCheckIn: status['hoursSinceLastCheckIn'] as int?,
+          needsCheckIn: canCheckIn,
+          canCheckIn: canCheckIn,
+          nextCheckInTime: nextCheckInTime,
+          streak: status['streak'] as int? ?? 0,
+          isAtRisk: status['isAtRisk'] as bool? ?? false,
+          isLoading: false,
+        );
+      });
     } catch (e) {
       debugPrint('Error fetching check-in status: $e');
+      if (!mounted) return;
       // Offline / timeout fallback — read last check-in from local SharedPrefs
       // so the button shows the correct state without waiting for the server.
       _applyLocalFallback();
@@ -192,12 +205,15 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
 
   /// Applies a local fallback state using SharedPrefs when the server is unreachable.
   void _applyLocalFallback() {
+    if (!mounted) return;
     try {
       final lastCheckIn = SharedPrefsService().lastCheckIn;
       if (lastCheckIn != null) {
         final nextCheckInTime = lastCheckIn.add(const Duration(hours: 24));
         final canCheckIn = DateTime.now().isAfter(nextCheckInTime);
         final hoursSince = DateTime.now().difference(lastCheckIn).inHours;
+
+        if (!mounted) return;
         state = CheckInStatusData(
           lastCheckIn: lastCheckIn,
           hoursSinceLastCheckIn: hoursSince,
@@ -210,32 +226,45 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
         );
       } else {
         // No local data — assume user needs to check in
+        if (!mounted) return;
         state = state.copyWith(
           isLoading: false,
           canCheckIn: true,
           needsCheckIn: true,
         );
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('CheckInStatusNotifier: Fallback error: $e');
+      if (!mounted) return;
       state = state.copyWith(isLoading: false);
     }
   }
 
   /// Called after a successful check-in to refresh status
-  void onCheckInComplete() {
-    final now = DateTime.now();
-    state = CheckInStatusData(
-      lastCheckIn: now,
-      hoursSinceLastCheckIn: 0,
-      needsCheckIn: false,
-      canCheckIn: false,
-      nextCheckInTime: now.add(const Duration(hours: 24)),
-      streak: state.streak + 1,
-      isAtRisk: false,
-      isLoading: false,
-    );
-    // Also refresh from server after a short delay
-    Future.delayed(const Duration(seconds: 1), fetchStatus);
+  Future<void> onCheckInComplete() async {
+    try {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: true);
+
+      final stats = await _repository.fetchStatus();
+
+      if (!mounted) return;
+
+      state = state.copyWith(
+        lastCheckIn: DateTime.now(),
+        needsCheckIn: false,
+        canCheckIn: false,
+        nextCheckInTime: DateTime.now().add(const Duration(hours: 24)),
+        streak: stats['streak'] as int? ?? (state.streak + 1),
+        isAtRisk: false,
+        isLoading: false,
+      );
+    } catch (e) {
+      debugPrint('Error updating check-in state: $e');
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+      }
+    }
   }
 
   @override
@@ -262,6 +291,7 @@ class CheckInHistoryNotifier
         .map((item) => _repository.checkinModelToApiMap(item))
         .toList();
     final merged = _repository.mergeHistory(cachedHistory, localHistory);
+    if (!mounted) return;
     if (merged.isNotEmpty) {
       state = AsyncData(merged);
     }
@@ -289,8 +319,10 @@ class CheckInHistoryNotifier
 
     try {
       final history = await _repository.fetchHistory(limit: 100, skip: 0);
+      if (!mounted) return;
       state = AsyncData(history);
     } catch (e, st) {
+      if (!mounted) return;
       if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
       }

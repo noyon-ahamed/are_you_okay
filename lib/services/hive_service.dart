@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../model/user_model.dart';
@@ -220,34 +221,38 @@ class HiveService {
   // ==================== Clear All Data ====================
 
   Future<void> clearAllData() async {
-    await _userBox.clear();
-    await _checkInBox.clear();
-    // await _contactBox.clear(); // Preserve contacts as requested
-    await _settingsBox.clear();
+    try {
+      await _userBox.clear();
+      await _checkInBox.clear();
+      await _contactBox.clear();
+      await _settingsBox.clear();
+      await clearCheckInsAndMoodsOnly();
+      debugPrint('HiveService: All core boxes cleared successfully');
+    } catch (e) {
+      debugPrint('HiveService: Error clearing all data: $e');
+    }
   }
 
   /// Clears only check-in and mood data (for offline-safe clear).
   /// Leaves user profile, contacts, and settings intact.
   Future<void> clearCheckInsAndMoodsOnly() async {
     await _checkInBox.clear();
-    // mood_box and mood_pending_box use different Hive.openBox calls
-    // so we open them directly if available
-    try {
-      if (Hive.isBoxOpen('mood_box')) {
-        await Hive.box('mood_box').clear();
-      } else {
-        final box = await Hive.openBox('mood_box');
-        await box.clear();
+    // mood_box and mood_pending_box might be opened dynamically
+    final boxesToClear = ['mood_box', 'mood_pending_box', 'mood_history_cache'];
+    for (final boxName in boxesToClear) {
+      try {
+        if (Hive.isBoxOpen(boxName)) {
+          await Hive.box(boxName).clear();
+        } else {
+          final box = await Hive.openBox(boxName);
+          await box.clear();
+          // We don't want to keep them open if they were just opened for clearing
+          await box.close();
+        }
+      } catch (e) {
+        debugPrint('HiveService: Warning clearing box $boxName: $e');
       }
-    } catch (_) {}
-    try {
-      if (Hive.isBoxOpen('mood_pending_box')) {
-        await Hive.box('mood_pending_box').clear();
-      } else {
-        final box = await Hive.openBox('mood_pending_box');
-        await box.clear();
-      }
-    } catch (_) {}
+    }
   }
 
   Future<void> close() async {

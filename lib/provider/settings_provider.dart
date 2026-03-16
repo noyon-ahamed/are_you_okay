@@ -19,7 +19,8 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   }
 
   Future<void> toggleDarkMode() async {
-    state = state.copyWith(themeIsDark: !state.themeIsDark);
+    final next = !state.themeIsDark;
+    state = state.copyWith(themeIsDark: next);
     await _hiveService.saveSettings(state);
   }
 
@@ -61,7 +62,6 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     state = state.copyWith(notificationsEnabled: newValue);
     await _hiveService.saveSettings(state);
 
-    // Persist the flag so the background isolate can also read it
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications_enabled', newValue);
 
@@ -75,15 +75,15 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
       );
     } catch (_) {}
 
+    if (!mounted) return;
+
     final notifService = LocalNotificationService();
     await notifService.initialize(onNotificationTap: (_) {});
 
     if (newValue) {
-      // Notifications turned ON → re-register background task and run an immediate check
       await BackgroundService.registerPeriodicTask();
       await BackgroundService.runImmediateReminderCheck();
     } else {
-      // Notifications turned OFF → cancel all notifications and background task
       await notifService.cancelAllNotifications();
       await BackgroundService.cancelAllTasks();
     }
@@ -120,6 +120,8 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
         earthquakeCountry: state.earthquakeCountry,
       );
     } catch (_) {}
+
+    if (!mounted) return;
 
     final notifService = LocalNotificationService();
     await notifService.initialize(onNotificationTap: (_) {});

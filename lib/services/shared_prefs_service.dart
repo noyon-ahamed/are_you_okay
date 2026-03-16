@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
@@ -128,6 +129,28 @@ class SharedPrefsService {
   Future<void> logout() async {
     await _prefs?.remove('user_id');
     await _prefs?.remove('user_token');
+  }
+
+  Future<void> clearLastCheckIn() async {
+    await _prefs?.remove(AppConstants.keyLastCheckin);
+  }
+
+  /// Clears ALL user-specific data from SharedPreferences.
+  /// This includes history caches, stats, and last activity timestamps.
+  Future<void> clearAccountData() async {
+    final futures = [
+      _prefs?.remove('user_id'),
+      _prefs?.remove('user_token'),
+      _prefs?.remove(AppConstants.keyLastCheckin),
+      _prefs?.remove('checkin_history_cache_v1'),
+      _prefs?.remove('checkin_history_cache_meta_v1'),
+      _prefs?.remove('mood_history_cache'),
+      _prefs?.remove('mood_stats_cache'),
+      _prefs?.remove('mood_history_cache_meta'),
+      _prefs?.remove('last_route'),
+    ];
+    await Future.wait(futures.whereType<Future>());
+    debugPrint('All account-specific SharedPreferences cleared');
   }
 
   // ==================== Pending Server Clear ====================

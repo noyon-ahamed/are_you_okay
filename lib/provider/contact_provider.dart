@@ -96,9 +96,11 @@ class ContactNotifier extends StateNotifier<ContactState> {
         notifyViaApp: notifyViaApp,
       );
 
-      await loadContacts();
+      if (mounted) await loadContacts();
     } catch (e) {
-      state = ContactError(e.toString());
+      if (mounted) {
+        state = ContactError(e.toString());
+      }
     }
   }
 
@@ -106,9 +108,11 @@ class ContactNotifier extends StateNotifier<ContactState> {
     try {
       state = const ContactLoading();
       await _repository.updateContact(contact);
-      await loadContacts();
+      if (mounted) await loadContacts();
     } catch (e) {
-      state = ContactError(e.toString());
+      if (mounted) {
+        state = ContactError(e.toString());
+      }
     }
   }
 
@@ -116,9 +120,11 @@ class ContactNotifier extends StateNotifier<ContactState> {
     try {
       state = const ContactLoading();
       await _repository.deleteContact(id);
-      await loadContacts();
+      if (mounted) await loadContacts();
     } catch (e) {
-      state = ContactError(e.toString());
+      if (mounted) {
+        state = ContactError(e.toString());
+      }
     }
   }
 
@@ -126,9 +132,11 @@ class ContactNotifier extends StateNotifier<ContactState> {
     try {
       state = const ContactLoading();
       await _repository.reorderContacts(orderedIds);
-      await loadContacts();
+      if (mounted) await loadContacts();
     } catch (e) {
-      state = ContactError(e.toString());
+      if (mounted) {
+        state = ContactError(e.toString());
+      }
     }
   }
 

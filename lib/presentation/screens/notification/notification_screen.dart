@@ -23,6 +23,7 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
 
   Future<void> _bootstrap() async {
     final cachedNotifications = await _historyService.getMergedNotifications();
+    if (!mounted) return;
     if (cachedNotifications.isNotEmpty) {
       state = AsyncData(cachedNotifications);
     }
@@ -71,10 +72,12 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
       }
 
       final merged = await _historyService.getMergedNotifications();
+      if (!mounted) return;
       if (merged.isNotEmpty || remoteFetchSucceeded) {
         state = AsyncData(merged);
       }
     } catch (e, st) {
+      if (!mounted) return;
       if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
       }

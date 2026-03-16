@@ -120,7 +120,7 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
 
     _listenToCallKitEvents();
     unawaited(_checkActiveCalls());
- 
+
     final bool isSimulator = Platform.isIOS &&
         Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
     if (!isSimulator) {
@@ -128,9 +128,11 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     }
   }
 
-
   Future<void> _syncNotificationPreferences() async {
     try {
+      final authState = ref.read(authProvider);
+      if (authState is! AuthAuthenticated) return;
+
       final prefs = await SharedPreferences.getInstance();
       final notificationsEnabled =
           prefs.getBool('notifications_enabled') ?? true;
@@ -180,8 +182,10 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkActiveCalls();
-      // Proactively refresh profile on resume to detect multi-device logout
-      ref.read(authProvider.notifier).refreshProfile();
+      final authState = ref.read(authProvider);
+      if (authState is AuthAuthenticated) {
+        ref.read(authProvider.notifier).refreshProfile();
+      }
     }
   }
 

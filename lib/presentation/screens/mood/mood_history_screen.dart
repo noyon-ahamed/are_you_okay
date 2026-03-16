@@ -6,7 +6,6 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
-import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
@@ -14,127 +13,7 @@ import '../../../provider/checkin_provider.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 
-// --- Providers --- //
-
-final moodApiProvider = Provider((ref) => MoodApiService());
-
-class MoodStatsNotifier
-    extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
-  MoodStatsNotifier(this._api) : super(const AsyncLoading()) {
-    _bootstrap();
-  }
-
-  final MoodApiService _api;
-  Future<void>? _fetchInFlight;
-
-  Future<void> _bootstrap() async {
-    final cached = await _api.getCachedStats();
-    if (cached != null) {
-      state = AsyncData(cached);
-    }
-    await fetch(silent: cached != null);
-  }
-
-  Future<void> fetch({bool silent = true}) async {
-    if (_fetchInFlight != null) {
-      return _fetchInFlight!;
-    }
-
-    final future = _fetchStats(silent: silent);
-    _fetchInFlight = future;
-    try {
-      await future;
-    } finally {
-      _fetchInFlight = null;
-    }
-  }
-
-  Future<void> _fetchStats({required bool silent}) async {
-    if (!silent || !state.hasValue) {
-      state = const AsyncLoading();
-    }
-
-    try {
-      state = AsyncData(await _api.getStats(days: 30));
-    } catch (e, st) {
-      if (!silent || !state.hasValue) {
-        state = AsyncError(e, st);
-      }
-    }
-  }
-}
-
-class MoodHistoryNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
-  MoodHistoryNotifier(this._api) : super(const AsyncLoading()) {
-    _bootstrap();
-  }
-
-  final MoodApiService _api;
-  Future<void>? _fetchInFlight;
-
-  Future<void> _bootstrap() async {
-    final cached = await _api.getCachedHistory();
-    final cachedHistory = _extractHistory(cached);
-    if (cachedHistory.isNotEmpty) {
-      state = AsyncData(cachedHistory);
-    }
-    await fetch(silent: cachedHistory.isNotEmpty);
-  }
-
-  Future<void> fetch({bool silent = true}) async {
-    if (_fetchInFlight != null) {
-      return _fetchInFlight!;
-    }
-
-    final future = _fetchHistory(silent: silent);
-    _fetchInFlight = future;
-    try {
-      await future;
-    } finally {
-      _fetchInFlight = null;
-    }
-  }
-
-  Future<void> _fetchHistory({required bool silent}) async {
-    if (!silent || !state.hasValue) {
-      state = const AsyncLoading();
-    }
-
-    try {
-      final latestCreatedAt = await _api.getLatestHistoryCreatedAt();
-      final result = await _api.getHistory(
-        limit: 50,
-        latestCreatedAt: latestCreatedAt,
-      );
-      state = AsyncData(_extractHistory(result));
-    } catch (e, st) {
-      if (!silent || !state.hasValue) {
-        state = AsyncError(e, st);
-      }
-    }
-  }
-
-  List<dynamic> _extractHistory(Map<String, dynamic>? result) {
-    if (result == null) return <dynamic>[];
-    final historyData = result['moods'] ?? result['history'] ?? result['data'];
-    if (historyData is List) {
-      return historyData;
-    }
-    return <dynamic>[];
-  }
-}
-
-final moodStatsProvider =
-    StateNotifierProvider<MoodStatsNotifier, AsyncValue<Map<String, dynamic>>>(
-        (ref) {
-  return MoodStatsNotifier(ref.watch(moodApiProvider));
-});
-
-final moodHistoryProvider =
-    StateNotifierProvider<MoodHistoryNotifier, AsyncValue<List<dynamic>>>(
-        (ref) {
-  return MoodHistoryNotifier(ref.watch(moodApiProvider));
-});
+import '../../../provider/mood_provider.dart';
 
 // --- Screen --- //
 

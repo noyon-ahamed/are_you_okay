@@ -25,6 +25,8 @@ import '../../../services/mood_local_service.dart';
 import '../../../services/shared_prefs_service.dart';
 import '../../../services/voice_detector_service.dart';
 import '../../../provider/settings_provider.dart';
+import '../../../provider/mood_provider.dart';
+import '../../widgets/custom_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -701,25 +703,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (_selectedMood >= 0) ...[
-                  ElevatedButton.icon(
-                    onPressed: _saveMood,
-                    icon:
-                        const Icon(Icons.check, size: 18, color: Colors.white),
-                    label: Text(
-                      s.homeMoodSave,
-                      style: const TextStyle(
-                        fontFamily: 'HindSiliguri',
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
+                  Flexible(
+                    child: CustomButton(
+                      text: s.homeMoodSave,
+                      icon: Icons.check,
+                      onPressed: _isSavingMood ? null : _saveMood,
+                      isLoading: _isSavingMood,
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      textColor: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1264,6 +1255,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             duration: const Duration(seconds: 2),
           ),
         );
+        
+        // Refresh history to trigger cooldown
+        ref.invalidate(moodHistoryProvider);
+        
         setState(() {
           _selectedMood = -1;
           _selectedMoodState.value = -1;
@@ -1288,6 +1283,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               duration: const Duration(seconds: 4),
             ),
           );
+          
+          // Reset mood selection so the button disappears
+          setState(() {
+            _selectedMood = -1;
+            _selectedMoodState.value = -1;
+          });
         }
       } else {
         // Network error — save locally

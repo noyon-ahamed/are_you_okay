@@ -108,7 +108,6 @@ class MoodApiService {
       }
     } on DioException catch (e) {
       debugPrint('Failed to fetch history from backend: $e');
-      // Fall back to persistent cache
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString(_kMoodHistoryCache);
       if (cached != null) {
@@ -157,7 +156,6 @@ class MoodApiService {
       );
 
       if (response.data['success'] == true) {
-        // Persist to local cache
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_kMoodStatsCache, jsonEncode(response.data));
         return response.data;
@@ -166,7 +164,6 @@ class MoodApiService {
       }
     } on DioException catch (e) {
       debugPrint('Failed to fetch mood stats from backend: $e');
-      // Fall back to persistent cache
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString(_kMoodStatsCache);
       if (cached != null) {
@@ -186,6 +183,18 @@ class MoodApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Clears all mood-related caches from SharedPreferences.
+  /// Call this on logout before invalidating providers.
+  Future<void> clearCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait([
+      prefs.remove(_kMoodHistoryCache),
+      prefs.remove(_kMoodStatsCache),
+      prefs.remove(_kMoodHistoryMeta),
+    ]);
+    debugPrint('MoodApiService: cache cleared');
   }
 
   Future<Map<String, dynamic>> _mergeAndPersistHistoryCache(

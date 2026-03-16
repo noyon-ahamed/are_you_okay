@@ -27,10 +27,6 @@ class AuthApiService {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          // Note: 401 handling for AuthApiService is done in AuthProvider
-          // (_syncProfileQuietly and refreshProfile) which check the auth
-          // state before logging out. Do NOT auto-logout here to avoid
-          // race conditions during login/token-save flow.
           return handler.next(error);
         },
       ),
@@ -53,6 +49,22 @@ class AuthApiService {
     }
   }
 
+  /// Remove FCM token from backend on logout
+  Future<void> removeFcmToken() async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) return;
+      await _dio.delete(
+        '$baseUrl/auth/fcm-token',
+        data: {'fcmToken': fcmToken},
+      );
+      debugPrint('FCM token removed from backend');
+    } catch (e) {
+      // Non-critical — logout should proceed even if this fails
+      debugPrint('FCM token removal failed (non-critical): $e');
+    }
+  }
+
   /// Register new user
   Future<Map<String, dynamic>> register({
     required String email,
@@ -72,16 +84,6 @@ class AuthApiService {
       );
 
       if (response.data['success'] == true) {
-        final token = response.data['data']['token'];
-        final userId = response.data['data']['user']['id'];
-
-        await TokenStorageService.saveToken(token);
-        await TokenStorageService.saveUserId(userId);
-        await SharedPrefsService().setUserToken(token);
-        await SharedPrefsService().setUserId(userId);
-
-        unawaited(sendFcmToken());
-
         return response.data['data'];
       } else {
         throw Exception(response.data['error'] ?? 'Registration failed');
@@ -132,6 +134,9 @@ class AuthApiService {
 
   /// Logout user
   Future<void> logout() async {
+    // ✅ আগে FCM token server থেকে remove করো
+    // এটা fail হলেও logout চলবে
+    await removeFcmToken();
     await SharedPrefsService().logout();
     await TokenStorageService.clearAll();
   }

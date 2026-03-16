@@ -40,9 +40,7 @@ class AuthRepository {
       phone: phone,
     );
     final user = UserModel.fromJson(response['user']);
-    await _hiveService.saveUser(user);
-    await _syncSettingsFromUserPayload(
-        response['user'] as Map<String, dynamic>?);
+    // Removed auto-login (saveUser/syncSettings) so user goes to login page
     return user;
   }
 
