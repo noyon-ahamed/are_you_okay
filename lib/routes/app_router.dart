@@ -293,6 +293,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         return Routes.splash;
       }
 
+      if (authState is AuthLoading) {
+        return null; // Stay on the current page during loading
+      }
+
       final isAuthenticated = authState is AuthAuthenticated;
 
       // Authenticated users

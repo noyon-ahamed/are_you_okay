@@ -305,8 +305,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   final data = message.data;
-  final title = message.notification?.title ?? 'Alert';
-  final body = message.notification?.body ?? '';
+  final title = message.notification?.title ?? data['title'] ?? 'Alert';
+  final body = message.notification?.body ?? data['body'] ?? '';
+
+  // Skip if it's just a generic "Alert" with no body and no other info
+  if (title == 'Alert' && body.isEmpty && data['type'] == null) {
+    debugPrint('Skipping empty notification');
+    return;
+  }
 
   final distanceKmStr = data['distanceKm'];
   bool isSeismicClose = false;
@@ -360,6 +366,12 @@ Future<void> _saveFirebaseMessageToHistory(
   String? payloadOverride,
 }) async {
   final data = message.data;
+  final title = message.notification?.title ?? data['title'] ?? 'Alert';
+  final body = message.notification?.body ?? data['body'] ?? '';
+
+  // Skip history if completely empty
+  if (title == 'Alert' && body.isEmpty && data['type'] == null) return;
+
   final payload = payloadOverride ??
       NotificationNavigationService.encodePayload({
         'route': _routeForNotificationType(data),
@@ -371,9 +383,9 @@ Future<void> _saveFirebaseMessageToHistory(
   await LocalNotificationHistoryService().saveNotification({
     '_id': data['notificationId']?.toString() ??
         'push-${message.messageId ?? DateTime.now().millisecondsSinceEpoch}',
-    'title': message.notification?.title ?? 'Alert',
-    'title_en': message.notification?.title ?? 'Alert',
-    'body': message.notification?.body ?? '',
+    'title': title,
+    'title_en': title,
+    'body': body,
     'type': data['type'] ?? 'alert',
     'payload': payload,
     'createdAt': DateTime.now().toIso8601String(),

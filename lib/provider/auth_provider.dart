@@ -151,6 +151,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    state = const AuthLoading();
     debugPrint('AuthNotifier: logout started');
 
     // ✅ Step 1: সংযোগ বিচ্ছিন্ন ও token clear
@@ -304,8 +305,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _syncLocalSettings(userData);
         Future.microtask(() {
           if (!mounted) return;
-          if (state is AuthAuthenticated) {
-            state = AuthAuthenticated(user);
+          final currentState = state;
+          if (currentState is AuthAuthenticated) {
+            // Only update if data is different to minimize rebuilds
+            if (currentState.user != user) {
+              state = AuthAuthenticated(user);
+            }
           }
         });
       }

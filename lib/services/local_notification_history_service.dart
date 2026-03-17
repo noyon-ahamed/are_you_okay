@@ -115,6 +115,13 @@ class LocalNotificationHistoryService {
         item['_id']?.toString() == id || item['id']?.toString() == id);
   }
 
+  Future<void> clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+    await prefs.remove(_remoteCacheKey);
+    await prefs.remove(_remoteMetaKey);
+  }
+
   Future<String?> getLatestRemoteCreatedAt() async {
     final cachedNotifications = await getCachedRemoteNotifications();
     if (cachedNotifications.isEmpty) return null;

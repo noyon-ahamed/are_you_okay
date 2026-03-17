@@ -1173,6 +1173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         setState(() {
           _selectedMood = -1;
+          _selectedMoodState.value = -1;
         });
 
         // ignore: use_build_context_synchronously
@@ -1322,8 +1323,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             );
           }
+          if (mounted) {
+            setState(() {
+              _selectedMood = -1;
+              _selectedMoodState.value = -1;
+            });
+          }
         }
       }
+    } catch (e) {
+      debugPrint('Unexpected error saving mood: $e');
     } finally {
       if (mounted) {
         setState(() => _isSavingMood = false);

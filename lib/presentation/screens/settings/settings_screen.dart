@@ -1142,30 +1142,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final s = ref.read(stringsProvider);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(s.settingsLogout,
-            style: const TextStyle(fontFamily: 'HindSiliguri')),
-        content: Text(
-          s.settingsLogoutConfirm,
-          style: const TextStyle(fontFamily: 'HindSiliguri'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(s.dialogCancel,
+      barrierDismissible: false,
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final authState = ref.watch(authProvider);
+          final isLoading = authState is AuthLoading;
+
+          return AlertDialog(
+            title: Text(s.settingsLogout,
                 style: const TextStyle(fontFamily: 'HindSiliguri')),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(authProvider.notifier).logout();
-              context.go(Routes.login);
-            },
-            child: Text(s.settingsLogout,
-                style: const TextStyle(
-                    fontFamily: 'HindSiliguri', color: AppColors.error)),
-          ),
-        ],
+            content: isLoading
+                ? const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Logging out...',
+                          style: TextStyle(fontFamily: 'HindSiliguri')),
+                    ],
+                  )
+                : Text(
+                    s.settingsLogoutConfirm,
+                    style: const TextStyle(fontFamily: 'HindSiliguri'),
+                  ),
+            actions: isLoading
+                ? []
+                : [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(s.dialogCancel,
+                          style: const TextStyle(fontFamily: 'HindSiliguri')),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // Don't pop yet, we want to show loading in the dialog
+                        ref.read(authProvider.notifier).logout();
+                      },
+                      child: Text(s.settingsLogout,
+                          style: const TextStyle(
+                              fontFamily: 'HindSiliguri',
+                              color: AppColors.error)),
+                    ),
+                  ],
+          );
+        },
       ),
     );
   }

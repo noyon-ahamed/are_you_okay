@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../shared_prefs_service.dart';
 import '../auth/token_storage_service.dart';
+import '../notification_service.dart';
+import '../local_notification_history_service.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -137,6 +139,11 @@ class AuthApiService {
     // ✅ আগে FCM token server থেকে remove করো
     // এটা fail হলেও logout চলবে
     await removeFcmToken();
+
+    // Clear local notifications and history
+    await LocalNotificationService().cancelAllNotifications();
+    await LocalNotificationHistoryService().clearHistory();
+
     await SharedPrefsService().logout();
     await TokenStorageService.clearAll();
   }
