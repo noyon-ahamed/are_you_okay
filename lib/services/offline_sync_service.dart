@@ -10,6 +10,7 @@ import '../repository/checkin_repository.dart';
 import '../services/api/mood_api_service.dart';
 import '../services/api/emergency_api_service.dart';
 import '../services/shared_prefs_service.dart';
+import '../services/auth/token_storage_service.dart';
 import 'mood_local_service.dart';
 import 'background_service.dart';
 import 'local_notification_history_service.dart';
@@ -55,6 +56,15 @@ class OfflineSyncService {
 
   Future<void> _triggerSync() async {
     try {
+      // ✅ Auth guard: Skip sync if no user is logged in.
+      // Prevents logged-out accounts from triggering notifications
+      // or syncing data meant for other users.
+      final token = await TokenStorageService.getToken();
+      if (token == null || token.isEmpty) {
+        debugPrint('Sync skipped — no authenticated user.');
+        return;
+      }
+
       debugPrint('Connectivity restored. Triggering sync...');
 
       // 0. Check and show missed reminders if deadline passed while offline

@@ -154,20 +154,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     debugPrint('AuthNotifier: logout started');
 
-    // ✅ Step 1: সংযোগ বিচ্ছিন্ন ও token clear
+    // ✅ Step 1: Remove FCM token & logout from backend FIRST
+    // The auth bearer token is still valid at this point, so the
+    // removeFcmToken() API call will succeed. This is CRITICAL —
+    // if we clear tokens first, the FCM removal fails silently and
+    // the backend keeps sending push notifications to this device
+    // for the logged-out user.
     _socketService.disconnect();
+    try {
+      await _authRepository.logout();
+    } catch (e) {
+      debugPrint('AuthNotifier: Error during repository logout: $e');
+    }
+
+    // ✅ Step 2: Now clear local tokens (safe — FCM removal is done)
     try {
       await TokenStorageService.clearAll();
       await SharedPrefsService().logout();
-      await _authRepository.logout();
     } catch (e) {
-      debugPrint('AuthNotifier: Error during early logout: $e');
+      debugPrint('AuthNotifier: Error clearing tokens: $e');
     }
 
-    // ✅ Step 2: সব persistent data clear — invalidate এর আগে অবশ্যই
+    // ✅ Step 3: Clear all persistent data
     try {
       await HiveService().clearAllData();
-      await MoodApiService().clearCache(); // mood SharedPrefs cache clear
+      await MoodApiService().clearCache();
       await SharedPrefsService().clearAccountData();
       await LocalNotificationService().cancelAllNotifications();
       await _ref.read(languageProvider.notifier).setLanguage('en');
@@ -176,14 +187,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('AuthNotifier: Error during data cleanup: $e');
     }
 
-    // ✅ Step 3: Unauthenticated set করো — router /login এ নিয়ে যাবে
+    // ✅ Step 4: Set state to Unauthenticated — router navigates to /login
     if (mounted) {
       state = const AuthUnauthenticated();
     }
     debugPrint('AuthNotifier: State set to Unauthenticated');
 
-    // ✅ Step 4: data clear হওয়ার পর microtask এ invalidate
-    // এতে নতুন provider bootstrap করলে empty cache পাবে
+    // ✅ Step 5: Invalidate all providers after data is cleared
     Future.microtask(() {
       _ref.invalidate(checkinStatusProvider);
       _ref.invalidate(checkinHistoryFromBackendProvider);

@@ -29,6 +29,7 @@ import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
 import 'presentation/screens/fake_call/fake_call_active_screen.dart';
+import 'services/auth/token_storage_service.dart';
 
 final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier =
     ValueNotifier(null);
@@ -299,11 +300,31 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } catch (e) {
     debugPrint('Firebase init background warning: $e');
   }
+
+  // ✅ Auth guard: Skip processing if no user is logged in.
+  // This prevents logged-out accounts from receiving notifications
+  // meant for other users on the same device.
+  final token = await TokenStorageService.getToken();
+  if (token == null || token.isEmpty) {
+    debugPrint('Background message skipped — no authenticated user.');
+    return;
+  }
+
   debugPrint("Handling a background message: ${message.messageId}");
   await _saveFirebaseMessageToHistory(message);
 }
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
+  // ✅ Auth guard: Skip processing if no user is logged in.
+  // When multiple accounts share a device, the FCM token may still
+  // deliver messages even after one account logs out. This check
+  // ensures only the currently logged-in user sees notifications.
+  final authToken = await TokenStorageService.getToken();
+  if (authToken == null || authToken.isEmpty) {
+    debugPrint('Foreground message skipped — no authenticated user.');
+    return;
+  }
+
   final data = message.data;
   final title = message.notification?.title ?? data['title'] ?? 'Alert';
   final body = message.notification?.body ?? data['body'] ?? '';

@@ -113,11 +113,17 @@ class AuthApiService {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
 
+        // ✅ Remove old user's FCM token before switching accounts
+        // This prevents the old account from receiving push notifications
+        // meant for the new account on the same device.
+        await removeFcmToken().catchError((_) {});
+
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
         await SharedPrefsService().setUserToken(token);
         await SharedPrefsService().setUserId(userId);
 
+        // ✅ Register FCM token for the newly logged-in user
         unawaited(sendFcmToken());
 
         return response.data['data'];
@@ -136,14 +142,18 @@ class AuthApiService {
 
   /// Logout user
   Future<void> logout() async {
-    // ✅ আগে FCM token server থেকে remove করো
-    // এটা fail হলেও logout চলবে
+    // ✅ CRITICAL: Remove FCM token BEFORE clearing auth tokens.
+    // The removeFcmToken() API call needs the Bearer token in the header.
+    // If we clear tokens first, the API call will fail silently and the
+    // backend will keep sending push notifications to this device for
+    // the logged-out user.
     await removeFcmToken();
 
     // Clear local notifications and history
     await LocalNotificationService().cancelAllNotifications();
     await LocalNotificationHistoryService().clearHistory();
 
+    // ✅ Now safe to clear auth tokens — FCM removal is already done
     await SharedPrefsService().logout();
     await TokenStorageService.clearAll();
   }
