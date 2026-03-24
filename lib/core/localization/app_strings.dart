@@ -258,6 +258,14 @@ class AppStrings {
       ? 'এই ফিচারের জন্য মাইক্রোফোন পারমিশন প্রয়োজন'
       : 'Microphone permission is required for this feature';
 
+  String get settingsVoiceSOSPopupTitle => isBangla
+      ? 'মাইক্রোফোন অ্যাক্সেস'
+      : 'Microphone Access';
+
+  String get settingsVoiceSOSPopupBody => isBangla
+      ? 'ভয়েস SOS জরুরি অবস্থায় চিৎকার শনাক্ত করতে মাইক্রোফোন ব্যবহার করে। আপনার গোপনীয়তা আমাদের কাছে গুরুত্বপূর্ণ; অ্যাপটি শুধু শব্দের উচ্চতা পরীক্ষা করে, কোনো ভয়েস রেকর্ড বা সেভ করে না।'
+      : 'Voice SOS uses the microphone to detect loud screams in emergency situations. Your privacy is important; the app only listens for volume levels and does not record or store your voice.';
+
   // Dialog Actions
   String get dialogCancel => isBangla ? 'বাতিল' : 'Cancel';
   String get dialogClose => isBangla ? 'বন্ধ করুন' : 'Close';

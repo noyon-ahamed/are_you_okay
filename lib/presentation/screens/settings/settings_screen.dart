@@ -188,14 +188,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               value: settings.voiceSOSEnabled,
               onChanged: (val) async {
                 if (val) {
-                  final status = await Permission.microphone.request();
-                  if (status.isGranted) {
-                    ref.read(settingsProvider.notifier).toggleVoiceSOS();
-                  } else {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(s.settingsVoiceSOSPermission)),
-                      );
+                  // Show explanation dialog first
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(s.settingsVoiceSOSPopupTitle,
+                          style: const TextStyle(fontFamily: 'HindSiliguri')),
+                      content: Text(s.settingsVoiceSOSPopupBody,
+                          style: const TextStyle(fontFamily: 'HindSiliguri')),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text(s.dialogCancel,
+                              style:
+                                  const TextStyle(fontFamily: 'HindSiliguri')),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text(s.confirm,
+                              style: const TextStyle(
+                                  fontFamily: 'HindSiliguri',
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirmed == true) {
+                    final status = await Permission.microphone.request();
+                    if (status.isGranted) {
+                      ref.read(settingsProvider.notifier).toggleVoiceSOS();
+                    } else if (status.isPermanentlyDenied) {
+                      if (context.mounted) {
+                        openAppSettings();
+                      }
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(s.settingsVoiceSOSPermission)),
+                        );
+                      }
                     }
                   }
                 } else {

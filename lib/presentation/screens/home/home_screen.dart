@@ -184,14 +184,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       debugPrint('Error initializing local notifications in HomeScreen: $e');
     }
 
-    final status = await [
+    await [
       Permission.location,
       Permission.notification,
-      Permission.microphone,
     ].request();
 
     // If microphone permission is denied, ensure Voice SOS is off
-    if (status[Permission.microphone] != PermissionStatus.granted) {
+    if (await Permission.microphone.isDenied) {
       final settings = ref.read(settingsProvider);
       if (settings.voiceSOSEnabled) {
         // ignore: unused_result

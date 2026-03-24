@@ -23,7 +23,7 @@ class SettingsModel {
     this.earthquakeCountry = '',
     this.themeIsDark = false,
     this.biometricEnabled = false,
-    this.voiceSOSEnabled = true,
+    this.voiceSOSEnabled = false,
     this.updatedAt,
   });
 
