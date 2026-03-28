@@ -1,10 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../core/constants/app_constants.dart';
 import '../auth/token_storage_service.dart';
-import '../shared_prefs_service.dart';
-import '../../routes/app_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../provider/auth_provider.dart';
+import 'session_guard.dart';
 
 /// NotificationApiService
 /// Handles notification API calls with JWT
@@ -26,15 +23,8 @@ class NotificationApiService {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            final context = rootNavigatorKey.currentContext;
-            if (context != null) {
-              final container = ProviderScope.containerOf(context);
-              await container.read(authProvider.notifier).logout();
-            } else {
-              await SharedPrefsService().logout();
-              await TokenStorageService.clearAll();
-            }
+          if (shouldForceLogout(error)) {
+            await forceLogoutFromApi();
           }
           return handler.next(error);
         },

@@ -83,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             email: _emailController.value.text.trim(),
             password: _passwordController.value.text,
           );
- 
+
       if (mounted) {
         final authState = ref.read(authProvider);
         if (authState is AuthAuthenticated) {
@@ -97,7 +97,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         String msg = e.toString();
         // Extract message from DioException or common Exception
         if (e is DioException) {
-          msg = e.response?.data['errorCode'] ?? e.response?.data['error'] ?? e.message ?? 'Network error';
+          msg = e.response?.data['errorCode'] ??
+              e.response?.data['error'] ??
+              e.message ??
+              'Network error';
         } else {
           msg = msg.replaceAll('Exception: ', '');
         }
@@ -121,8 +124,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             message.toLowerCase().contains('password')) ||
         message.contains('INVALID_CREDENTIALS')) {
       message = s.loginWrongPassword;
-    } else if (message == 'USER_NOT_FOUND' || message.contains('USER_NOT_FOUND')) {
+    } else if (message == 'USER_NOT_FOUND' ||
+        message.contains('USER_NOT_FOUND')) {
       message = s.loginUserNotFound;
+    } else if (message.contains('ACCOUNT_BLOCKED') ||
+        message.toLowerCase().contains('blocked by an administrator')) {
+      message = 'Your account has been blocked. Please contact support.';
+    } else if (message.contains('ACCOUNT_DELETED') ||
+        message.toLowerCase().contains('account has been deleted')) {
+      message = 'This account is no longer available.';
     } else if (message.contains('SocketException') ||
         message.contains('Failed host lookup') ||
         message.contains('No Internet') ||
@@ -201,7 +211,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -210,7 +222,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   s.loginSubtitle,
                   style: TextStyle(
                     fontSize: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -296,7 +310,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     Text(
                       s.loginNoAccountText,
                       style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                     ),
                     TextButton(

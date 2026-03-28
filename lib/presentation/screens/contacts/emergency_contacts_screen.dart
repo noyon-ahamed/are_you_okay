@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
@@ -7,10 +8,10 @@ import '../../../model/emergency_contact_model.dart';
 import '../../../provider/contact_provider.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../routes/app_router.dart';
 
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/custom_text_field.dart';
 
 class EmergencyContactsScreen extends ConsumerStatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -75,7 +76,7 @@ class _EmergencyContactsScreenState
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddContactSheet(context, ref, s),
+        onPressed: () => _openAddContact(context, s),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
@@ -115,7 +116,7 @@ class _EmergencyContactsScreenState
         title: s.contactsEmpty,
         description: s.contactsEmptyDesc,
         buttonText: s.contactsAdd,
-        onButtonPressed: () => _showAddContactSheet(context, ref, s),
+        onButtonPressed: () => _openAddContact(context, s),
       );
     }
 
@@ -132,7 +133,10 @@ class _EmergencyContactsScreenState
         final ids = contacts.map((c) => c.id).toList();
         final movedId = ids.removeAt(oldIndex);
         ids.insert(newIndex, movedId);
-        ref.read(contactProvider.notifier).reorderContacts(ids);
+        ref
+            .read(contactProvider.notifier)
+            .reorderContacts(ids)
+            .catchError((_) {});
       },
       itemBuilder: (context, index) {
         final contact = contacts[index];
@@ -167,7 +171,10 @@ class _EmergencyContactsScreenState
       ),
       confirmDismiss: (_) => _showDeleteConfirm(context, s),
       onDismissed: (_) {
-        ref.read(contactProvider.notifier).deleteContact(contact.id);
+        ref
+            .read(contactProvider.notifier)
+            .deleteContact(contact.id)
+            .catchError((_) {});
       },
       child: Container(
         key: ValueKey(contact.id),
@@ -306,100 +313,35 @@ class _EmergencyContactsScreenState
     );
   }
 
-  void _showAddContactSheet(BuildContext context, WidgetRef ref, AppStrings s) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final relationController = TextEditingController();
-    final emailController = TextEditingController();
+  Future<void> _openAddContact(BuildContext context, AppStrings s) async {
+    final notifier = ref.read(contactProvider.notifier);
+    final maxContacts = await notifier.getMaxEmergencyContacts();
+    if (!context.mounted) return;
+    final canAddMore = await notifier.canAddMoreContacts();
+    if (!context.mounted) return;
+    if (!canAddMore) {
+      await _showContactLimitDialog(context, s, maxContacts);
+      return;
+    }
 
-    showModalBottomSheet(
+    if (!context.mounted) return;
+    context.push(Routes.addContact);
+  }
+
+  Future<void> _showContactLimitDialog(
+      BuildContext context, AppStrings s, int maxContacts) {
+    return showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      builder: (context) => AlertDialog(
+        title: Text(s.contactsLimitTitle),
+        content: Text(s.contactsLimitMessage(maxContacts)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(s.ok),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                s.contactsAdd,
-                style: TextStyle(
-                  fontFamily: 'HindSiliguri',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              CustomTextField(
-                controller: nameController,
-                label: s.contactsName,
-                prefixIcon: Icons.person_outline,
-              ),
-              const SizedBox(height: 12),
-              CustomTextField(
-                controller: phoneController,
-                label: s.contactsPhone,
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              CustomTextField(
-                controller: relationController,
-                label: s.contactsRelation,
-                prefixIcon: Icons.family_restroom_outlined,
-              ),
-              const SizedBox(height: 12),
-              CustomTextField(
-                controller: emailController,
-                label: s.contactsEmailMissedAlert,
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (nameController.text.isNotEmpty &&
-                        phoneController.text.isNotEmpty) {
-                      ref.read(contactProvider.notifier).addContact(
-                            name: nameController.text.trim(),
-                            phoneNumber: phoneController.text.trim(),
-                            email: emailController.text.trim().isNotEmpty
-                                ? emailController.text.trim()
-                                : null,
-                            relationship: relationController.text.trim(),
-                          );
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(s.save,
-                      style: const TextStyle(
-                        fontFamily: 'HindSiliguri',
-                        fontWeight: FontWeight.bold,
-                      )),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 

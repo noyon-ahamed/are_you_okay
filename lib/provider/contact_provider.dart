@@ -51,7 +51,7 @@ class ContactNotifier extends StateNotifier<ContactState> {
       final contacts = await _repository
           .loadContactsFromBackend()
           .timeout(const Duration(seconds: 8));
-      
+
       if (mounted) {
         state = ContactLoaded(contacts);
       }
@@ -81,8 +81,13 @@ class ContactNotifier extends StateNotifier<ContactState> {
     bool notifyViaEmail = true,
     bool notifyViaApp = true,
   }) async {
+    final previousContacts =
+        state is ContactLoaded ? (state as ContactLoaded).contacts : null;
+
     try {
-      state = const ContactLoading();
+      if (previousContacts == null) {
+        state = const ContactLoading();
+      }
 
       await _repository.addContact(
         name: name,
@@ -96,56 +101,95 @@ class ContactNotifier extends StateNotifier<ContactState> {
         notifyViaApp: notifyViaApp,
       );
 
-      if (mounted) await loadContacts();
+      if (mounted) {
+        await loadContacts(silent: previousContacts != null);
+      }
     } catch (e) {
       if (mounted) {
-        state = ContactError(e.toString());
+        state = previousContacts != null
+            ? ContactLoaded(previousContacts)
+            : ContactError(e.toString());
       }
+      rethrow;
     }
   }
 
   Future<void> updateContact(EmergencyContactModel contact) async {
+    final previousContacts =
+        state is ContactLoaded ? (state as ContactLoaded).contacts : null;
+
     try {
-      state = const ContactLoading();
+      if (previousContacts == null) {
+        state = const ContactLoading();
+      }
       await _repository.updateContact(contact);
-      if (mounted) await loadContacts();
+      if (mounted) {
+        await loadContacts(silent: previousContacts != null);
+      }
     } catch (e) {
       if (mounted) {
-        state = ContactError(e.toString());
+        state = previousContacts != null
+            ? ContactLoaded(previousContacts)
+            : ContactError(e.toString());
       }
+      rethrow;
     }
   }
 
   Future<void> deleteContact(String id) async {
+    final previousContacts =
+        state is ContactLoaded ? (state as ContactLoaded).contacts : null;
+
     try {
-      state = const ContactLoading();
+      if (previousContacts == null) {
+        state = const ContactLoading();
+      }
       await _repository.deleteContact(id);
-      if (mounted) await loadContacts();
+      if (mounted) {
+        await loadContacts(silent: previousContacts != null);
+      }
     } catch (e) {
       if (mounted) {
-        state = ContactError(e.toString());
+        state = previousContacts != null
+            ? ContactLoaded(previousContacts)
+            : ContactError(e.toString());
       }
+      rethrow;
     }
   }
 
   Future<void> reorderContacts(List<String> orderedIds) async {
+    final previousContacts =
+        state is ContactLoaded ? (state as ContactLoaded).contacts : null;
+
     try {
-      state = const ContactLoading();
+      if (previousContacts == null) {
+        state = const ContactLoading();
+      }
       await _repository.reorderContacts(orderedIds);
-      if (mounted) await loadContacts();
+      if (mounted) {
+        await loadContacts(silent: previousContacts != null);
+      }
     } catch (e) {
       if (mounted) {
-        state = ContactError(e.toString());
+        state = previousContacts != null
+            ? ContactLoaded(previousContacts)
+            : ContactError(e.toString());
       }
+      rethrow;
     }
   }
 
-  bool canAddMoreContacts() {
+  Future<bool> canAddMoreContacts() {
     return _repository.canAddMoreContacts();
   }
 
   int getContactCount() {
     return _repository.getContactCount();
+  }
+
+  Future<int> getMaxEmergencyContacts() {
+    return _repository.getMaxEmergencyContacts();
   }
 }
 
@@ -180,4 +224,9 @@ final notificationContactsProvider =
     Provider<List<EmergencyContactModel>>((ref) {
   final repository = ref.watch(contactRepositoryProvider);
   return repository.getNotificationContacts();
+});
+
+final maxEmergencyContactsProvider = FutureProvider<int>((ref) async {
+  final repository = ref.watch(contactRepositoryProvider);
+  return repository.getMaxEmergencyContacts();
 });

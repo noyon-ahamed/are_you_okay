@@ -6,6 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../model/emergency_contact_model.dart';
 import '../auth/token_storage_service.dart';
 import '../hive_service.dart';
+import 'session_guard.dart';
 
 const String _kPendingContactsKey = 'pending_contacts_to_sync';
 
@@ -27,6 +28,12 @@ class EmergencyApiService {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
+        },
+        onError: (error, handler) async {
+          if (shouldForceLogout(error)) {
+            await forceLogoutFromApi();
+          }
+          return handler.next(error);
         },
       ),
     );

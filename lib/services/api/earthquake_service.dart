@@ -5,9 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 import '../auth/token_storage_service.dart';
-import '../shared_prefs_service.dart';
-import '../../routes/app_router.dart';
-import '../../provider/auth_provider.dart';
+import 'session_guard.dart';
 
 final earthquakeServiceProvider =
     Provider<EarthquakeService>((ref) => EarthquakeService());
@@ -31,15 +29,8 @@ class EarthquakeService {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            final context = rootNavigatorKey.currentContext;
-            if (context != null) {
-              final container = ProviderScope.containerOf(context);
-              await container.read(authProvider.notifier).logout();
-            } else {
-              await SharedPrefsService().logout();
-              await TokenStorageService.clearAll();
-            }
+          if (shouldForceLogout(error)) {
+            await forceLogoutFromApi();
           }
           return handler.next(error);
         },

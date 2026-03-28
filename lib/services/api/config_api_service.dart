@@ -21,4 +21,17 @@ class ConfigApiService {
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }
   }
+
+  Future<int> getMaxEmergencyContacts() async {
+    try {
+      final config = await getConfig();
+      final settings = config['settings'] as Map<String, dynamic>?;
+      final maxContacts = settings?['maxEmergencyContacts'];
+      if (maxContacts is num && maxContacts > 0) {
+        return maxContacts.toInt();
+      }
+    } catch (_) {}
+
+    return AppConstants.maxEmergencyContacts;
+  }
 }

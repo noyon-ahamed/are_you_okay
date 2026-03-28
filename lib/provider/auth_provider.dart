@@ -12,9 +12,11 @@ import '../services/api/mood_api_service.dart';
 import '../services/notification_service.dart';
 import '../services/shared_prefs_service.dart';
 import '../services/auth/token_storage_service.dart';
+import '../services/api/session_guard.dart';
 import '../provider/checkin_provider.dart';
 import '../provider/contact_provider.dart';
 import '../provider/mood_provider.dart';
+import '../services/notification_sync_service.dart';
 
 abstract class AuthState {
   const AuthState();
@@ -58,6 +60,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user != null) {
         state = AuthAuthenticated(user);
         _socketService.init();
+        unawaited(
+          NotificationSyncService().syncMissedNotifications(force: true),
+        );
         if (user.isEmpty) {
           _syncProfileQuietly();
         }
@@ -92,12 +97,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       debugPrint('Failed to background sync profile: $e');
       if (!mounted) return;
-      if (e is DioException) {
-        if (e.response?.statusCode == 401 && state is AuthAuthenticated) {
-          debugPrint(
-              'Detected invalid session via background sync. Logging out.');
-          logout();
-        }
+      if (e is DioException &&
+          shouldForceLogout(e) &&
+          state is AuthAuthenticated) {
+        debugPrint(
+            'Detected revoked session via background sync. Logging out.');
+        logout();
       }
     }
   }
@@ -114,6 +119,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (!mounted) return;
       state = AuthAuthenticated(user);
       _socketService.init();
+      unawaited(
+        NotificationSyncService().syncMissedNotifications(force: true),
+      );
       debugPrint(
           'AuthNotifier: State set to Authenticated, socket initialized');
 
@@ -327,7 +335,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       debugPrint('AuthNotifier: Failed to refresh profile: $e');
       if (!mounted) return;
-      if (e is DioException && e.response?.statusCode == 401) {
+      if (e is DioException && shouldForceLogout(e)) {
         if (state is AuthAuthenticated) {
           logout();
         }

@@ -27,14 +27,14 @@ import 'services/local_notification_history_service.dart';
 import 'services/shared_prefs_service.dart';
 import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
+import 'services/notification_sync_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
 import 'presentation/screens/fake_call/fake_call_active_screen.dart';
 import 'services/auth/token_storage_service.dart';
 
 final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier =
     ValueNotifier(null);
-
-final Set<String> _handledCallIds = {};
+const MethodChannel _appBridgeChannel = MethodChannel('com.areyouokay.app/app');
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -186,28 +186,24 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       final authState = ref.read(authProvider);
       if (authState is AuthAuthenticated) {
         ref.read(authProvider.notifier).refreshProfile();
+        unawaited(NotificationSyncService().syncMissedNotifications());
       }
     }
   }
 
   Future<void> _checkActiveCalls() async {
     final calls = await FlutterCallkitIncoming.activeCalls();
-    if (calls is List && calls.isNotEmpty) {
-      final currentCall = calls.first;
-      final callId = currentCall['id'] as String? ?? '';
+    final currentCall = _resolveActiveCall(calls, preferAccepted: true);
 
-      if (_handledCallIds.contains(callId)) return;
+    if (currentCall != null) {
+      final nextCallId = currentCall['callId']?.toString() ?? '';
+      final currentCallId =
+          globalActiveCallNotifier.value?['callId']?.toString() ?? '';
 
-      final callerFullName = currentCall['nameCaller'] as String? ?? 'Unknown';
-      final parts = callerFullName.split('\n');
-      final name = parts.isNotEmpty ? parts[0] : 'Unknown';
-      final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
-
-      globalActiveCallNotifier.value = {
-        'callerName': name,
-        'callerNumber': number,
-        'callId': callId,
-      };
+      if (currentCallId != nextCallId ||
+          globalActiveCallNotifier.value == null) {
+        globalActiveCallNotifier.value = currentCall;
+      }
     } else {
       globalActiveCallNotifier.value = null;
     }
@@ -220,31 +216,26 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       switch (event.event) {
         case Event.actionCallAccept:
           debugPrint('Global CallKit Accept received');
-          final body = event.body as Map<dynamic, dynamic>?;
-          if (body != null) {
-            final callerFullName = body['nameCaller'] as String? ?? 'Unknown';
-            final parts = callerFullName.split('\n');
-            final name = parts.isNotEmpty ? parts[0] : 'Unknown';
-            final number = parts.length > 1 ? parts.sublist(1).join('\n') : '';
-            final callId = body['id'] as String? ?? '';
-
-            _handledCallIds.add(callId);
-
-            globalActiveCallNotifier.value = {
-              'callerName': name,
-              'callerNumber': number,
-              'callId': callId,
-            };
+          unawaited(_bringAppToForeground());
+          final activeCall = _resolveCallInfo(event.body) ??
+              _resolveActiveCall(
+                await FlutterCallkitIncoming.activeCalls(),
+                preferAccepted: true,
+              );
+          if (activeCall != null) {
+            final callId = activeCall['callId']?.toString() ?? '';
+            if (callId.isNotEmpty) {
+              unawaited(FlutterCallkitIncoming.setCallConnected(callId));
+            }
+            globalActiveCallNotifier.value = activeCall;
+          } else {
+            await _checkActiveCalls();
           }
           break;
 
         case Event.actionCallEnded:
         case Event.actionCallDecline:
         case Event.actionCallTimeout:
-          final body = event.body as Map<dynamic, dynamic>?;
-          if (body != null) {
-            _handledCallIds.remove(body['id'] as String? ?? '');
-          }
           globalActiveCallNotifier.value = null;
           break;
 
@@ -291,6 +282,74 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       },
     );
   }
+
+  Future<void> _bringAppToForeground() async {
+    if (!Platform.isAndroid) return;
+
+    try {
+      await _appBridgeChannel.invokeMethod<bool>('bringToFront');
+    } catch (e) {
+      debugPrint('Bring to foreground failed: $e');
+    }
+  }
+}
+
+Map<String, dynamic>? _resolveActiveCall(
+  dynamic rawCalls, {
+  bool preferAccepted = false,
+}) {
+  if (rawCalls is! List || rawCalls.isEmpty) return null;
+
+  final parsedCalls = rawCalls
+      .whereType<Map>()
+      .map<Map<String, dynamic>?>((call) => _resolveCallInfo(call))
+      .whereType<Map<String, dynamic>>()
+      .toList();
+
+  if (parsedCalls.isEmpty) return null;
+
+  if (preferAccepted) {
+    final acceptedCall = parsedCalls.cast<Map<String, dynamic>?>().firstWhere(
+          (call) => call?['isAccepted'] == true,
+          orElse: () => null,
+        );
+    if (acceptedCall != null) return acceptedCall;
+  }
+
+  return parsedCalls.first;
+}
+
+Map<String, dynamic>? _resolveCallInfo(dynamic rawCall) {
+  if (rawCall is! Map) return null;
+
+  final call = Map<String, dynamic>.from(rawCall);
+  final callerFullName =
+      call['nameCaller']?.toString() ?? call['handle']?.toString() ?? 'Unknown';
+  final parts = callerFullName.split('\n');
+  final fallbackNumber = call['handle']?.toString() ?? '';
+  final name = parts.isNotEmpty && parts.first.trim().isNotEmpty
+      ? parts.first.trim()
+      : 'Unknown';
+  final number = parts.length > 1
+      ? parts.sublist(1).join('\n').trim()
+      : fallbackNumber.trim();
+
+  return {
+    'callerName': name,
+    'callerNumber': number,
+    'callId': call['id']?.toString() ?? '',
+    'isAccepted': _asBool(call['isAccepted']),
+  };
+}
+
+bool _asBool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    return normalized == 'true' || normalized == '1';
+  }
+  return false;
 }
 
 @pragma('vm:entry-point')

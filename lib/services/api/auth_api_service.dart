@@ -8,6 +8,7 @@ import '../shared_prefs_service.dart';
 import '../auth/token_storage_service.dart';
 import '../notification_service.dart';
 import '../local_notification_history_service.dart';
+import 'session_guard.dart';
 
 /// AuthApiService
 /// Handles authentication API calls with JWT
@@ -29,6 +30,9 @@ class AuthApiService {
           return handler.next(options);
         },
         onError: (error, handler) async {
+          if (shouldForceLogout(error)) {
+            await forceLogoutFromApi();
+          }
           return handler.next(error);
         },
       ),

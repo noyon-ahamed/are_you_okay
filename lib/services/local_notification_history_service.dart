@@ -101,12 +101,13 @@ class LocalNotificationHistoryService {
     await _markAllRemoteAsRead();
   }
 
-  Future<void> deleteNotification(String id) async {
+  Future<void> deleteNotification(String id, {String? payload}) async {
     final items = await getNotifications();
-    items.removeWhere((item) =>
-        item['_id']?.toString() == id || item['id']?.toString() == id);
+    items.removeWhere(
+      (item) => _matchesNotification(item, id: id, payload: payload),
+    );
     await _writeList(_storageKey, items);
-    await _deleteRemoteNotification(id);
+    await _deleteRemoteNotification(id, payload: payload);
   }
 
   Future<bool> containsNotification(String id) async {
@@ -207,14 +208,28 @@ class LocalNotificationHistoryService {
     }
   }
 
-  Future<void> _deleteRemoteNotification(String id) async {
+  Future<void> _deleteRemoteNotification(String id, {String? payload}) async {
     final items = await getCachedRemoteNotifications();
     final before = items.length;
-    items.removeWhere((item) =>
-        item['_id']?.toString() == id || item['id']?.toString() == id);
+    items.removeWhere(
+      (item) => _matchesNotification(item, id: id, payload: payload),
+    );
     if (items.length != before) {
       await _writeList(_remoteCacheKey, items);
     }
+  }
+
+  bool _matchesNotification(
+    Map<String, dynamic> item, {
+    required String id,
+    String? payload,
+  }) {
+    final matchesId =
+        item['_id']?.toString() == id || item['id']?.toString() == id;
+    final matchesPayload = payload != null &&
+        payload.isNotEmpty &&
+        item['payload']?.toString() == payload;
+    return matchesId || matchesPayload;
   }
 
   List<Map<String, dynamic>> _mergeNotifications(

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../model/emergency_contact_model.dart';
 import '../services/hive_service.dart';
 import '../services/api/emergency_api_service.dart';
+import '../services/api/config_api_service.dart';
 import '../core/constants/app_constants.dart';
 
 final contactRepositoryProvider = Provider<ContactRepository>((ref) {
@@ -16,6 +17,7 @@ final contactRepositoryProvider = Provider<ContactRepository>((ref) {
 class ContactRepository {
   final HiveService hive;
   final EmergencyApiService api;
+  final ConfigApiService _configApi = ConfigApiService();
   final _uuid = const Uuid();
 
   ContactRepository({required this.hive, required this.api});
@@ -90,10 +92,11 @@ class ContactRepository {
     bool notifyViaApp = true,
   }) async {
     // Check max contacts limit
+    final maxContacts = await getMaxEmergencyContacts();
     final currentCount = await _getContactCount();
-    if (currentCount >= AppConstants.maxEmergencyContacts) {
+    if (currentCount >= maxContacts) {
       throw Exception(
-        'সর্বোচ্চ ${AppConstants.maxEmergencyContacts}টি কন্টাক্ট যোগ করা যায়',
+        'সর্বোচ্চ $maxContacts টি কন্টাক্ট যোগ করা যায়',
       );
     }
 
@@ -107,13 +110,13 @@ class ContactRepository {
         priority: priority,
       );
 
-        final contact = EmergencyContactModel(
-          id: backendContact['_id']?.toString() ?? _uuid.v4(),
-          userId: backendContact['userId']?.toString() ??
-              backendContact['user']?.toString() ??
-              '',
-          name: name,
-          phoneNumber: phoneNumber,
+      final contact = EmergencyContactModel(
+        id: backendContact['_id']?.toString() ?? _uuid.v4(),
+        userId: backendContact['userId']?.toString() ??
+            backendContact['user']?.toString() ??
+            '',
+        name: name,
+        phoneNumber: phoneNumber,
         email: email,
         relationship: relationship,
         priority: backendContact['priority'] as int? ?? priority,
@@ -212,8 +215,17 @@ class ContactRepository {
   }
 
   /// Check if can add more contacts
-  bool canAddMoreContacts() {
-    return getContactCount() < AppConstants.maxEmergencyContacts;
+  Future<bool> canAddMoreContacts() async {
+    final maxContacts = await getMaxEmergencyContacts();
+    return getContactCount() < maxContacts;
+  }
+
+  Future<int> getMaxEmergencyContacts() async {
+    try {
+      return await _configApi.getMaxEmergencyContacts();
+    } catch (_) {
+      return AppConstants.maxEmergencyContacts;
+    }
   }
 
   /// Reorder contacts (change priority) — updates backend for each

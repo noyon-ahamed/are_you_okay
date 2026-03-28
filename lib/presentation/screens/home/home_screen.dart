@@ -13,6 +13,7 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/contact_provider.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../routes/app_router.dart';
@@ -60,6 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // Countdown — will be synced from server
   Duration _timeRemaining = const Duration(hours: 24);
+  bool _isContactReminderVisible = false;
 
   @override
   String? get restorationId => 'home_screen';
@@ -109,6 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       // Request permissions after login
       _requestPermissions();
+      _checkForMissingEmergencyContacts();
     });
     pendingNotificationAction.addListener(_handlePendingReminderAction);
 
@@ -135,6 +138,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (state == AppLifecycleState.resumed) {
       // Refresh profile data automatically when app comes to foreground
       ref.read(authProvider.notifier).refreshProfile();
+      _checkForMissingEmergencyContacts();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _isContactReminderVisible = false;
     }
   }
 
@@ -150,6 +157,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
       }
     });
+  }
+
+  Future<void> _checkForMissingEmergencyContacts() async {
+    if (!mounted ||
+        _isContactReminderVisible ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+
+    final localContactCount =
+        ref.read(contactProvider.notifier).getContactCount();
+    if (localContactCount > 0) {
+      return;
+    }
+
+    try {
+      await ref.read(contactProvider.notifier).loadContacts(silent: true);
+    } catch (_) {}
+
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+
+    final contactState = ref.read(contactProvider);
+    final hasContacts = contactState is ContactLoaded
+        ? contactState.contacts.isNotEmpty
+        : ref.read(contactProvider.notifier).getContactCount() > 0;
+
+    if (hasContacts || !mounted || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+
+    _isContactReminderVisible = true;
+    final s = ref.read(stringsProvider);
+
+    final shouldOpenContacts = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(s.contactsReminderTitle),
+            content: Text(s.contactsReminderMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(s.contactsReminderLater),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(s.contactsReminderAdd),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    _isContactReminderVisible = false;
+
+    if (!mounted || !shouldOpenContacts) return;
+    context.push(Routes.contacts);
   }
 
   void _initVoiceSOS() {

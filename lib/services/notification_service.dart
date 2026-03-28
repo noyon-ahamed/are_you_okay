@@ -459,6 +459,35 @@ class LocalNotificationService {
     await _notifications.cancel(id);
   }
 
+  Future<void> cancelMatchingNotification({
+    int? id,
+    String? title,
+    String? body,
+    String? payload,
+  }) async {
+    if (id != null) {
+      await cancelNotification(id);
+      return;
+    }
+
+    final activeNotifications = await getActiveNotifications();
+    for (final notification in activeNotifications) {
+      final payloadMatches = payload != null &&
+          payload.isNotEmpty &&
+          notification.payload == payload;
+      final contentMatches = title != null &&
+          title.isNotEmpty &&
+          body != null &&
+          body.isNotEmpty &&
+          notification.title == title &&
+          notification.body == body;
+
+      if ((payloadMatches || contentMatches) && notification.id != null) {
+        await _notifications.cancel(notification.id!);
+      }
+    }
+  }
+
   /// Cancel all notifications
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();

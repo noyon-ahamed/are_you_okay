@@ -99,9 +99,8 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
   Future<void> markAsRead(Map<String, dynamic> notification) async {
     try {
       final id = notification['_id']?.toString() ?? '';
-      if (notification['isLocal'] == true) {
-        await LocalNotificationHistoryService().markAsRead(id);
-      } else {
+      await _historyService.markAsRead(id);
+      if (notification['isLocal'] != true) {
         await NotificationApiService().markAsRead(id);
       }
       fetch(silent: true);
@@ -113,15 +112,22 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
   Future<void> deleteNotification(Map<String, dynamic> notification) async {
     try {
       final id = notification['_id']?.toString() ?? '';
-      if (notification['isLocal'] == true) {
-        await LocalNotificationHistoryService().deleteNotification(id);
-        final localId = notification['notificationId'];
-        if (localId is int) {
-          await LocalNotificationService().cancelNotification(localId);
-        }
-      } else {
+      final payload = notification['payload']?.toString();
+
+      await _historyService.deleteNotification(id, payload: payload);
+
+      if (notification['isLocal'] != true) {
         await NotificationApiService().deleteNotification(id);
       }
+
+      final localId = notification['notificationId'];
+      await LocalNotificationService().cancelMatchingNotification(
+        id: localId is int ? localId : null,
+        title: notification['title']?.toString(),
+        body: notification['body']?.toString(),
+        payload: payload,
+      );
+
       fetch(silent: true);
     } catch (e) {
       rethrow;

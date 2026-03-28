@@ -1,3 +1,5 @@
+import '../constants/app_constants.dart';
+
 /// AppStrings
 /// Centralized localization strings for English and Bangla.
 /// Usage: AppStrings.of(context).homeTitle
@@ -366,16 +368,18 @@ class AppStrings {
       : 'Email (will get alert if check-in missed)';
   String get contactsNewContact => isBangla ? 'নতুন কন্টাক্ট' : 'New Contact';
   String get contactsNameHint =>
-      isBangla ? 'ব্যক্তির নাম লিখুন' : 'Enter person\'s name';
+      isBangla ? 'যার সাথে যোগাযোগ করা হবে তার পূর্ণ নাম লিখুন' : 'Enter the full name of your trusted contact';
   String get contactsNameReq => isBangla ? 'নাম প্রয়োজন' : 'Name required';
-  String get contactsPhoneHint => isBangla ? '01XXXXXXXXX' : '01XXXXXXXXX';
+  String get contactsPhoneHint => isBangla
+      ? '১১ সংখ্যার নম্বর লিখুন, যেমন 017XXXXXXXX'
+      : 'Enter an 11-digit number, e.g. 017XXXXXXXX';
   String get contactsPhoneReq =>
       isBangla ? 'ফোন নম্বর প্রয়োজন' : 'Phone number required';
   String get contactsPhoneInvalid =>
       isBangla ? 'সঠিক ফোন নম্বর লিখুন' : 'Enter valid phone number';
   String get contactsRelationHint => isBangla
-      ? 'যেমন: বাবা, মা, ভাই, বন্ধু'
-      : 'e.g. Father, Mother, Brother, Friend';
+      ? 'যেমন: মা, বাবা, ভাই, বোন, বন্ধু'
+      : 'e.g. Mother, Father, Sister, Brother, Friend';
   String get contactsRelationReq =>
       isBangla ? 'সম্পর্ক উল্লেখ করুন' : 'Please mention relation';
   String get contactsPriorityLevel =>
@@ -384,13 +388,35 @@ class AppStrings {
       ? '১ নং অগ্রাধিকার সবচেয়ে বেশি গুরুত্বপূর্ণ।'
       : '#1 priority is the most important.';
   String get contactsNotifType =>
-      isBangla ? 'বিজ্ঞপ্তির ধরণ' : 'Notification Type';
+      isBangla ? 'অ্যালার্ট পাঠানোর মাধ্যম' : 'Alert Methods';
   String get contactsNotifySMS =>
       isBangla ? 'SMS এর মাধ্যমে জানান' : 'Notify via SMS';
-  String get contactsNotifyApp =>
-      isBangla ? 'অ্যাপ বিজ্ঞপ্তির মাধ্যমে জানান' : 'Notify via App';
+  String get contactsNotifyEmail =>
+      isBangla ? 'ইমেইলের মাধ্যমে জানান' : 'Notify via Email';
   String get contactsAddedToast =>
       isBangla ? 'নতুন কন্টাক্ট যোগ করা হয়েছে।' : 'New contact added.';
+  String get contactsLimitTitle =>
+      isBangla ? 'কন্টাক্ট সীমা পূর্ণ' : 'Contact limit reached';
+  String contactsLimitMessage([int max = AppConstants.maxEmergencyContacts]) =>
+      isBangla
+          ? 'আপনি সর্বোচ্চ $max টি জরুরি কন্টাক্ট যোগ করতে পারবেন।'
+          : 'You can add up to $max emergency contacts only.';
+  String contactsCounterLabel(int count,
+          [int max = AppConstants.maxEmergencyContacts]) =>
+      isBangla ? '$count / $max কন্টাক্ট যোগ করা হয়েছে' : '$count / $max contacts added';
+  String get contactsReminderTitle => isBangla
+      ? 'জরুরি কন্টাক্ট যোগ করুন'
+      : 'Add emergency contacts';
+  String get contactsReminderMessage => isBangla
+      ? 'আপনার নিরাপত্তার জন্য কমপক্ষে একটি জরুরি কন্টাক্ট যোগ করা দরকার। এখনই যোগ করলে SOS ও missed check-in alert দ্রুত পাঠানো যাবে।'
+      : 'For your safety, please add at least one emergency contact. This helps SOS and missed check-in alerts reach someone quickly.';
+  String get contactsReminderAdd =>
+      isBangla ? 'এখন যোগ করুন' : 'Add';
+  String get contactsReminderLater =>
+      isBangla ? 'পরে' : 'Later';
+  String get contactsFormIntro => isBangla
+      ? 'বিশ্বস্ত মানুষের তথ্য দিন। সর্বোচ্চ ৫টি কন্টাক্ট যোগ করা যাবে।'
+      : 'Add trusted people here. You can save up to 5 contacts.';
 
   // ===================== Earthquake =====================
   String get earthquakeTitle =>

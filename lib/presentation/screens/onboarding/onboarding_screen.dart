@@ -193,79 +193,97 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     final textSecondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          const Spacer(),
-          _buildHeroCard(item, isDark, s),
-          const SizedBox(height: 36),
-          Text(
-            item.title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'HindSiliguri',
-              color: textPrimary,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            item.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: textSecondary,
-              fontFamily: 'HindSiliguri',
-              height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 28),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.white.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.white,
-              ),
-            ),
-            child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxHeight < 560;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(item.icon, color: AppColors.primary, size: 18),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    item.stat,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'HindSiliguri',
-                      fontWeight: FontWeight.w700,
-                      color: textPrimary,
-                    ),
+                SizedBox(height: isCompact ? 12 : 20),
+                _buildHeroCard(item, isDark, s, isCompact: isCompact),
+                SizedBox(height: isCompact ? 24 : 36),
+                Text(
+                  item.title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isCompact ? 26 : 30,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'HindSiliguri',
+                    color: textPrimary,
+                    height: 1.2,
                   ),
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  item.description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isCompact ? 15 : 16,
+                    color: textSecondary,
+                    fontFamily: 'HindSiliguri',
+                    height: 1.6,
+                  ),
+                ),
+                SizedBox(height: isCompact ? 20 : 28),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.white,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(item.icon, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          item.stat,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'HindSiliguri',
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: isCompact ? 12 : 20),
               ],
             ),
           ),
-          const Spacer(),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeroCard(_OnboardingItem item, bool isDark, AppStrings s) {
+  Widget _buildHeroCard(
+    _OnboardingItem item,
+    bool isDark,
+    AppStrings s, {
+    bool isCompact = false,
+  }) {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 360),
-      padding: const EdgeInsets.all(22),
+      padding: EdgeInsets.all(isCompact ? 18 : 22),
       decoration: BoxDecoration(
         color: isDark
             ? Colors.white.withValues(alpha: 0.06)
@@ -288,7 +306,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             children: [
               Expanded(
                 child: Container(
-                  height: 170,
+                  height: isCompact ? 142 : 170,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -314,7 +332,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           child: Icon(
                             item.icon,
                             color: AppColors.primary,
-                            size: 30,
+                            size: isCompact ? 26 : 30,
                           ),
                         ),
                       ),
@@ -323,8 +341,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                         bottom: 18,
                         child: Image.asset(
                           'assets/images/logo_padded.png',
-                          width: 88,
-                          height: 88,
+                          width: isCompact ? 72 : 88,
+                          height: isCompact ? 72 : 88,
                           fit: BoxFit.contain,
                           filterQuality: FilterQuality.high,
                         ),
@@ -338,8 +356,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           style: TextStyle(
                             fontFamily: 'HindSiliguri',
                             fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                            fontSize: isCompact ? 13 : 15,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary,
                             height: 1.4,
                           ),
                         ),
@@ -350,13 +370,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isCompact ? 12 : 16),
           Row(
             children: [
               Expanded(
                 child: _FeatureStrip(
                   color: AppColors.primary,
                   label: s.onbFeatureCheckin,
+                  isCompact: isCompact,
                 ),
               ),
               const SizedBox(width: 12),
@@ -364,6 +385,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 child: _FeatureStrip(
                   color: AppColors.secondary,
                   label: s.onbFeatureAlerts,
+                  isCompact: isCompact,
                 ),
               ),
             ],
@@ -386,15 +408,20 @@ class _FeatureStrip extends StatelessWidget {
   const _FeatureStrip({
     required this.color,
     required this.label,
+    this.isCompact = false,
   });
 
   final Color color;
   final String label;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 14,
+        vertical: isCompact ? 10 : 12,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(18),
@@ -405,6 +432,7 @@ class _FeatureStrip extends StatelessWidget {
         style: TextStyle(
           fontFamily: 'HindSiliguri',
           fontWeight: FontWeight.w700,
+          fontSize: isCompact ? 12 : 14,
           color: color,
         ),
       ),

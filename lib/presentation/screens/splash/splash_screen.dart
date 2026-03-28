@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -6,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../provider/language_provider.dart';
 import '../../../provider/splash_provider.dart';
+import '../../../services/api/config_api_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -16,6 +19,7 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
+  final ConfigApiService _configApiService = ConfigApiService();
   late AnimationController _logoController;
   late AnimationController _textController;
   late AnimationController _pulseController;
@@ -31,6 +35,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late Animation<double> _pulse;
   late Animation<double> _progress;
   late Animation<double> _shimmer;
+  bool _isBlockingLaunch = false;
+  String? _blockTitle;
+  String? _blockMessage;
 
   @override
   void initState() {
@@ -41,11 +48,76 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       FlutterNativeSplash.remove();
     });
 
-    Future.delayed(const Duration(milliseconds: 2800), () {
-      if (mounted) {
-        ref.read(splashDisplayCompleteProvider.notifier).state = true;
+    _runLaunchChecks();
+  }
+
+  Future<void> _runLaunchChecks() async {
+    await Future<void>.delayed(const Duration(milliseconds: 1800));
+
+    try {
+      final config = await _configApiService.getConfig();
+      final maintenanceMode = config['maintenanceMode'] == true;
+      final minAppVersion =
+          ((config['minAppVersion'] as Map<String, dynamic>?) ??
+                  const <String, dynamic>{})[Platform.isIOS ? 'ios' : 'android']
+              ?.toString();
+
+      if (!mounted) return;
+
+      if (maintenanceMode) {
+        setState(() {
+          _isBlockingLaunch = true;
+          _blockTitle = 'Maintenance mode is enabled';
+          _blockMessage =
+              'The app is temporarily unavailable. Please try again a little later.';
+        });
+        return;
       }
-    });
+
+      if (_isVersionLower(
+        AppConstants.appVersion,
+        minAppVersion ?? AppConstants.appVersion,
+      )) {
+        setState(() {
+          _isBlockingLaunch = true;
+          _blockTitle = 'Update required';
+          _blockMessage =
+              'Your app version is ${AppConstants.appVersion}. Please update to at least ${minAppVersion ?? AppConstants.appVersion} to continue.';
+        });
+        return;
+      }
+    } catch (_) {
+      // Config fetch is best-effort. If it fails, allow the app to continue.
+    }
+
+    if (mounted) {
+      ref.read(splashDisplayCompleteProvider.notifier).state = true;
+    }
+  }
+
+  bool _isVersionLower(String currentVersion, String minimumVersion) {
+    final currentParts = currentVersion
+        .split('.')
+        .map((part) => int.tryParse(part) ?? 0)
+        .toList();
+    final minimumParts = minimumVersion
+        .split('.')
+        .map((part) => int.tryParse(part) ?? 0)
+        .toList();
+
+    final maxLength = currentParts.length > minimumParts.length
+        ? currentParts.length
+        : minimumParts.length;
+
+    for (var index = 0; index < maxLength; index++) {
+      final currentPart = index < currentParts.length ? currentParts[index] : 0;
+      final minimumPart = index < minimumParts.length ? minimumParts[index] : 0;
+
+      if (currentPart < minimumPart) return true;
+      if (currentPart > minimumPart) return false;
+    }
+
+    return false;
   }
 
   void _initAnimations() {
@@ -146,6 +218,91 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final s = ref.watch(stringsProvider);
+
+    if (_isBlockingLaunch) {
+      return Scaffold(
+        body: Container(
+          width: size.width,
+          height: size.height,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF003D2E),
+                Color(0xFF005C42),
+                Color(0xFF006A4E),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.system_update_alt_rounded,
+                        size: 42,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        _blockTitle ?? 'Please try again later',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _blockMessage ?? '',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _isBlockingLaunch = false;
+                            _blockTitle = null;
+                            _blockMessage = null;
+                          });
+                          _runLaunchChecks();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.32),
+                          ),
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: Container(
