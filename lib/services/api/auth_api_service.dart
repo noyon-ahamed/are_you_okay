@@ -14,6 +14,7 @@ import 'session_guard.dart';
 /// Handles authentication API calls with JWT
 class AuthApiService {
   static String get baseUrl => AppConstants.apiBaseUrl;
+  static const String _skipForceLogoutKey = 'skipForceLogout';
   final Dio _dio = Dio();
 
   AuthApiService() {
@@ -48,7 +49,7 @@ class AuthApiService {
       await _dio.post(
         '$baseUrl/auth/fcm-token',
         data: {'fcmToken': fcmToken},
-      );
+      ).timeout(const Duration(seconds: 6));
       debugPrint('FCM token sent to backend');
     } catch (e) {
       debugPrint('FCM token send failed: $e');
@@ -60,10 +61,13 @@ class AuthApiService {
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken == null) return;
-      await _dio.delete(
-        '$baseUrl/auth/fcm-token',
-        data: {'fcmToken': fcmToken},
-      );
+      await _dio
+          .delete(
+            '$baseUrl/auth/fcm-token',
+            data: {'fcmToken': fcmToken},
+            options: _skipForceLogoutOptions(),
+          )
+          .timeout(const Duration(seconds: 4));
       debugPrint('FCM token removed from backend');
     } catch (e) {
       // Non-critical — logout should proceed even if this fails
@@ -87,6 +91,7 @@ class AuthApiService {
           'name': name,
           if (phone != null) 'phone': phone,
         },
+        options: _skipForceLogoutOptions(),
       );
 
       if (response.data['success'] == true) {
@@ -105,22 +110,23 @@ class AuthApiService {
     required String password,
   }) async {
     try {
-      final response = await _dio.post(
-        '$baseUrl/auth/login',
-        data: {
-          'email': email,
-          'password': password,
-        },
-      );
+      final response = await _dio
+          .post(
+            '$baseUrl/auth/login',
+            data: {
+              'email': email,
+              'password': password,
+            },
+            options: _skipForceLogoutOptions(),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.data['success'] == true) {
         final token = response.data['data']['token'];
         final userId = response.data['data']['user']['id'];
 
-        // ✅ Remove old user's FCM token before switching accounts
-        // This prevents the old account from receiving push notifications
-        // meant for the new account on the same device.
-        await removeFcmToken().catchError((_) {});
+        // Best-effort cleanup of the previous session should never block login.
+        unawaited(_cleanupPreviousSessionFcmToken());
 
         await TokenStorageService.saveToken(token);
         await TokenStorageService.saveUserId(userId);
@@ -140,18 +146,28 @@ class AuthApiService {
           e.error.toString().contains('SocketException')) {
         throw Exception('No Internet Connection');
       }
-      throw Exception(e.response?.data['error'] ?? 'Network error');
+      throw Exception(
+        e.response?.data['errorCode'] ??
+            e.response?.data['error'] ??
+            'Network error',
+      );
     }
   }
 
   /// Logout user
   Future<void> logout() async {
-    // ✅ CRITICAL: Remove FCM token BEFORE clearing auth tokens.
-    // The removeFcmToken() API call needs the Bearer token in the header.
-    // If we clear tokens first, the API call will fail silently and the
-    // backend will keep sending push notifications to this device for
-    // the logged-out user.
-    await removeFcmToken();
+    try {
+      await _dio
+          .post(
+            '$baseUrl/auth/logout',
+            options: _skipForceLogoutOptions(),
+          )
+          .timeout(const Duration(seconds: 6));
+      debugPrint('Backend logout completed');
+    } catch (e) {
+      debugPrint('Backend logout failed, falling back to FCM removal: $e');
+      await removeFcmToken();
+    }
 
     // Clear local notifications and history
     await LocalNotificationService().cancelAllNotifications();
@@ -262,6 +278,7 @@ class AuthApiService {
       final response = await _dio.post(
         '$baseUrl/auth/forgot-password',
         data: {'email': email},
+        options: _skipForceLogoutOptions(),
       );
 
       if (response.data['success'] != true) {
@@ -284,6 +301,7 @@ class AuthApiService {
           'email': email,
           'otp': otp,
         },
+        options: _skipForceLogoutOptions(),
       );
 
       if (response.data['success'] == true) {
@@ -308,6 +326,7 @@ class AuthApiService {
           'token': token,
           'password': newPassword,
         },
+        options: _skipForceLogoutOptions(),
       );
 
       if (response.data['success'] != true) {
@@ -321,7 +340,10 @@ class AuthApiService {
   /// Verify email
   Future<void> verifyEmail(String token) async {
     try {
-      final response = await _dio.get('$baseUrl/auth/verify-email/$token');
+      final response = await _dio.get(
+        '$baseUrl/auth/verify-email/$token',
+        options: _skipForceLogoutOptions(),
+      );
 
       if (response.data['success'] != true) {
         throw Exception(response.data['error'] ?? 'Failed to verify email');
@@ -341,6 +363,44 @@ class AuthApiService {
       }
     } on DioException catch (e) {
       throw Exception(e.response?.data['error'] ?? 'Network error');
+    }
+  }
+
+  Options _skipForceLogoutOptions({
+    Map<String, dynamic>? headers,
+  }) {
+    return Options(
+      headers: headers,
+      extra: const {_skipForceLogoutKey: true},
+    );
+  }
+
+  Future<void> _cleanupPreviousSessionFcmToken() async {
+    try {
+      final previousAuthToken = await TokenStorageService.getToken();
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (previousAuthToken == null ||
+          previousAuthToken.isEmpty ||
+          fcmToken == null ||
+          fcmToken.isEmpty) {
+        return;
+      }
+
+      final cleanupDio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+          headers: {'Authorization': 'Bearer $previousAuthToken'},
+        ),
+      );
+
+      await cleanupDio.delete(
+        '$baseUrl/auth/fcm-token',
+        data: {'fcmToken': fcmToken},
+      );
+      debugPrint('Previous session FCM token cleanup completed');
+    } catch (e) {
+      debugPrint('Previous session FCM token cleanup skipped: $e');
     }
   }
 }

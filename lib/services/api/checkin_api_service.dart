@@ -3,6 +3,21 @@ import '../../core/constants/app_constants.dart';
 import '../auth/token_storage_service.dart';
 import 'session_guard.dart';
 
+class AlreadyCheckedInException implements Exception {
+  final String message;
+  final Map<String, dynamic>? existingCheckIn;
+  final DateTime? nextCheckInTime;
+
+  const AlreadyCheckedInException({
+    required this.message,
+    this.existingCheckIn,
+    this.nextCheckInTime,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// CheckinApiService
 /// Handles check-in API calls with JWT authentication
 class CheckinApiService {
@@ -38,6 +53,8 @@ class CheckinApiService {
     required double longitude,
     String status = 'safe',
     String? note,
+    DateTime? timestamp,
+    String? clientGeneratedId,
   }) async {
     try {
       final response = await _dio.post(
@@ -49,6 +66,9 @@ class CheckinApiService {
           },
           'status': status,
           if (note != null) 'note': note,
+          if (timestamp != null) 'timestamp': timestamp.toIso8601String(),
+          if (timestamp != null) 'checkInTime': timestamp.toIso8601String(),
+          if (clientGeneratedId != null) 'clientGeneratedId': clientGeneratedId,
         },
       );
 
@@ -59,9 +79,22 @@ class CheckinApiService {
       }
     } on DioException catch (e) {
       if (e.response?.statusCode == 400) {
-        // Already checked in today
-        throw Exception(
-            e.response?.data['error'] ?? 'Already checked in today');
+        final payload = e.response?.data;
+        final existingCheckIn =
+            payload is Map<String, dynamic> && payload['checkIn'] is Map
+                ? Map<String, dynamic>.from(payload['checkIn'] as Map)
+                : null;
+        final nextCheckInTime = payload is Map<String, dynamic> &&
+                payload['nextCheckInTime'] != null
+            ? DateTime.tryParse(payload['nextCheckInTime'].toString())
+            : null;
+        throw AlreadyCheckedInException(
+          message: payload is Map<String, dynamic>
+              ? payload['error']?.toString() ?? 'Already checked in today'
+              : 'Already checked in today',
+          existingCheckIn: existingCheckIn,
+          nextCheckInTime: nextCheckInTime,
+        );
       }
       throw Exception(e.response?.data['error'] ?? 'Network error');
     }

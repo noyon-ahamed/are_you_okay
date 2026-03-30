@@ -1,26 +1,86 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api/mood_api_service.dart';
+import '../services/mood_local_service.dart';
 
 // --- Mood API Provider ---
 final moodApiProvider = Provider((ref) => MoodApiService());
 
+List<Map<String, dynamic>> _mergeMoodEntries(
+  List<dynamic> remoteHistory,
+  List<Map<String, dynamic>> pendingLocal,
+) {
+  final merged = <Map<String, dynamic>>[];
+  final seen = <String>{};
+
+  for (final item in [...pendingLocal, ...remoteHistory]) {
+    if (item is! Map) continue;
+    final normalized = Map<String, dynamic>.from(item);
+    final timestamp = normalized['timestamp']?.toString() ?? '';
+    final mood = normalized['mood']?.toString().trim().toLowerCase() ?? '';
+    final note = normalized['note']?.toString().trim().toLowerCase() ?? '';
+    final key = timestamp.isNotEmpty
+        ? 'ts:$timestamp|$mood|$note'
+        : 'id:${normalized['_id'] ?? normalized['id'] ?? merged.length}';
+
+    if (seen.add(key)) {
+      merged.add(normalized);
+    }
+  }
+
+  merged.sort((a, b) {
+    final aTs = DateTime.tryParse(a['timestamp']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final bTs = DateTime.tryParse(b['timestamp']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return bTs.compareTo(aTs);
+  });
+
+  return merged;
+}
+
+Map<String, dynamic>? _buildOfflineMoodStats(
+    List<Map<String, dynamic>> history) {
+  if (history.isEmpty) return null;
+
+  final distribution = <String, int>{};
+  for (final entry in history) {
+    final mood = entry['mood']?.toString().trim().toLowerCase();
+    if (mood == null || mood.isEmpty) continue;
+    distribution[mood] = (distribution[mood] ?? 0) + 1;
+  }
+
+  return {
+    'success': true,
+    'stats': {
+      'totalEntries': history.length,
+      'distribution': distribution,
+    },
+    'source': 'offline_local',
+  };
+}
+
 // --- Mood Stats Notifier ---
 class MoodStatsNotifier
     extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
-  MoodStatsNotifier(this._api) : super(const AsyncLoading()) {
+  MoodStatsNotifier(this._api, this._localService)
+      : super(const AsyncLoading()) {
     _bootstrap();
   }
 
   final MoodApiService _api;
+  final MoodLocalService _localService;
   Future<void>? _fetchInFlight;
 
   Future<void> _bootstrap() async {
     final cached = await _api.getCachedStats();
+    final fallback = await _buildLocalStatsFallback();
     if (!mounted) return;
-    if (cached != null) {
+    if (fallback != null) {
+      state = AsyncData(fallback);
+    } else if (cached != null) {
       state = AsyncData(cached);
     }
-    await fetch(silent: cached != null);
+    await fetch(silent: cached != null || fallback != null);
   }
 
   Future<void> fetch({bool silent = true}) async {
@@ -48,25 +108,40 @@ class MoodStatsNotifier
       state = AsyncData(stats);
     } catch (e, st) {
       if (!mounted) return;
-      if (!silent || !state.hasValue) {
+      final fallback = await _buildLocalStatsFallback();
+      if (fallback != null) {
+        state = AsyncData(fallback);
+      } else if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
       }
     }
+  }
+
+  Future<Map<String, dynamic>?> _buildLocalStatsFallback() async {
+    final cachedHistory = await _api.getCachedHistory();
+    final pendingLocal = await _localService.getPendingMoods();
+    final historyData = cachedHistory?['moods'] is List
+        ? cachedHistory!['moods'] as List
+        : <dynamic>[];
+    final merged = _mergeMoodEntries(historyData, pendingLocal);
+    return _buildOfflineMoodStats(merged);
   }
 }
 
 // --- Mood History Notifier ---
 class MoodHistoryNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
-  MoodHistoryNotifier(this._api) : super(const AsyncLoading()) {
+  MoodHistoryNotifier(this._api, this._localService)
+      : super(const AsyncLoading()) {
     _bootstrap();
   }
 
   final MoodApiService _api;
+  final MoodLocalService _localService;
   Future<void>? _fetchInFlight;
 
   Future<void> _bootstrap() async {
     final cached = await _api.getCachedHistory();
-    final cachedHistory = _extractHistory(cached);
+    final cachedHistory = await _mergeWithLocal(_extractHistory(cached));
     if (!mounted) return;
     if (cachedHistory.isNotEmpty) {
       state = AsyncData(cachedHistory);
@@ -101,10 +176,14 @@ class MoodHistoryNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
         latestCreatedAt: latestCreatedAt,
       );
       if (!mounted) return;
-      state = AsyncData(_extractHistory(result));
+      state = AsyncData(await _mergeWithLocal(_extractHistory(result)));
     } catch (e, st) {
       if (!mounted) return;
-      if (!silent || !state.hasValue) {
+      final cached = await _api.getCachedHistory();
+      final fallback = await _mergeWithLocal(_extractHistory(cached));
+      if (fallback.isNotEmpty) {
+        state = AsyncData(fallback);
+      } else if (!silent || !state.hasValue) {
         state = AsyncError(e, st);
       }
     }
@@ -118,19 +197,30 @@ class MoodHistoryNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
     }
     return <dynamic>[];
   }
+
+  Future<List<dynamic>> _mergeWithLocal(List<dynamic> remoteHistory) async {
+    final pendingLocal = await _localService.getPendingMoods();
+    return _mergeMoodEntries(remoteHistory, pendingLocal);
+  }
 }
 
 // --- Providers ---
 final moodStatsProvider =
     StateNotifierProvider<MoodStatsNotifier, AsyncValue<Map<String, dynamic>>>(
         (ref) {
-  return MoodStatsNotifier(ref.watch(moodApiProvider));
+  return MoodStatsNotifier(
+    ref.watch(moodApiProvider),
+    ref.watch(moodLocalServiceProvider),
+  );
 });
 
 final moodHistoryProvider =
     StateNotifierProvider<MoodHistoryNotifier, AsyncValue<List<dynamic>>>(
         (ref) {
-  return MoodHistoryNotifier(ref.watch(moodApiProvider));
+  return MoodHistoryNotifier(
+    ref.watch(moodApiProvider),
+    ref.watch(moodLocalServiceProvider),
+  );
 });
 
 /// Provider that calculates the remaining cooldown duration for mood saves.

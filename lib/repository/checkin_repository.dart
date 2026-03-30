@@ -42,6 +42,13 @@ class CheckInRepository {
     String method = 'button',
     String? notes,
   }) async {
+    final performedAt = DateTime.now();
+    final existingLocal = _findExistingCheckInAround(performedAt);
+    if (existingLocal != null) {
+      await prefs.setLastCheckIn(existingLocal.timestamp);
+      return existingLocal;
+    }
+
     // Get location if not provided
     double lat = latitude ?? 23.8103;
     double lng = longitude ?? 90.4125;
@@ -67,27 +74,43 @@ class CheckInRepository {
         longitude: lng,
         status: 'safe',
         note: notes,
+        timestamp: performedAt,
       );
 
+      final payload = _extractCheckInPayload(response);
+      final resolvedTimestamp = _parseCheckinTime(payload) ?? performedAt;
       final checkIn = CheckInModel(
-        id: response['checkIn']?['_id'] ?? _uuid.v4(),
-        userId: response['checkIn']?['user'] ??
-            response['checkIn']?['userId'] ??
-            '',
-        timestamp: DateTime.now(),
+        id: payload['_id']?.toString() ??
+            payload['id']?.toString() ??
+            _uuid.v4(),
+        userId:
+            payload['user']?.toString() ?? payload['userId']?.toString() ?? '',
+        timestamp: resolvedTimestamp,
         latitude: lat,
         longitude: lng,
         method: method,
         notes: notes,
         isSynced: true,
-        createdAt: DateTime.now(),
+        createdAt: DateTime.tryParse(payload['createdAt']?.toString() ?? '') ??
+            resolvedTimestamp,
       );
 
-      // Cache locally
-      await hive.saveCheckIn(checkIn);
+      await _persistCanonicalCheckIn(checkIn);
       await prefs.setLastCheckIn(checkIn.timestamp);
 
       return checkIn;
+    } on AlreadyCheckedInException catch (e) {
+      final canonical = _resolveExistingCheckIn(
+        existingPayload: e.existingCheckIn,
+        fallbackTime: performedAt,
+        latitude: lat,
+        longitude: lng,
+        method: method,
+        notes: notes,
+      );
+      await _persistCanonicalCheckIn(canonical);
+      await prefs.setLastCheckIn(canonical.timestamp);
+      return canonical;
     } catch (e) {
       debugPrint('Backend check-in failed, saving locally: $e');
 
@@ -96,16 +119,16 @@ class CheckInRepository {
       final checkIn = CheckInModel(
         id: _uuid.v4(),
         userId: user?.id ?? 'offline',
-        timestamp: DateTime.now(),
+        timestamp: performedAt,
         latitude: lat,
         longitude: lng,
         method: method,
         notes: notes,
         isSynced: false,
-        createdAt: DateTime.now(),
+        createdAt: performedAt,
       );
 
-      await hive.saveCheckIn(checkIn);
+      await _persistCanonicalCheckIn(checkIn);
       await prefs.setLastCheckIn(checkIn.timestamp);
       return checkIn;
     }
@@ -144,9 +167,7 @@ class CheckInRepository {
 
       for (final item in remote) {
         final model = _apiMapToCheckinModel(item, isSynced: true);
-        if (!_hasLocalEquivalent(model)) {
-          await hive.saveCheckIn(model);
-        }
+        await _persistCanonicalCheckIn(model);
       }
 
       await _saveHistoryCache(merged);
@@ -197,21 +218,61 @@ class CheckInRepository {
 
   /// Sync pending check-ins with server
   Future<void> syncPendingCheckIns() async {
-    final pending = hive.getPendingSyncCheckIns();
+    final pending = hive.getPendingSyncCheckIns()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
     if (pending.isEmpty) return;
 
     debugPrint('Syncing ${pending.length} pending check-ins...');
 
+    List<Map<String, dynamic>> remoteHistory = <Map<String, dynamic>>[];
+    try {
+      final response = await api.getHistory(limit: 100, skip: 0);
+      remoteHistory =
+          List<Map<String, dynamic>>.from(response['checkIns'] ?? []);
+    } catch (e) {
+      debugPrint('Unable to preload remote check-in history: $e');
+    }
+
     for (final checkIn in pending) {
+      final localMap = checkinModelToApiMap(checkIn);
+
+      if (remoteHistory.any((item) => _isSameLogicalCheckIn(item, localMap))) {
+        final remoteMatch = remoteHistory.firstWhere(
+          (item) => _isSameLogicalCheckIn(item, localMap),
+        );
+        final canonical = _apiMapToCheckinModel(remoteMatch, isSynced: true);
+        await _persistCanonicalCheckIn(canonical);
+        continue;
+      }
+
       try {
-        await api.checkIn(
+        final response = await api.checkIn(
           latitude: checkIn.latitude ?? 23.8103,
           longitude: checkIn.longitude ?? 90.4125,
           status: 'safe',
           note: checkIn.notes,
+          timestamp: checkIn.timestamp,
+          clientGeneratedId: checkIn.id,
         );
-        await hive.markCheckInAsSynced(checkIn.id);
+        final syncedModel = _buildSyncedCheckIn(checkIn, response);
+        await _persistCanonicalCheckIn(syncedModel);
+        remoteHistory.insert(0, checkinModelToApiMap(syncedModel));
+      } on AlreadyCheckedInException catch (e) {
+        final canonical = _resolveExistingCheckIn(
+          existingPayload: e.existingCheckIn,
+          fallbackTime: checkIn.timestamp,
+          latitude: checkIn.latitude ?? 23.8103,
+          longitude: checkIn.longitude ?? 90.4125,
+          method: checkIn.method,
+          notes: checkIn.notes,
+        );
+        await _persistCanonicalCheckIn(canonical);
+        remoteHistory.insert(0, checkinModelToApiMap(canonical));
       } catch (e) {
+        if (_isAlreadyCheckedInError(e)) {
+          await hive.deleteCheckIn(checkIn.id);
+          continue;
+        }
         debugPrint('Failed to sync pending check-in ${checkIn.id}: $e');
       }
     }
@@ -299,13 +360,24 @@ class CheckInRepository {
     List<Map<String, dynamic>> local,
   ) {
     final merged = <Map<String, dynamic>>[];
-    final seenKeys = <String>{};
+    final combined = [...remote, ...local]..sort((a, b) {
+        final aTime =
+            _parseCheckinTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime =
+            _parseCheckinTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return aTime.compareTo(bTime);
+      });
 
-    for (final item in [...remote, ...local]) {
+    for (final item in combined) {
       final normalized = Map<String, dynamic>.from(item);
-      final key = _historyKey(normalized);
-      if (seenKeys.add(key)) {
+      final existingIndex = merged.indexWhere(
+        (entry) => _isSameLogicalCheckIn(entry, normalized),
+      );
+      if (existingIndex == -1) {
         merged.add(normalized);
+      } else {
+        merged[existingIndex] =
+            _mergeHistoryEntry(merged[existingIndex], normalized);
       }
     }
 
@@ -319,16 +391,6 @@ class CheckInRepository {
     return merged;
   }
 
-  String _historyKey(Map<String, dynamic> item) {
-    final dt = _parseCheckinTime(item);
-    final epochMinute = dt == null ? 0 : dt.millisecondsSinceEpoch ~/ 60000;
-    final lat =
-        (item['latitude'] ?? item['location']?['latitude'] ?? 0).toString();
-    final lng =
-        (item['longitude'] ?? item['location']?['longitude'] ?? 0).toString();
-    return '$epochMinute-$lat-$lng';
-  }
-
   DateTime? _parseCheckinTime(Map<String, dynamic> item) {
     final raw = item['checkInTime'] ?? item['timestamp'] ?? item['createdAt'];
     if (raw == null) return null;
@@ -339,6 +401,7 @@ class CheckInRepository {
     return {
       'id': model.id,
       'userId': model.userId,
+      'clientGeneratedId': model.id,
       'checkInTime': model.timestamp.toIso8601String(),
       'timestamp': model.timestamp.toIso8601String(),
       'createdAt': model.createdAt.toIso8601String(),
@@ -376,11 +439,221 @@ class CheckInRepository {
     );
   }
 
-  bool _hasLocalEquivalent(CheckInModel candidate) {
-    final candidateKey = _historyKey(checkinModelToApiMap(candidate));
-    return hive
-        .getAllCheckIns()
-        .any((item) => _historyKey(checkinModelToApiMap(item)) == candidateKey);
+  Map<String, dynamic> _extractCheckInPayload(Map<String, dynamic> response) {
+    final raw = response['checkIn'];
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return <String, dynamic>{};
+  }
+
+  CheckInModel _buildSyncedCheckIn(
+    CheckInModel localCheckIn,
+    Map<String, dynamic> response,
+  ) {
+    final payload = _extractCheckInPayload(response);
+    final syncedTimestamp =
+        _parseCheckinTime(payload) ?? localCheckIn.timestamp;
+    final syncedLatitude =
+        (payload['latitude'] ?? payload['location']?['latitude'] as num?)
+            ?.toDouble();
+    final syncedLongitude =
+        (payload['longitude'] ?? payload['location']?['longitude'] as num?)
+            ?.toDouble();
+
+    return localCheckIn.copyWith(
+      id: payload['_id']?.toString() ??
+          payload['id']?.toString() ??
+          localCheckIn.id,
+      userId: payload['user']?.toString() ??
+          payload['userId']?.toString() ??
+          localCheckIn.userId,
+      timestamp: syncedTimestamp,
+      latitude: syncedLatitude ?? localCheckIn.latitude,
+      longitude: syncedLongitude ?? localCheckIn.longitude,
+      notes: payload['note']?.toString() ??
+          payload['notes']?.toString() ??
+          localCheckIn.notes,
+      isSynced: true,
+      createdAt: DateTime.tryParse(payload['createdAt']?.toString() ?? '') ??
+          localCheckIn.createdAt,
+    );
+  }
+
+  bool _isAlreadyCheckedInError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('already checked in today') ||
+        message.contains('already checked in');
+  }
+
+  bool _isSameLogicalCheckIn(
+    Map<String, dynamic> first,
+    Map<String, dynamic> second,
+  ) {
+    if (_sameNonEmptyValue(
+      _extractClientGeneratedId(first),
+      _extractClientGeneratedId(second),
+    )) {
+      return true;
+    }
+
+    if (_sameNonEmptyValue(_extractStableId(first), _extractStableId(second))) {
+      return true;
+    }
+
+    final firstTime = _parseCheckinTime(first);
+    final secondTime = _parseCheckinTime(second);
+    if (firstTime == null || secondTime == null) {
+      return false;
+    }
+
+    final firstUserId = _extractUserId(first);
+    final secondUserId = _extractUserId(second);
+    if (_hasMeaningfulValue(firstUserId) &&
+        _hasMeaningfulValue(secondUserId) &&
+        firstUserId != secondUserId) {
+      return false;
+    }
+
+    final timeDifference = firstTime.difference(secondTime).abs();
+    return timeDifference < const Duration(hours: 24);
+  }
+
+  Map<String, dynamic> _mergeHistoryEntry(
+    Map<String, dynamic> existing,
+    Map<String, dynamic> incoming,
+  ) {
+    final existingTime = _parseCheckinTime(existing);
+    final incomingTime = _parseCheckinTime(incoming);
+    final preferIncoming = existingTime == null ||
+        (incomingTime != null && incomingTime.isBefore(existingTime));
+
+    final preferred =
+        Map<String, dynamic>.from(preferIncoming ? incoming : existing);
+    final secondary =
+        Map<String, dynamic>.from(preferIncoming ? existing : incoming);
+
+    const fields = <String>[
+      '_id',
+      'id',
+      'user',
+      'userId',
+      'method',
+      'status',
+      'notes',
+      'note',
+      'checkInTime',
+      'timestamp',
+      'createdAt',
+      'clientGeneratedId',
+    ];
+
+    for (final field in fields) {
+      if (!_hasMeaningfulValue(preferred[field]) &&
+          _hasMeaningfulValue(secondary[field])) {
+        preferred[field] = secondary[field];
+      }
+    }
+
+    if ((preferred['isSynced'] != true) && secondary['isSynced'] == true) {
+      preferred['isSynced'] = true;
+      preferred['_id'] ??= secondary['_id'];
+      preferred['id'] ??= secondary['id'];
+    } else {
+      preferred['isSynced'] =
+          preferred['isSynced'] == true || secondary['isSynced'] == true;
+    }
+
+    final preferredLat =
+        preferred['latitude'] ?? preferred['location']?['latitude'];
+    final preferredLng =
+        preferred['longitude'] ?? preferred['location']?['longitude'];
+    if (preferredLat == null || preferredLng == null) {
+      final secondaryLocation = secondary['location'];
+      if (secondaryLocation is Map) {
+        preferred['location'] ??= Map<String, dynamic>.from(secondaryLocation);
+      }
+      preferred['latitude'] ??= secondary['latitude'];
+      preferred['longitude'] ??= secondary['longitude'];
+    }
+
+    return preferred;
+  }
+
+  bool _hasMeaningfulValue(Object? value) {
+    if (value == null) return false;
+    if (value is String) return value.trim().isNotEmpty;
+    return true;
+  }
+
+  Future<void> _persistCanonicalCheckIn(CheckInModel canonical) async {
+    final canonicalMap = checkinModelToApiMap(canonical);
+    for (final item in hive.getAllCheckIns()) {
+      if (item.id == canonical.id) continue;
+      if (_isSameLogicalCheckIn(checkinModelToApiMap(item), canonicalMap)) {
+        await hive.deleteCheckIn(item.id);
+      }
+    }
+    await hive.saveCheckIn(canonical);
+  }
+
+  CheckInModel? _findExistingCheckInAround(DateTime timestamp) {
+    for (final item in hive.getAllCheckIns()) {
+      final difference = item.timestamp.difference(timestamp).abs();
+      if (difference < const Duration(hours: 24)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  CheckInModel _resolveExistingCheckIn({
+    required Map<String, dynamic>? existingPayload,
+    required DateTime fallbackTime,
+    required double latitude,
+    required double longitude,
+    required String method,
+    required String? notes,
+  }) {
+    if (existingPayload != null && existingPayload.isNotEmpty) {
+      return _apiMapToCheckinModel(existingPayload, isSynced: true);
+    }
+
+    final localExisting = _findExistingCheckInAround(fallbackTime);
+    if (localExisting != null) {
+      return localExisting.copyWith(isSynced: true);
+    }
+
+    final user = hive.getCurrentUser();
+    return CheckInModel(
+      id: _uuid.v4(),
+      userId: user?.id ?? '',
+      timestamp: fallbackTime,
+      latitude: latitude,
+      longitude: longitude,
+      method: method,
+      notes: notes,
+      isSynced: true,
+      createdAt: fallbackTime,
+    );
+  }
+
+  String? _extractStableId(Map<String, dynamic> item) {
+    return item['_id']?.toString() ?? item['id']?.toString();
+  }
+
+  String? _extractClientGeneratedId(Map<String, dynamic> item) {
+    return item['clientGeneratedId']?.toString();
+  }
+
+  String? _extractUserId(Map<String, dynamic> item) {
+    return item['userId']?.toString() ?? item['user']?.toString();
+  }
+
+  bool _sameNonEmptyValue(String? first, String? second) {
+    return _hasMeaningfulValue(first) &&
+        _hasMeaningfulValue(second) &&
+        first == second;
   }
 
   Future<void> _saveHistoryCache(List<Map<String, dynamic>> history) async {

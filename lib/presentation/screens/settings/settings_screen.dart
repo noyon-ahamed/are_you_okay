@@ -20,13 +20,16 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../provider/checkin_provider.dart';
+import '../../../provider/mood_provider.dart';
 import '../../../routes/app_router.dart';
 import '../../../services/api/checkin_api_service.dart';
+import '../../../services/api/mood_api_service.dart';
 import '../../../services/shared_prefs_service.dart';
 import '../../../services/auth/token_storage_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../services/location_service.dart';
+import '../../../services/local_notification_history_service.dart';
 import '../../../services/notification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -683,7 +686,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: isDark
-                                ? [AppColors.surfaceVariantDark, AppColors.surfaceDark]
+                                ? [
+                                    AppColors.surfaceVariantDark,
+                                    AppColors.surfaceDark
+                                  ]
                                 : const [Color(0xFFE7F4EE), Color(0xFFF8F7F3)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -978,6 +984,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     required AppStrings s,
   }) async {
     try {
+      final sessionToken = await SharedPrefsService.getToken();
+      final currentUserId = await TokenStorageService.getUserId();
+
       // 1. Always clear local Hive data
       final checkInBox = await Hive.openBox('checkin_box');
       await checkInBox.clear();
@@ -998,38 +1007,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
       // NEW: Cancel all scheduled and active local notifications
       await LocalNotificationService().cancelAllNotifications();
+      await LocalNotificationHistoryService().clearHistory();
+      await MoodApiService().clearCache();
 
       // 2. Clear relevant SharedPreferences keys
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('last_checkin_time');
       await prefs.remove(AppConstants.keyLastCheckin);
       await prefs.remove(AppConstants.keyCheckinInterval);
+      await prefs.remove('checkin_history_cache_v1');
+      await prefs.remove('checkin_history_cache_meta_v1');
       await prefs.remove('mood_history_cache');
       await prefs.remove('mood_stats_cache');
+      await prefs.remove('mood_history_cache_meta');
 
       if (clearServer) {
         // Online path — try to clear server immediately
         bool serverCleared = false;
         try {
           final dio = Dio();
-          final token = await SharedPrefsService.getToken();
-          if (token != null) {
+          if (sessionToken != null) {
             await dio
                 .delete(
                   '${AppConstants.apiBaseUrl}/checkin',
-                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                  options: Options(
+                      headers: {'Authorization': 'Bearer $sessionToken'}),
                 )
                 .timeout(const Duration(seconds: 5));
             await dio
                 .delete(
                   '${AppConstants.apiBaseUrl}/mood',
-                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                  options: Options(
+                      headers: {'Authorization': 'Bearer $sessionToken'}),
                 )
                 .timeout(const Duration(seconds: 5));
             await dio
                 .delete(
                   '${AppConstants.apiBaseUrl}/notification',
-                  options: Options(headers: {'Authorization': 'Bearer $token'}),
+                  options: Options(
+                      headers: {'Authorization': 'Bearer $sessionToken'}),
                 )
                 .timeout(const Duration(seconds: 5));
             serverCleared = true;
@@ -1041,13 +1057,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         // If server clear failed even online, queue it for retry
         if (!serverCleared) {
           final prefsService = ref.read(sharedPrefsServiceProvider);
-          await prefsService.setPendingServerClear(true);
+          await prefsService.setPendingServerClear(
+            true,
+            userId: currentUserId,
+          );
+        } else {
+          await ref
+              .read(sharedPrefsServiceProvider)
+              .setPendingServerClear(false);
         }
 
         // 3. Invalidate providers AFTER server is cleared
         ref.invalidate(checkinHistoryFromBackendProvider);
         ref.invalidate(checkinStatusProvider);
         ref.invalidate(userStatsFromBackendProvider);
+        ref.invalidate(moodHistoryProvider);
+        ref.invalidate(moodStatsProvider);
         // ref.invalidate(contactProvider); // Do not invalidate contacts
 
         if (mounted) {
@@ -1067,12 +1092,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       } else {
         // Offline path — mark pending server clear for background sync
         final prefsService = ref.read(sharedPrefsServiceProvider);
-        await prefsService.setPendingServerClear(true);
+        await prefsService.setPendingServerClear(
+          true,
+          userId: currentUserId,
+        );
 
         // 3. Invalidate providers for offline mode
         ref.invalidate(checkinHistoryFromBackendProvider);
         ref.invalidate(checkinStatusProvider);
         ref.invalidate(userStatsFromBackendProvider);
+        ref.invalidate(moodHistoryProvider);
+        ref.invalidate(moodStatsProvider);
 
         if (mounted) {
           scaffoldMessenger.showSnackBar(
@@ -1424,8 +1454,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       s.isBangla
                           ? 'ব্যক্তিগত স্বাস্থ্য প্রতিবেদন'
                           : 'Personal Health Report',
-                      style:
-                          const pw.TextStyle(fontSize: 24, color: PdfColors.grey700)),
+                      style: const pw.TextStyle(
+                          fontSize: 24, color: PdfColors.grey700)),
                   pw.SizedBox(height: 40),
                   pw.Text(
                       '${s.isBangla ? 'তারিখ' : 'Date'}: ${DateTime.now().toString().split(' ')[0]}',

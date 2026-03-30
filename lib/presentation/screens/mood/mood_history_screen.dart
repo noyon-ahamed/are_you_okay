@@ -6,7 +6,6 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decorations.dart';
-import '../../../services/mood_local_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
 import '../../../provider/checkin_provider.dart';
@@ -311,21 +310,6 @@ class _MoodHistoryScreenState extends ConsumerState<MoodHistoryScreen>
         // Show cached history on error (offline)
         if (_cachedHistory != null) {
           return _buildHistoryList(_cachedHistory!, isDark, context, s);
-        }
-
-        // Fallback to local pending moods
-        final localMoods = ref.read(moodLocalServiceProvider).getPendingMoods();
-        if (localMoods.isNotEmpty) {
-          return SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final s = ref.watch(stringsProvider);
-                final moodData = localMoods[index];
-                return _buildMoodItem(context, moodData, isDark, s);
-              },
-              childCount: localMoods.length,
-            ),
-          );
         }
 
         return SliverToBoxAdapter(

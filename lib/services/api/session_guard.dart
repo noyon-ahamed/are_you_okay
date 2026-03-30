@@ -13,6 +13,10 @@ const Set<String> _sessionRevocationErrorCodes = {
 };
 
 bool shouldForceLogout(DioException error) {
+  if (error.requestOptions.extra['skipForceLogout'] == true) {
+    return false;
+  }
+
   final statusCode = error.response?.statusCode;
   final payload = error.response?.data;
   final errorCode =

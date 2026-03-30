@@ -3,11 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-final moodLocalServiceProvider = Provider<MoodLocalService>((ref) => MoodLocalService());
+final moodLocalServiceProvider =
+    Provider<MoodLocalService>((ref) => MoodLocalService());
 
 /// Stores mood entries locally for offline support.
 /// Pending moods are synced to the backend when connectivity is restored.
 class MoodLocalService {
+  static final MoodLocalService _instance = MoodLocalService._internal();
+  factory MoodLocalService() => _instance;
+  MoodLocalService._internal();
+
   static const String _boxName = 'mood_pending_box';
   Box? _box;
 
@@ -20,14 +25,16 @@ class MoodLocalService {
   Future<void> saveMoodLocally({
     required String mood,
     String? note,
+    DateTime? timestamp,
   }) async {
     final box = await _getBox();
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final savedAt = timestamp ?? DateTime.now();
+    final id = savedAt.microsecondsSinceEpoch.toString();
     final entry = {
       'id': id,
       'mood': mood,
       'note': note,
-      'timestamp': DateTime.now().toIso8601String(),
+      'timestamp': savedAt.toIso8601String(),
       'isSynced': false,
     };
     await box.put(id, jsonEncode(entry));
@@ -35,12 +42,12 @@ class MoodLocalService {
   }
 
   /// Get all pending (unsynced) moods
-  List<Map<String, dynamic>> getPendingMoods() {
-    if (_box == null || !_box!.isOpen) return [];
+  Future<List<Map<String, dynamic>>> getPendingMoods() async {
+    final box = await _getBox();
     final List<Map<String, dynamic>> pending = [];
-    for (var i = 0; i < _box!.length; i++) {
+    for (var i = 0; i < box.length; i++) {
       try {
-        final jsonString = _box!.getAt(i);
+        final jsonString = box.getAt(i);
         if (jsonString != null) {
           final entry = jsonDecode(jsonString) as Map<String, dynamic>;
           if (entry['isSynced'] != true) {

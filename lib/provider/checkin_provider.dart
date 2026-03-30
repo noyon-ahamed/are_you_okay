@@ -107,7 +107,7 @@ class CheckInNotifier extends StateNotifier<CheckInState> {
 
   CheckInNotifier(this._repository) : super(const CheckInInitial());
 
-  Future<void> performCheckIn({
+  Future<CheckInModel> performCheckIn({
     double? latitude,
     double? longitude,
     String method = 'button',
@@ -123,16 +123,19 @@ class CheckInNotifier extends StateNotifier<CheckInState> {
         notes: notes,
       );
 
-      if (!mounted) return;
+      if (!mounted) return checkIn;
       state = CheckInSuccess(checkIn);
 
       // Reset to initial after a delay
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      state = const CheckInInitial();
+      unawaited(Future<void>.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        state = const CheckInInitial();
+      }));
+      return checkIn;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) rethrow;
       state = CheckInError(e.toString());
+      rethrow;
     }
   }
 }
@@ -241,21 +244,31 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
   }
 
   /// Called after a successful check-in to refresh status
-  Future<void> onCheckInComplete() async {
-    try {
-      if (!mounted) return;
-      state = state.copyWith(isLoading: true);
+  Future<void> onCheckInComplete({required DateTime checkInTime}) async {
+    if (!mounted) return;
 
+    state = CheckInStatusData(
+      lastCheckIn: checkInTime,
+      hoursSinceLastCheckIn: 0,
+      needsCheckIn: false,
+      canCheckIn: false,
+      nextCheckInTime: checkInTime.add(const Duration(hours: 24)),
+      streak: state.streak,
+      isAtRisk: false,
+      isLoading: false,
+    );
+
+    try {
       final stats = await _repository.fetchStatus();
 
       if (!mounted) return;
 
       state = state.copyWith(
-        lastCheckIn: DateTime.now(),
+        lastCheckIn: checkInTime,
         needsCheckIn: false,
         canCheckIn: false,
-        nextCheckInTime: DateTime.now().add(const Duration(hours: 24)),
-        streak: stats['streak'] as int? ?? (state.streak + 1),
+        nextCheckInTime: checkInTime.add(const Duration(hours: 24)),
+        streak: stats['streak'] as int? ?? state.streak,
         isAtRisk: false,
         isLoading: false,
       );

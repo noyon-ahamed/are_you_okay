@@ -160,16 +160,27 @@ class SharedPrefsService {
     return _prefs?.getBool('pending_server_clear') ?? false;
   }
 
-  Future<void> setPendingServerClear(bool value) async {
+  String? get pendingClearUserId {
+    return _prefs?.getString('pending_clear_user_id');
+  }
+
+  Future<void> setPendingServerClear(bool value, {String? userId}) async {
     if (value) {
       await _prefs?.setBool('pending_server_clear', true);
       await _prefs?.setInt(
         'pending_clear_timestamp',
         DateTime.now().millisecondsSinceEpoch,
       );
+      final ownerId = userId ?? _prefs?.getString('user_id');
+      if (ownerId != null && ownerId.isNotEmpty) {
+        await _prefs?.setString('pending_clear_user_id', ownerId);
+      } else {
+        await _prefs?.remove('pending_clear_user_id');
+      }
     } else {
       await _prefs?.remove('pending_server_clear');
       await _prefs?.remove('pending_clear_timestamp');
+      await _prefs?.remove('pending_clear_user_id');
     }
   }
 

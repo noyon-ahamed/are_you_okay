@@ -192,6 +192,17 @@ class OfflineSyncService {
         return;
       }
 
+      final pendingUserId = prefs.pendingClearUserId;
+      final currentUserId = await TokenStorageService.getUserId();
+      if (pendingUserId != null &&
+          pendingUserId.isNotEmpty &&
+          currentUserId != pendingUserId) {
+        debugPrint(
+          'Pending server clear belongs to another account. Skipping sync.',
+        );
+        return;
+      }
+
       final dio = Dio();
       bool checkinCleared = false;
       bool moodCleared = false;
@@ -249,7 +260,7 @@ class OfflineSyncService {
     try {
       final moodLocal = ref.read(moodLocalServiceProvider);
       final moodApi = MoodApiService();
-      final pendingMoods = moodLocal.getPendingMoods();
+      final pendingMoods = await moodLocal.getPendingMoods();
 
       if (pendingMoods.isEmpty) return;
 

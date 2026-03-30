@@ -102,8 +102,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
       });
 
-      // Fetch check-in status from server
-      ref.read(checkinStatusProvider.notifier).fetchStatus();
       _handlePendingReminderAction();
 
       // Initialize Voice SOS if enabled
@@ -233,7 +231,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _requestPermissions() async {
     // We delay slightly to let the home screen settle
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 300));
 
     try {
       final notifService = LocalNotificationService();
@@ -1211,14 +1209,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // Visual 2-second loading state
       await Future.delayed(const Duration(seconds: 2));
 
-      await ref.read(checkinProvider.notifier).performCheckIn(
+      final checkIn = await ref.read(checkinProvider.notifier).performCheckIn(
             method: 'button',
             notes: notes,
           );
 
       // Update status after check-in ONLY if successful
       if (mounted) {
-        ref.read(checkinStatusProvider.notifier).onCheckInComplete();
+        ref
+            .read(checkinStatusProvider.notifier)
+            .onCheckInComplete(checkInTime: checkIn.timestamp);
         ref.invalidate(checkinHistoryProvider); // Refresh local history UI
 
         // Cancel remaining check-in reminder notifications & schedule new ones
@@ -1231,7 +1231,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         // Use SharedPrefsService so background_service.dart reads the same key ('last_checkin' int)
         await ref
             .read(sharedPrefsServiceProvider)
-            .setLastCheckIn(DateTime.now());
+            .setLastCheckIn(checkIn.timestamp);
 
         setState(() {
           _selectedMood = -1;
@@ -1290,8 +1290,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final moodKey = moodKeys[_selectedMood];
     final noteText = _moodNoteController.text.trim();
-    final note =
-        noteText.isNotEmpty ? noteText : s.moodLabels[_selectedMood];
+    final note = noteText.isNotEmpty ? noteText : s.moodLabels[_selectedMood];
 
     try {
       // Check connectivity first
@@ -1318,10 +1317,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // Refresh history to trigger cooldown
         ref.invalidate(moodHistoryProvider);
-        
+
         setState(() {
           _selectedMood = -1;
           _selectedMoodState.value = -1;
@@ -1346,7 +1345,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               duration: const Duration(seconds: 4),
             ),
           );
-          
+
           // Reset mood selection so the button disappears
           setState(() {
             _selectedMood = -1;

@@ -52,10 +52,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _runLaunchChecks() async {
-    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    final startedAt = DateTime.now();
 
     try {
-      final config = await _configApiService.getConfig();
+      final config = await _configApiService
+          .getConfig()
+          .timeout(const Duration(seconds: 2));
       final maintenanceMode = config['maintenanceMode'] == true;
       final minAppVersion =
           ((config['minAppVersion'] as Map<String, dynamic>?) ??
@@ -88,6 +90,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
     } catch (_) {
       // Config fetch is best-effort. If it fails, allow the app to continue.
+    }
+
+    const minSplashDuration = Duration(milliseconds: 350);
+    final elapsed = DateTime.now().difference(startedAt);
+    if (elapsed < minSplashDuration) {
+      await Future<void>.delayed(minSplashDuration - elapsed);
     }
 
     if (mounted) {

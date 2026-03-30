@@ -130,7 +130,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       });
     } catch (e) {
       debugPrint('AuthNotifier: Login error: $e');
-      state = AuthError(e.toString());
+      state = AuthError(_normalizeAuthMessage(e));
     }
   }
 
@@ -162,28 +162,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     debugPrint('AuthNotifier: logout started');
 
-    // ✅ Step 1: Remove FCM token & logout from backend FIRST
-    // The auth bearer token is still valid at this point, so the
-    // removeFcmToken() API call will succeed. This is CRITICAL —
-    // if we clear tokens first, the FCM removal fails silently and
-    // the backend keeps sending push notifications to this device
-    // for the logged-out user.
     _socketService.disconnect();
     try {
-      await _authRepository.logout();
+      await _authRepository.logout().timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('AuthNotifier: Error during repository logout: $e');
     }
 
-    // ✅ Step 2: Now clear local tokens (safe — FCM removal is done)
     try {
+      await HiveService().deleteUser();
       await TokenStorageService.clearAll();
       await SharedPrefsService().logout();
     } catch (e) {
       debugPrint('AuthNotifier: Error clearing tokens: $e');
     }
 
-    // ✅ Step 3: Clear all persistent data
+    if (mounted) {
+      state = const AuthUnauthenticated();
+    }
+    debugPrint('AuthNotifier: State set to Unauthenticated');
+
+    Future.microtask(() {
+      _ref.invalidate(checkinStatusProvider);
+      _ref.invalidate(checkinHistoryFromBackendProvider);
+      _ref.invalidate(moodHistoryProvider);
+      _ref.invalidate(moodStatsProvider);
+      _ref.invalidate(contactProvider);
+      debugPrint('AuthNotifier: All providers invalidated');
+    });
+
+    unawaited(_finishLogoutCleanup());
+  }
+
+  Future<void> _finishLogoutCleanup() async {
     try {
       await HiveService().clearAllData();
       await MoodApiService().clearCache();
@@ -194,22 +205,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       debugPrint('AuthNotifier: Error during data cleanup: $e');
     }
-
-    // ✅ Step 4: Set state to Unauthenticated — router navigates to /login
-    if (mounted) {
-      state = const AuthUnauthenticated();
-    }
-    debugPrint('AuthNotifier: State set to Unauthenticated');
-
-    // ✅ Step 5: Invalidate all providers after data is cleared
-    Future.microtask(() {
-      _ref.invalidate(checkinStatusProvider);
-      _ref.invalidate(checkinHistoryFromBackendProvider);
-      _ref.invalidate(moodHistoryProvider);
-      _ref.invalidate(moodStatsProvider);
-      _ref.invalidate(contactProvider);
-      debugPrint('AuthNotifier: All providers invalidated');
-    });
   }
 
   Future<void> updateProfile({
@@ -363,6 +358,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
             current.earthquakeCountry,
       ),
     );
+  }
+
+  String _normalizeAuthMessage(Object error) {
+    if (error is DioException) {
+      return error.response?.data?['errorCode']?.toString() ??
+          error.response?.data?['error']?.toString() ??
+          error.message ??
+          'Network error';
+    }
+
+    return error.toString().replaceFirst('Exception: ', '');
   }
 }
 

@@ -83,15 +83,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             email: _emailController.value.text.trim(),
             password: _passwordController.value.text,
           );
-
-      if (mounted) {
-        final authState = ref.read(authProvider);
-        if (authState is AuthAuthenticated) {
-          context.go('/home');
-        } else if (authState is AuthError) {
-          _showError(authState.message);
-        }
-      }
     } catch (e) {
       if (mounted) {
         String msg = e.toString();
@@ -164,6 +155,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (!mounted) return;
+
+      if (_isLoading && next is! AuthLoading) {
+        setState(() => _isLoading = false);
+      }
+
+      if (next is AuthAuthenticated && previous is! AuthAuthenticated) {
+        context.go('/home');
+      } else if (next is AuthError &&
+          (previous is! AuthError || previous.message != next.message)) {
+        _showError(next.message);
+      }
+    });
+
     final s = ref.watch(stringsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
