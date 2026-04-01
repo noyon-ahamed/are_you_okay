@@ -25,6 +25,7 @@ import 'services/api/auth_api_service.dart';
 import 'services/hive_service.dart';
 import 'services/local_notification_history_service.dart';
 import 'services/shared_prefs_service.dart';
+import 'services/earthquake_alarm_service.dart';
 import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
 import 'services/notification_sync_service.dart';
@@ -68,6 +69,7 @@ void main() async {
 
   sharedPrefsService = SharedPrefsService();
   await sharedPrefsService.init();
+  await _primeInitialActiveCallState();
 
   runApp(
     ProviderScope(
@@ -106,6 +108,9 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     if (_servicesBootstrapped) return;
     _servicesBootstrapped = true;
 
+    _listenToCallKitEvents();
+    unawaited(_checkActiveCalls());
+
     await Future<void>.delayed(const Duration(milliseconds: 800));
 
     try {
@@ -118,10 +123,6 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     } catch (e) {
       debugPrint('Firebase initialization warning: $e');
     }
-
-    _listenToCallKitEvents();
-    unawaited(_checkActiveCalls());
-
     final bool isSimulator = Platform.isIOS &&
         Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
     if (!isSimulator) {
@@ -294,6 +295,18 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
   }
 }
 
+Future<void> _primeInitialActiveCallState() async {
+  try {
+    final calls = await FlutterCallkitIncoming.activeCalls();
+    final activeCall = _resolveActiveCall(calls, preferAccepted: true);
+    if (activeCall != null) {
+      globalActiveCallNotifier.value = activeCall;
+    }
+  } catch (e) {
+    debugPrint('Initial active call check failed: $e');
+  }
+}
+
 Map<String, dynamic>? _resolveActiveCall(
   dynamic rawCalls, {
   bool preferAccepted = false,
@@ -352,6 +365,13 @@ bool _asBool(dynamic value) {
   return false;
 }
 
+int _localNotificationIdForData(Map<String, dynamic> data) {
+  final rawId = data['eventId']?.toString() ??
+      data['notificationId']?.toString() ??
+      '${data['type'] ?? 'alert'}-${data['route'] ?? ''}';
+  return rawId.hashCode & 0x7fffffff;
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -370,6 +390,48 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 
   debugPrint("Handling a background message: ${message.messageId}");
+
+  final data = message.data;
+  final distanceKmStr = data['distanceKm'];
+  bool isSeismicClose = data['isClose'] == '1';
+  if (!isSeismicClose && distanceKmStr != null) {
+    final distance = double.tryParse(distanceKmStr);
+    if (distance != null && distance < 100) {
+      isSeismicClose = true;
+    }
+  }
+
+  if (isSeismicClose) {
+    final title =
+        message.notification?.title ?? data['title'] ?? 'Earthquake Alert';
+    final body = message.notification?.body ?? data['body'] ?? '';
+    final payload = NotificationNavigationService.encodePayload({
+      'route': _routeForNotificationType(data),
+      'action': _actionForNotificationType(data),
+      'type': data['type'] ?? 'earthquake',
+      'eventId': data['eventId'] ?? '',
+      'source': 'push_background',
+    });
+    final localNotificationId = _localNotificationIdForData(data);
+
+    await EarthquakeAlarmService().startCloseAlert(
+      eventId: data['eventId']?.toString() ??
+          'close-${localNotificationId.toString()}',
+    );
+
+    final notifService = LocalNotificationService();
+    await notifService.initialize(
+      onNotificationTap: (_) {},
+    );
+    await notifService.showEmergencyAlert(
+      id: localNotificationId,
+      title: title,
+      body: body,
+      payload: payload,
+      isSeismicClose: true,
+    );
+  }
+
   await _saveFirebaseMessageToHistory(message);
 }
 
@@ -412,8 +474,10 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
     'route': _routeForNotificationType(data),
     'action': _actionForNotificationType(data),
     'type': data['type'] ?? 'alert',
+    'eventId': data['eventId'] ?? '',
     'source': 'push',
   });
+  final localNotificationId = _localNotificationIdForData(data);
 
   if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
     await notifService.showCheckinReminder(
@@ -422,7 +486,12 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
       payload: payload,
     );
   } else if (data['isClose'] == '1' || isSeismicClose) {
+    await EarthquakeAlarmService().startCloseAlert(
+      eventId: data['eventId']?.toString() ??
+          'close-${localNotificationId.toString()}',
+    );
     await notifService.showEmergencyAlert(
+      id: localNotificationId,
       title: title,
       body: body,
       payload: payload,
@@ -430,7 +499,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
     );
   } else {
     await notifService.showNotification(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: localNotificationId,
       title: title,
       body: body,
       payload: payload,

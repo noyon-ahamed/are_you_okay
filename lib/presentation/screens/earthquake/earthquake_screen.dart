@@ -13,7 +13,10 @@ import '../../../core/theme/app_decorations.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../services/api/auth_api_service.dart';
 import '../../../services/api/earthquake_service.dart';
+import '../../../services/earthquake_alarm_service.dart';
 import '../../../services/location_service.dart';
+import '../../../services/notification_navigation_service.dart';
+import '../../../services/notification_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../core/localization/app_strings.dart';
 
@@ -414,12 +417,34 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
   Future<void> _playSirenAlert(_EarthquakeData quake) async {
     try {
       _shownDangerAlerts.add(quake.eventId);
+      final s = ref.read(stringsProvider);
+      final notificationBody =
+          '${quake.location} • ${quake.magnitude.toStringAsFixed(1)}M'
+          '${quake.distanceKm != null ? ' • ${quake.distanceKm!.toStringAsFixed(0)} km' : ''}';
+      await EarthquakeAlarmService().startCloseAlert(eventId: quake.eventId);
+
+      final localNotificationService = LocalNotificationService();
+      await localNotificationService.initialize(
+        onNotificationTap: NotificationNavigationService.handlePayload,
+      );
+      await localNotificationService.showEmergencyAlert(
+        id: quake.eventId.hashCode & 0x7fffffff,
+        title: s.earthquakeAlertTitle,
+        body: notificationBody,
+        payload: NotificationNavigationService.encodePayload({
+          'route': '/earthquake',
+          'type': 'earthquake',
+          'eventId': quake.eventId,
+          'source': 'screen_fetch',
+        }),
+        isSeismicClose: true,
+      );
+
       if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) {
-            final s = ref.read(stringsProvider);
             return AlertDialog(
               backgroundColor: AppColors.error,
               shape: RoundedRectangleBorder(
@@ -456,7 +481,12 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    await EarthquakeAlarmService().stop();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
                   style: TextButton.styleFrom(backgroundColor: Colors.white),
                   child: Text(s.earthquakeUnderstood,
                       style: const TextStyle(
@@ -570,7 +600,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                         _countryQuakes,
                         s,
                         false,
-                        headerMessage: s.earthquakeCountryRecent(_selectedCountry),
+                        headerMessage:
+                            s.earthquakeCountryRecent(_selectedCountry),
                       ),
                     ),
                     // TAB 1: Near Me
@@ -581,7 +612,8 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                         _localQuakes,
                         s,
                         true,
-                        headerMessage: s.earthquakeNearMeRecent(_nearbyRadiusKm),
+                        headerMessage:
+                            s.earthquakeNearMeRecent(_nearbyRadiusKm),
                       ),
                     ),
                     // TAB 2: Global

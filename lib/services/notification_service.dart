@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -8,6 +11,51 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:io';
 import '../core/localization/app_strings.dart';
+import 'earthquake_alarm_service.dart';
+
+const String seismicNotificationCategoryId = 'earthquake_siren_category';
+const String stopSirenActionId = 'stop_earthquake_siren';
+
+bool _payloadContainsEarthquake(String? payload) {
+  if (payload == null || payload.isEmpty) return false;
+
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is Map) {
+      final type = decoded['type']?.toString();
+      if (type == 'earthquake') {
+        return true;
+      }
+    }
+  } catch (_) {
+    return payload.contains('earthquake');
+  }
+
+  return payload.contains('earthquake');
+}
+
+Future<void> _stopSirenFromNotification(NotificationResponse response) async {
+  await EarthquakeAlarmService().stop();
+
+  final id = response.id;
+  if (id != null) {
+    try {
+      await FlutterLocalNotificationsPlugin().cancel(id);
+    } catch (error) {
+      debugPrint('Failed to cancel seismic notification: $error');
+    }
+  }
+}
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  unawaited(() async {
+    if (notificationResponse.actionId == stopSirenActionId ||
+        _payloadContainsEarthquake(notificationResponse.payload)) {
+      await _stopSirenFromNotification(notificationResponse);
+    }
+  }());
+}
 
 /// Local Notification Service
 /// Handles local notifications including scheduled reminders
@@ -39,18 +87,36 @@ class LocalNotificationService {
       final timeZoneName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timeZoneName));
 
+      final prefs = await SharedPreferences.getInstance();
+      final lang = prefs.getString('language') ?? 'en';
+      final isBn = lang == 'bn';
+
       // Android initialization settings — use monochrome drawable for notification tray icon
       const androidSettings =
           AndroidInitializationSettings('@drawable/ic_notification');
 
       // iOS initialization settings
-      const iosSettings = DarwinInitializationSettings(
+      final iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
+        notificationCategories: <DarwinNotificationCategory>[
+          DarwinNotificationCategory(
+            seismicNotificationCategoryId,
+            actions: <DarwinNotificationAction>[
+              DarwinNotificationAction.plain(
+                stopSirenActionId,
+                isBn ? 'সাইরেন বন্ধ' : 'Stop Siren',
+                options: <DarwinNotificationActionOption>{
+                  DarwinNotificationActionOption.destructive,
+                },
+              ),
+            ],
+          ),
+        ],
       );
 
-      const initSettings = InitializationSettings(
+      final initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       );
@@ -58,10 +124,21 @@ class LocalNotificationService {
       // Initialize
       await _notifications.initialize(
         initSettings,
-        onDidReceiveNotificationResponse: (response) {
+        onDidReceiveNotificationResponse: (response) async {
           debugPrint('Notification tapped: ${response.payload}');
+
+          if (response.actionId == stopSirenActionId) {
+            await _stopSirenFromNotification(response);
+            return;
+          }
+
+          if (_payloadContainsEarthquake(response.payload)) {
+            await EarthquakeAlarmService().stop();
+          }
+
           onNotificationTap(response.payload);
         },
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
 
       // Request permissions (iOS)
@@ -143,8 +220,10 @@ class LocalNotificationService {
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 1200, 600, 1200]),
       enableLights: true,
       ledColor: const Color(0xFFDC143C),
+      audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     // Info channel
@@ -175,9 +254,15 @@ class LocalNotificationService {
     Priority priority = Priority.defaultPriority,
   }) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final lang = prefs.getString('language') ?? 'en';
+      final isBn = lang == 'bn';
+      final isAlarmChannel =
+          channelId == 'emergency_alerts' || channelId == 'seismic_alerts';
+      final isSeismicChannel = channelId == 'seismic_alerts';
       final androidDetails = AndroidNotificationDetails(
         channelId,
-        channelId == 'seismic_alerts'
+        isSeismicChannel
             ? 'ভূমিকম্প সাইরেন'
             : channelId == 'emergency_alerts'
                 ? 'জরুরি সতর্কতা'
@@ -185,30 +270,46 @@ class LocalNotificationService {
                     ? 'চেক-ইন রিমাইন্ডার'
                     : 'তথ্য আপডেট',
         channelDescription: '',
-        importance:
-            (channelId == 'emergency_alerts' || channelId == 'seismic_alerts')
-                ? Importance.max
-                : Importance.high,
-        priority:
-            (channelId == 'emergency_alerts' || channelId == 'seismic_alerts')
-                ? Priority.max
-                : Priority.high,
+        importance: isAlarmChannel ? Importance.max : Importance.high,
+        priority: isAlarmChannel ? Priority.max : Priority.high,
         playSound: true,
         enableVibration: true,
-        fullScreenIntent:
-            channelId == 'emergency_alerts' || channelId == 'seismic_alerts',
+        vibrationPattern:
+            isSeismicChannel ? Int64List.fromList([0, 1200, 600, 1200]) : null,
+        fullScreenIntent: isAlarmChannel,
+        autoCancel: !isSeismicChannel,
+        ongoing: isSeismicChannel,
         icon: 'ic_notification',
         visibility: NotificationVisibility.public,
         showWhen: true,
-        category: channelId == 'emergency_alerts' || channelId == 'seismic_alerts'
+        category: isAlarmChannel
             ? AndroidNotificationCategory.alarm
             : AndroidNotificationCategory.reminder,
+        audioAttributesUsage: isSeismicChannel
+            ? AudioAttributesUsage.alarm
+            : AudioAttributesUsage.notification,
+        actions: isSeismicChannel
+            ? <AndroidNotificationAction>[
+                AndroidNotificationAction(
+                  stopSirenActionId,
+                  isBn ? 'সাইরেন বন্ধ' : 'Stop Siren',
+                  showsUserInterface: false,
+                ),
+              ]
+            : null,
       );
 
-      const iosDetails = DarwinNotificationDetails(
+      final iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        presentBanner: true,
+        presentList: true,
+        interruptionLevel: isAlarmChannel
+            ? InterruptionLevel.timeSensitive
+            : InterruptionLevel.active,
+        categoryIdentifier:
+            isSeismicChannel ? seismicNotificationCategoryId : null,
       );
 
       final details = NotificationDetails(
@@ -423,13 +524,14 @@ class LocalNotificationService {
 
   /// Show emergency alert
   Future<void> showEmergencyAlert({
+    int? id,
     required String title,
     required String body,
     String? payload,
     bool isSeismicClose = false,
   }) async {
     await showNotification(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: id ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title: title,
       body: body,
       payload: payload,

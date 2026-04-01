@@ -16,6 +16,7 @@ import 'background_service.dart';
 import 'local_notification_history_service.dart';
 import 'notification_navigation_service.dart';
 import 'notification_service.dart';
+import 'notification_sync_service.dart';
 import '../provider/language_provider.dart';
 
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
@@ -82,6 +83,9 @@ class OfflineSyncService {
 
       // 4. Sync pending moods
       await _syncPendingMoods();
+
+      // 5. Surface notifications that arrived while the device was offline
+      await NotificationSyncService().syncMissedNotifications(force: true);
     } catch (e) {
       debugPrint('Sync trigger failed: $e');
     }
@@ -92,14 +96,12 @@ class OfflineSyncService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastCheckInTs = prefs.getInt(AppConstants.keyLastCheckin);
-      final intervalDays = prefs.getInt(AppConstants.keyCheckinInterval) ??
-          AppConstants.defaultCheckinIntervalDays;
 
       if (lastCheckInTs == null) return; // No check-in history
 
       final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
-
-      final deadline = lastCheckIn.add(Duration(days: intervalDays));
+      // The current app flow treats check-in eligibility as a 24 hour window.
+      final deadline = lastCheckIn.add(const Duration(hours: 24));
       final now = DateTime.now();
 
       // If deadline has passed

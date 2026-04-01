@@ -69,8 +69,11 @@
    MONGODB_URI=your_mongodb_uri
    JWT_SECRET=your_jwt_secret
    FIREBASE_KEY=your_firebase_key
-   TWILIO_SID=your_twilio_sid
+   TWILIO_ACCOUNT_SID=your_twilio_account_sid
    TWILIO_AUTH_TOKEN=your_twilio_token
+   TWILIO_PHONE_NUMBER=your_twilio_phone_number
+   EMAIL_USER=your_email@gmail.com
+   EMAIL_PASS=your_email_app_password
    ```
 4. Start the server:
    ```bash

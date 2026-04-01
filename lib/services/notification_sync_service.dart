@@ -182,7 +182,20 @@ class NotificationSyncService {
       return 'checkin_reminders';
     }
     if (type == 'earthquake_alert') {
-      return 'seismic_alerts';
+      final actionData = notification['actionData'];
+      final params = actionData is Map
+          ? Map<String, dynamic>.from(actionData['params'] as Map? ?? const {})
+          : const <String, dynamic>{};
+      final severity = params['severity']?.toString() ?? '';
+      if (severity == 'siren') {
+        return 'seismic_alerts';
+      }
+      if (severity == 'urgent' ||
+          notification['priority']?.toString() == 'urgent' ||
+          notification['priority']?.toString() == 'high') {
+        return 'emergency_alerts';
+      }
+      return 'info_updates';
     }
     if (type == 'emergency_alert' ||
         notification['priority']?.toString() == 'urgent') {

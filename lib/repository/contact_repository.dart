@@ -100,60 +100,36 @@ class ContactRepository {
       );
     }
 
-    try {
-      // Save to backend first
-      final backendContact = await api.addContact(
-        name: name,
-        phone: phoneNumber,
-        email: email,
-        relation: relationship,
-        priority: priority,
-      );
+    final backendContact = await api.addContact(
+      name: name,
+      phone: phoneNumber,
+      email: email,
+      relation: relationship,
+      priority: priority,
+    );
 
-      final contact = EmergencyContactModel(
-        id: backendContact['_id']?.toString() ?? _uuid.v4(),
-        userId: backendContact['userId']?.toString() ??
-            backendContact['user']?.toString() ??
-            '',
-        name: name,
-        phoneNumber: phoneNumber,
-        email: email,
-        relationship: relationship,
-        priority: backendContact['priority'] as int? ?? priority,
-        notifyViaSMS: notifyViaSMS,
-        notifyViaCall: notifyViaCall,
-        notifyViaEmail: notifyViaEmail,
-        notifyViaApp: notifyViaApp,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    final now = DateTime.now();
+    final contact = EmergencyContactModel(
+      id: _contactIdFromMap(backendContact),
+      userId: backendContact['userId']?.toString() ??
+          backendContact['user']?.toString() ??
+          hive.getCurrentUser()?.id ??
+          '',
+      name: backendContact['name']?.toString() ?? name,
+      phoneNumber: backendContact['phone']?.toString() ?? phoneNumber,
+      email: backendContact['email']?.toString() ?? email,
+      relationship: backendContact['relation']?.toString() ?? relationship,
+      priority: _priorityFromMap(backendContact, fallback: priority),
+      notifyViaSMS: notifyViaSMS,
+      notifyViaCall: notifyViaCall,
+      notifyViaEmail: notifyViaEmail,
+      notifyViaApp: notifyViaApp,
+      createdAt: _dateFromMap(backendContact['createdAt']) ?? now,
+      updatedAt: _dateFromMap(backendContact['updatedAt']) ?? now,
+    );
 
-      // Cache locally
-      await hive.saveContact(contact);
-      return contact;
-    } catch (e) {
-      // Backend failed (offline) — still save locally for later sync
-      debugPrint('Backend addContact failed, saving locally: $e');
-      final user = hive.getCurrentUser();
-      final contact = EmergencyContactModel(
-        id: _uuid.v4(),
-        userId: user?.id ?? 'offline',
-        name: name,
-        phoneNumber: phoneNumber,
-        email: email,
-        relationship: relationship,
-        priority: priority,
-        notifyViaSMS: notifyViaSMS,
-        notifyViaCall: notifyViaCall,
-        notifyViaEmail: notifyViaEmail,
-        notifyViaApp: notifyViaApp,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await hive.saveContact(contact);
-      // Don't rethrow — local save succeeded, UI should show the new contact
-      return contact;
-    }
+    await hive.saveContact(contact);
+    return contact;
   }
 
   /// Get all contacts (from local cache)
@@ -262,5 +238,26 @@ class ContactRepository {
             c.notifyViaEmail ||
             c.notifyViaApp)
         .toList();
+  }
+
+  String _contactIdFromMap(Map<String, dynamic> contact) {
+    return contact['_id']?.toString() ??
+        contact['id']?.toString() ??
+        _uuid.v4();
+  }
+
+  int _priorityFromMap(
+    Map<String, dynamic> contact, {
+    required int fallback,
+  }) {
+    final raw = contact['priority'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '') ?? fallback;
+  }
+
+  DateTime? _dateFromMap(dynamic raw) {
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString());
   }
 }
