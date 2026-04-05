@@ -40,6 +40,7 @@ class LocalNotificationHistoryService {
           notification['createdAt'] ?? DateTime.now().toIso8601String(),
       'isRead': notification['isRead'] == true,
       'isLocal': true,
+      'surfacedLocally': notification['surfacedLocally'] != false,
       'source': notification['source'] ?? 'local',
       'scheduledFor': notification['scheduledFor'],
       'notificationId': notification['notificationId'],
@@ -79,6 +80,29 @@ class LocalNotificationHistoryService {
       ...remoteNotifications
           .map((item) => _normalizeNotification(item, isLocal: false)),
     ], preferRemote: true);
+  }
+
+  Future<List<Map<String, dynamic>>>
+      getPendingRemoteNotificationsForSurfacing() async {
+    final localNotifications = await getNotifications();
+    final remoteNotifications = await getCachedRemoteNotifications();
+
+    final surfacedIds = localNotifications
+        .where((item) => item['surfacedLocally'] != false)
+        .map(_notificationId)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    return remoteNotifications
+        .map((item) => _normalizeNotification(item, isLocal: false))
+        .where((item) {
+      final id = _notificationId(item);
+      return id != null &&
+          id.isNotEmpty &&
+          item['isRead'] != true &&
+          !surfacedIds.contains(id);
+    }).toList();
   }
 
   Future<void> markAsRead(String id) async {
@@ -232,6 +256,10 @@ class LocalNotificationHistoryService {
     return matchesId || matchesPayload;
   }
 
+  String? _notificationId(Map<String, dynamic> notification) {
+    return notification['_id']?.toString() ?? notification['id']?.toString();
+  }
+
   List<Map<String, dynamic>> _mergeNotifications(
     List<Map<String, dynamic>> notifications, {
     required bool preferRemote,
@@ -309,6 +337,8 @@ class LocalNotificationHistoryService {
           notification['createdAt'] ?? DateTime.now().toIso8601String(),
       'isRead': notification['isRead'] == true,
       'isLocal': notification['isLocal'] == true || isLocal,
+      'surfacedLocally': notification['surfacedLocally'] == true ||
+          (isLocal && notification['surfacedLocally'] != false),
     };
   }
 

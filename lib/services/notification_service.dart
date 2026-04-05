@@ -259,6 +259,7 @@ class LocalNotificationService {
       final isBn = lang == 'bn';
       final isAlarmChannel =
           channelId == 'emergency_alerts' || channelId == 'seismic_alerts';
+      final isReminderChannel = channelId == 'checkin_reminders';
       final isSeismicChannel = channelId == 'seismic_alerts';
       final androidDetails = AndroidNotificationDetails(
         channelId,
@@ -270,14 +271,17 @@ class LocalNotificationService {
                     ? 'চেক-ইন রিমাইন্ডার'
                     : 'তথ্য আপডেট',
         channelDescription: '',
-        importance: isAlarmChannel ? Importance.max : Importance.high,
-        priority: isAlarmChannel ? Priority.max : Priority.high,
+        importance: isAlarmChannel || isReminderChannel
+            ? Importance.max
+            : Importance.high,
+        priority:
+            isAlarmChannel || isReminderChannel ? Priority.max : Priority.high,
         playSound: true,
         enableVibration: true,
         vibrationPattern:
             isSeismicChannel ? Int64List.fromList([0, 1200, 600, 1200]) : null,
         fullScreenIntent: isAlarmChannel,
-        autoCancel: !isSeismicChannel,
+        autoCancel: !(isSeismicChannel || isReminderChannel),
         ongoing: isSeismicChannel,
         icon: 'ic_notification',
         visibility: NotificationVisibility.public,
@@ -542,12 +546,13 @@ class LocalNotificationService {
 
   /// Show check-in reminder (immediate)
   Future<void> showCheckinReminder({
+    int? id,
     required String title,
     required String body,
     String? payload,
   }) async {
     await showNotification(
-      id: 1, // Fixed ID so it replaces previous reminder
+      id: id ?? 1,
       title: title,
       body: body,
       payload: payload,
@@ -559,6 +564,25 @@ class LocalNotificationService {
   /// Cancel notification
   Future<void> cancelNotification(int id) async {
     await _notifications.cancel(id);
+  }
+
+  Future<void> cancelActiveReminderNotifications() async {
+    final activeNotifications = await getActiveNotifications();
+    for (final notification in activeNotifications) {
+      if (notification.channelId == 'checkin_reminders' &&
+          notification.id != null) {
+        await _notifications.cancel(notification.id!);
+      }
+    }
+  }
+
+  Future<void> cancelAllActiveNotifications() async {
+    final activeNotifications = await getActiveNotifications();
+    for (final notification in activeNotifications) {
+      if (notification.id != null) {
+        await _notifications.cancel(notification.id!);
+      }
+    }
   }
 
   Future<void> cancelMatchingNotification({

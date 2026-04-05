@@ -95,17 +95,30 @@ class OfflineSyncService {
   Future<void> _checkAndShowMissedReminder() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final repository = ref.read(checkinRepositoryProvider);
+      final dbLastCheckIn = repository.getLastCheckIn()?.timestamp;
       final lastCheckInTs = prefs.getInt(AppConstants.keyLastCheckin);
+      final prefsLastCheckIn = lastCheckInTs != null
+          ? DateTime.fromMillisecondsSinceEpoch(lastCheckInTs)
+          : null;
+      final lastCheckIn = _latestCheckIn(dbLastCheckIn, prefsLastCheckIn);
 
-      if (lastCheckInTs == null) return; // No check-in history
+      if (lastCheckIn == null) return; // No check-in history
 
-      final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
       // The current app flow treats check-in eligibility as a 24 hour window.
       final deadline = lastCheckIn.add(const Duration(hours: 24));
       final now = DateTime.now();
+      final missedNotificationId = 'missed-${deadline.millisecondsSinceEpoch}';
 
       // If deadline has passed
       if (now.isAfter(deadline)) {
+        final historyService = LocalNotificationHistoryService();
+        final alreadySaved =
+            await historyService.containsNotification(missedNotificationId);
+        if (alreadySaved) {
+          return;
+        }
+
         // Did we already notify recently?
         final lastAlertStr = prefs.getString('last_offline_missed_alert');
         if (lastAlertStr != null) {
@@ -121,8 +134,7 @@ class OfflineSyncService {
         final notificationService = LocalNotificationService();
         final payload = NotificationNavigationService.encodePayload(
           NotificationNavigationService.payloadForReminder(
-            notificationId:
-                'missed-${now.year}-${now.month}-${now.day}-${deadline.millisecondsSinceEpoch}',
+            notificationId: missedNotificationId,
           ),
         );
 
@@ -139,9 +151,8 @@ class OfflineSyncService {
           priority: Priority.max,
         );
 
-        await LocalNotificationHistoryService().saveNotification({
-          '_id':
-              'missed-${now.year}-${now.month}-${now.day}-${deadline.millisecondsSinceEpoch}',
+        await historyService.saveNotification({
+          '_id': missedNotificationId,
           'title': s.notifMissedCheckinTitle,
           'title_en': 'Check-in missed',
           'body': s.notifMissedCheckinHistory,
@@ -149,6 +160,7 @@ class OfflineSyncService {
           'payload': payload,
           'createdAt': now.toIso8601String(),
           'source': 'offline_sync',
+          'scheduledFor': deadline.toIso8601String(),
         });
 
         // Record that we alerted
@@ -178,6 +190,12 @@ class OfflineSyncService {
     } catch (e) {
       debugPrint('Failed to check missed reminder: $e');
     }
+  }
+
+  DateTime? _latestCheckIn(DateTime? a, DateTime? b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    return a.isAfter(b) ? a : b;
   }
 
   /// Sends DELETE to server for check-ins & moods when user cleared data offline.

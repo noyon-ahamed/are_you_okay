@@ -393,6 +393,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   final data = message.data;
   final distanceKmStr = data['distanceKm'];
+  final localNotificationId = _localNotificationIdForData(data);
   bool isSeismicClose = data['isClose'] == '1';
   if (!isSeismicClose && distanceKmStr != null) {
     final distance = double.tryParse(distanceKmStr);
@@ -412,7 +413,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       'eventId': data['eventId'] ?? '',
       'source': 'push_background',
     });
-    final localNotificationId = _localNotificationIdForData(data);
 
     await EarthquakeAlarmService().startCloseAlert(
       eventId: data['eventId']?.toString() ??
@@ -432,7 +432,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
   }
 
-  await _saveFirebaseMessageToHistory(message);
+  await _saveFirebaseMessageToHistory(
+    message,
+    notificationIdOverride: localNotificationId,
+    surfacedLocally: isSeismicClose || message.notification != null,
+  );
 }
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
@@ -481,6 +485,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
 
   if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
     await notifService.showCheckinReminder(
+      id: localNotificationId,
       title: title,
       body: body,
       payload: payload,
@@ -507,12 +512,19 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
     );
   }
 
-  await _saveFirebaseMessageToHistory(message, payloadOverride: payload);
+  await _saveFirebaseMessageToHistory(
+    message,
+    payloadOverride: payload,
+    notificationIdOverride: localNotificationId,
+    surfacedLocally: true,
+  );
 }
 
 Future<void> _saveFirebaseMessageToHistory(
   RemoteMessage message, {
   String? payloadOverride,
+  int? notificationIdOverride,
+  bool surfacedLocally = true,
 }) async {
   final data = message.data;
   final title = message.notification?.title ?? data['title'] ?? 'Alert';
@@ -538,6 +550,8 @@ Future<void> _saveFirebaseMessageToHistory(
     'type': data['type'] ?? 'alert',
     'payload': payload,
     'createdAt': DateTime.now().toIso8601String(),
+    'notificationId': notificationIdOverride,
+    'surfacedLocally': surfacedLocally,
     'source': 'push',
   });
 }

@@ -1224,7 +1224,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         // Cancel remaining check-in reminder notifications & schedule new ones
         final notifService = LocalNotificationService();
         await notifService.cancelCheckinReminders();
-        await notifService.cancelNotification(1);
+        await notifService.cancelActiveReminderNotifications();
         await notifService.cancelDailyReminders();
 
         // Save check-in time for background service WorkManager

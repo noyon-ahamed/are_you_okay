@@ -86,6 +86,7 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
 
   Future<void> markAllAsRead() async {
     try {
+      await LocalNotificationService().cancelAllActiveNotifications();
       await LocalNotificationHistoryService().markAllAsRead();
       try {
         await NotificationApiService().markAllAsRead();
@@ -99,6 +100,16 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
   Future<void> markAsRead(Map<String, dynamic> notification) async {
     try {
       final id = notification['_id']?.toString() ?? '';
+      final payload = notification['payload']?.toString();
+      final localId = notification['notificationId'];
+
+      await LocalNotificationService().cancelMatchingNotification(
+        id: localId is int ? localId : null,
+        title: notification['title']?.toString(),
+        body: notification['body']?.toString(),
+        payload: payload,
+      );
+
       await _historyService.markAsRead(id);
       if (notification['isLocal'] != true) {
         await NotificationApiService().markAsRead(id);

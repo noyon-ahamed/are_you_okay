@@ -74,8 +74,12 @@ class NotificationSyncService {
     }
 
     var surfacedCount = 0;
-    if (surfaceLocally && remoteNotifications.isNotEmpty) {
-      surfacedCount = await _surfaceMissedNotifications(remoteNotifications);
+    if (surfaceLocally) {
+      final pendingNotifications =
+          await _historyService.getPendingRemoteNotificationsForSurfacing();
+      if (pendingNotifications.isNotEmpty) {
+        surfacedCount = await _surfaceMissedNotifications(pendingNotifications);
+      }
     }
 
     await _historyService.setLatestRemoteCreatedAt(
@@ -121,6 +125,7 @@ class NotificationSyncService {
         final normalizedType = _normalizedType(notification);
         if (normalizedType == 'reminder') {
           await _localNotificationService.showCheckinReminder(
+            id: localNotificationId,
             title: title,
             body: body,
             payload: payload,
@@ -205,9 +210,6 @@ class NotificationSyncService {
   }
 
   int _localIdFor(Map<String, dynamic> notification) {
-    if (_normalizedType(notification) == 'reminder') {
-      return 1;
-    }
     final id = _notificationId(notification);
     if (id.isEmpty) {
       return DateTime.now().millisecondsSinceEpoch ~/ 1000;
