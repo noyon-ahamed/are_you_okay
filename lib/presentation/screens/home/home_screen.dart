@@ -238,9 +238,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       await notifService.initialize(
         onNotificationTap: NotificationNavigationService.handlePayload,
       );
-      // Cancel any old reminders that might be stuck
-      await notifService.cancelDailyReminders();
-      await notifService.cancelCheckinReminders();
     } catch (e) {
       debugPrint('Error initializing local notifications in HomeScreen: $e');
     }
