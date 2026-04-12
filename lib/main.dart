@@ -365,10 +365,20 @@ bool _asBool(dynamic value) {
   return false;
 }
 
-int _localNotificationIdForData(Map<String, dynamic> data) {
-  final rawId = data['eventId']?.toString() ??
-      data['notificationId']?.toString() ??
-      '${data['type'] ?? 'alert'}-${data['route'] ?? ''}';
+int _localNotificationIdForMessage(RemoteMessage message) {
+  final data = message.data;
+  final title = message.notification?.title ?? data['title']?.toString() ?? '';
+  final body = message.notification?.body ?? data['body']?.toString() ?? '';
+  final sentAt = message.sentTime?.millisecondsSinceEpoch.toString() ?? '';
+
+  final rawId = data['notificationId']?.toString() ??
+      data['eventId']?.toString() ??
+      message.messageId ??
+      '${data['type'] ?? 'alert'}-'
+          '${data['route'] ?? ''}-'
+          '$title-'
+          '$body-'
+          '$sentAt';
   return rawId.hashCode & 0x7fffffff;
 }
 
@@ -393,7 +403,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   final data = message.data;
   final distanceKmStr = data['distanceKm'];
-  final localNotificationId = _localNotificationIdForData(data);
+  final localNotificationId = _localNotificationIdForMessage(message);
   bool isSeismicClose = data['isClose'] == '1';
   if (!isSeismicClose && distanceKmStr != null) {
     final distance = double.tryParse(distanceKmStr);
@@ -481,7 +491,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
     'eventId': data['eventId'] ?? '',
     'source': 'push',
   });
-  final localNotificationId = _localNotificationIdForData(data);
+  final localNotificationId = _localNotificationIdForMessage(message);
 
   if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
     await notifService.showCheckinReminder(

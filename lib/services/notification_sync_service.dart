@@ -16,6 +16,8 @@ class NotificationSyncService {
   factory NotificationSyncService() => _instance;
 
   static const Duration _minimumSyncGap = Duration(seconds: 15);
+  static const Duration _maxSurfaceAge = Duration(hours: 2);
+  static const int _maxSurfaceCount = 3;
 
   final LocalNotificationHistoryService _historyService =
       LocalNotificationHistoryService();
@@ -99,9 +101,11 @@ class NotificationSyncService {
     final unreadNotifications = remoteNotifications
         .where((item) => item['isRead'] != true)
         .toList()
-      ..sort((a, b) => _parseCreatedAt(a).compareTo(_parseCreatedAt(b)));
+      ..sort((a, b) => _parseCreatedAt(b).compareTo(_parseCreatedAt(a)));
 
     var surfacedCount = 0;
+    final now = DateTime.now();
+
     for (final notification in unreadNotifications) {
       final id = _notificationId(notification);
       if (id.isEmpty) continue;
@@ -123,21 +127,30 @@ class NotificationSyncService {
 
       try {
         final normalizedType = _normalizedType(notification);
-        if (normalizedType == 'reminder') {
-          await _localNotificationService.showCheckinReminder(
-            id: localNotificationId,
-            title: title,
-            body: body,
-            payload: payload,
-          );
-        } else {
-          await _localNotificationService.showNotification(
-            id: localNotificationId,
-            title: title,
-            body: body,
-            payload: payload,
-            channelId: _channelIdFor(notification),
-          );
+        final createdAt = _parseCreatedAt(notification);
+        final age = now.difference(createdAt);
+        final shouldSurface = surfacedCount < _maxSurfaceCount &&
+            age <= _maxSurfaceAge &&
+            normalizedType != 'system_announcement';
+
+        if (shouldSurface) {
+          if (normalizedType == 'reminder') {
+            await _localNotificationService.showCheckinReminder(
+              id: localNotificationId,
+              title: title,
+              body: body,
+              payload: payload,
+            );
+          } else {
+            await _localNotificationService.showNotification(
+              id: localNotificationId,
+              title: title,
+              body: body,
+              payload: payload,
+              channelId: _channelIdFor(notification),
+            );
+          }
+          surfacedCount += 1;
         }
 
         await _historyService.saveNotification({
@@ -148,8 +161,8 @@ class NotificationSyncService {
           'type': normalizedType,
           'source': 'server_sync',
           'notificationId': localNotificationId,
+          'surfacedLocally': shouldSurface,
         });
-        surfacedCount += 1;
       } catch (error, stackTrace) {
         debugPrint('Failed to surface synced notification $id: $error');
         debugPrintStack(stackTrace: stackTrace);
