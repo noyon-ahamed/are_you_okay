@@ -43,6 +43,21 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-backend/
+
+# Security and Credentials
 .env
-admin_dashboard/
+**/.env
+**/.env.local
+**/.env.production
+**/.env.development
+**/firebase-service-account.json
+
+# Dependencies and Build Outputs
+**/node_modules/
+**/dist/
+**/dist-ssr/
+.DS_Store
+
+# Separate Repositories
+are_you_okay_backend/
+are_you_okay_admin_dahboard/

@@ -1,7 +1,7 @@
 name: are_you_okay
 description: A safety check-in app with emergency features
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -86,7 +86,6 @@ dependencies:
   flutter_timezone: ^4.1.1
 
   # Ads
-  google_mobile_ads: ^7.0.0
   flutter_callkit_incoming: ^3.0.0
   wakelock_plus: ^1.4.0
   share_plus: ^12.0.1
@@ -104,6 +103,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  config:
+    enable-swift-package-manager: false
   
   assets:
     - assets/images/

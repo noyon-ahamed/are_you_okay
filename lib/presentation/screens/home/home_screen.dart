@@ -824,6 +824,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         gradient: [const Color(0xFF00BCD4), const Color(0xFF0097A7)],
         route: Routes.contacts,
       ),
+      /*
       _QuickAction(
         icon: Icons.phone_callback_outlined,
         label: s.actionFakeCall,
@@ -831,6 +832,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         gradient: [const Color(0xFFFF9800), const Color(0xFFF57C00)],
         route: Routes.fakeCall,
       ),
+      */
       _QuickAction(
         icon: Icons.public,
         label: s.actionEarthquake,

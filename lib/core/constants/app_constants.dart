@@ -4,10 +4,10 @@ class AppConstants {
   AppConstants._();
 
   // API Configuration
-  // For production (VPS): 'http://76.13.246.186:3000/api'
   static String get apiBaseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://76.13.246.186:3000/api';
-  static String get socketUrl => 'http://76.13.246.186:3000';
+      dotenv.env['API_BASE_URL'] ?? 'https://areyouokayapi.syntfyit.com/api';
+  static String get socketUrl =>
+      dotenv.env['SOCKET_URL'] ?? 'https://areyouokayapi.syntfyit.com';
 
   // App Information
   static const String appName = 'Are You Okay';

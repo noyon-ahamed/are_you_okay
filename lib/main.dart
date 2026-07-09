@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -122,11 +121,6 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       unawaited(_syncNotificationPreferences());
     } catch (e) {
       debugPrint('Firebase initialization warning: $e');
-    }
-    final bool isSimulator = Platform.isIOS &&
-        Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
-    if (!isSimulator) {
-      unawaited(MobileAds.instance.initialize());
     }
   }
 

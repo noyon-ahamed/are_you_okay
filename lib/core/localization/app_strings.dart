@@ -443,7 +443,7 @@ class AppStrings {
   String earthquakeTabNearWithRadius([int radiusKm = 3000]) =>
       isBangla ? 'আপনার কাছে ($radiusKm km)' : 'Near You ($radiusKm km)';
   String get earthquakeTabGlobal =>
-      isBangla ? 'শীর্ষ ৫ বৈশ্বিক' : 'Top 5 Global';
+      isBangla ? 'শীর্ষ ২০ বৈশ্বিক' : 'Top 20 Global';
   String get earthquakeMaxMag => isBangla ? 'সর্বোচ্চ মাত্রা' : 'Max Magnitude';
   String get earthquakeMag45 => isBangla ? '৪.৫+ মাত্রা' : '4.5+ Magnitude';
   String get earthquakeAway => isBangla ? 'কি.মি. দূরে' : 'km away';

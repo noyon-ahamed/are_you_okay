@@ -310,7 +310,7 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
               globalQuakes: parsedGlobal,
             )
           : parsedCountry;
-      _globalQuakes = parsedGlobal.take(5).toList();
+      _globalQuakes = parsedGlobal.take(20).toList();
       _showingCachedData =
           allowCachedState || responseData['_fromCache'] == true;
       _isLoading = false;
