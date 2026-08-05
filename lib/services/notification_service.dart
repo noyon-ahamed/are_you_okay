@@ -127,6 +127,15 @@ class LocalNotificationService {
         onDidReceiveNotificationResponse: (response) async {
           debugPrint('Notification tapped: ${response.payload}');
 
+          // Remove notification banner from status bar tray upon click
+          if (response.id != null) {
+            try {
+              await _notifications.cancel(response.id!);
+            } catch (e) {
+              debugPrint('Failed to clear tapped notification from tray: $e');
+            }
+          }
+
           if (response.actionId == stopSirenActionId) {
             await _stopSirenFromNotification(response);
             return;
@@ -231,8 +240,10 @@ class LocalNotificationService {
       'info_updates',
       s.channelGeneralTitle,
       description: s.channelGeneralDesc,
-      importance: Importance.low,
-      playSound: false,
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
     );
 
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<
@@ -252,6 +263,7 @@ class LocalNotificationService {
     String? payload,
     String channelId = 'info_updates',
     Priority priority = Priority.defaultPriority,
+    int? badgeCount,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -261,6 +273,7 @@ class LocalNotificationService {
           channelId == 'emergency_alerts' || channelId == 'seismic_alerts';
       final isReminderChannel = channelId == 'checkin_reminders';
       final isSeismicChannel = channelId == 'seismic_alerts';
+      final count = badgeCount != null && badgeCount > 0 ? badgeCount : 1;
       final androidDetails = AndroidNotificationDetails(
         channelId,
         isSeismicChannel
@@ -293,6 +306,7 @@ class LocalNotificationService {
         audioAttributesUsage: isSeismicChannel
             ? AudioAttributesUsage.alarm
             : AudioAttributesUsage.notification,
+        number: count,
         actions: isSeismicChannel
             ? <AndroidNotificationAction>[
                 AndroidNotificationAction(
@@ -310,6 +324,7 @@ class LocalNotificationService {
         presentSound: true,
         presentBanner: true,
         presentList: true,
+        badgeNumber: count,
         interruptionLevel: isAlarmChannel
             ? InterruptionLevel.timeSensitive
             : InterruptionLevel.active,
@@ -542,6 +557,7 @@ class LocalNotificationService {
     required String body,
     String? payload,
     bool isSeismicClose = false,
+    int? badgeCount,
   }) async {
     await showNotification(
       id: id ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -550,6 +566,7 @@ class LocalNotificationService {
       payload: payload,
       channelId: isSeismicClose ? 'seismic_alerts' : 'emergency_alerts',
       priority: Priority.max,
+      badgeCount: badgeCount,
     );
   }
 
@@ -559,6 +576,7 @@ class LocalNotificationService {
     required String title,
     required String body,
     String? payload,
+    int? badgeCount,
   }) async {
     await showNotification(
       id: id ?? 1,
@@ -567,6 +585,7 @@ class LocalNotificationService {
       payload: payload,
       channelId: 'checkin_reminders',
       priority: Priority.high,
+      badgeCount: badgeCount,
     );
   }
 

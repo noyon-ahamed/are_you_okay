@@ -21,6 +21,7 @@ import '../../widgets/status_badge.dart';
 import '../../../services/shake_detector_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/notification_navigation_service.dart';
+import '../../../services/local_notification_history_service.dart';
 import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
 import '../../../services/shared_prefs_service.dart';
@@ -96,6 +97,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     // Initialize Shake Detection
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      LocalNotificationHistoryService.updateUnreadCount();
+
       ref.read(shakeDetectorProvider).startListening(() {
         if (mounted) {
           context.push(Routes.sos);
@@ -396,9 +399,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         Row(
           children: [
-            _buildHeaderIcon(Icons.notifications_outlined, () {
-              context.push(Routes.notifications);
-            }),
+            ValueListenableBuilder<int>(
+              valueListenable: LocalNotificationHistoryService.unreadCountNotifier,
+              builder: (context, unreadCount, child) {
+                return _buildHeaderIcon(
+                  Icons.notifications_outlined,
+                  () {
+                    context.push(Routes.notifications);
+                  },
+                  badgeCount: unreadCount,
+                );
+              },
+            ),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => context.push(Routes.profile),
@@ -437,21 +449,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildHeaderIcon(IconData icon, VoidCallback onTap) {
+  Widget _buildHeaderIcon(IconData icon, VoidCallback onTap, {int badgeCount = 0}) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.surface,
-          border: Border.all(
-            // ignore: deprecated_member_use
-            color: Theme.of(context).dividerColor.withOpacity(0.1),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Theme.of(context).colorScheme.surface,
+              border: Border.all(
+                // ignore: deprecated_member_use
+                color: Theme.of(context).dividerColor.withOpacity(0.1),
+              ),
+            ),
+            child: Icon(icon, size: 22),
           ),
-        ),
-        child: Icon(icon, size: 22),
+          if (badgeCount > 0)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.surface,
+                    width: 1.5,
+                  ),
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 18,
+                  minHeight: 18,
+                ),
+                child: Center(
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      height: 1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

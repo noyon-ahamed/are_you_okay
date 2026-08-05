@@ -61,6 +61,23 @@ void main() async {
   sharedPrefsService = SharedPrefsService();
   await sharedPrefsService.init();
 
+  // 1. Initialize Firebase & register FCM background handler top-level
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase init error in main: $e');
+  }
+
+  // 2. Initialize LocalNotificationService on startup so Android channels exist
+  try {
+    await LocalNotificationService().initialize(
+      onNotificationTap: NotificationNavigationService.handlePayload,
+    );
+  } catch (e) {
+    debugPrint('LocalNotificationService init error in main: $e');
+  }
+
   runApp(
     ProviderScope(
       overrides: [
@@ -98,17 +115,13 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
     if (_servicesBootstrapped) return;
     _servicesBootstrapped = true;
 
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
 
     try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
-      );
       _setupFirebaseMessaging();
       unawaited(_syncNotificationPreferences());
     } catch (e) {
-      debugPrint('Firebase initialization warning: $e');
+      debugPrint('Firebase setup warning: $e');
     }
   }
 
@@ -242,40 +255,72 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     }
   }
 
-  if (isSeismicClose) {
-    final title =
-        message.notification?.title ?? data['title'] ?? 'Earthquake Alert';
-    final body = message.notification?.body ?? data['body'] ?? '';
-    final payload = NotificationNavigationService.encodePayload({
-      'route': _routeForNotificationType(data),
-      'action': _actionForNotificationType(data),
-      'type': data['type'] ?? 'earthquake',
-      'eventId': data['eventId'] ?? '',
-      'source': 'push_background',
-    });
+  final title = message.notification?.title ?? data['title']?.toString() ?? 'Alert';
+  final body = message.notification?.body ?? data['body']?.toString() ?? '';
+  final badgeCount = int.tryParse(data['badgeCount']?.toString() ?? '');
 
+  if (title == 'Alert' && body.isEmpty && data['type'] == null) {
+    return;
+  }
+
+  final notifService = LocalNotificationService();
+  await notifService.initialize(
+    onNotificationTap: (_) {},
+  );
+
+  final payload = NotificationNavigationService.encodePayload({
+    'route': _routeForNotificationType(data),
+    'action': _actionForNotificationType(data),
+    'type': data['type'] ?? 'alert',
+    'eventId': data['eventId'] ?? '',
+    'source': 'push_background',
+  });
+
+  bool surfacedLocally = false;
+
+  if (isSeismicClose) {
     await EarthquakeAlarmService().startCloseAlert(
       eventId: data['eventId']?.toString() ??
           'close-${localNotificationId.toString()}',
     );
 
-    final notifService = LocalNotificationService();
-    await notifService.initialize(
-      onNotificationTap: (_) {},
-    );
     await notifService.showEmergencyAlert(
       id: localNotificationId,
       title: title,
       body: body,
       payload: payload,
       isSeismicClose: true,
+      badgeCount: badgeCount,
     );
+    surfacedLocally = true;
+  } else if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
+    if (message.notification == null) {
+      await notifService.showCheckinReminder(
+        id: localNotificationId,
+        title: title,
+        body: body,
+        payload: payload,
+        badgeCount: badgeCount,
+      );
+      surfacedLocally = true;
+    }
+  } else if (message.notification == null && ((title.isNotEmpty && title != 'Alert') || body.isNotEmpty)) {
+    await notifService.showNotification(
+      id: localNotificationId,
+      title: title,
+      body: body,
+      payload: payload,
+      channelId: data['channelId']?.toString() ?? 'info_updates',
+      badgeCount: badgeCount,
+    );
+    surfacedLocally = true;
   }
 
   await _saveFirebaseMessageToHistory(
     message,
+    payloadOverride: payload,
     notificationIdOverride: localNotificationId,
-    surfacedLocally: isSeismicClose || message.notification != null,
+    surfacedLocally: surfacedLocally,
   );
 }
 
@@ -293,6 +338,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   final data = message.data;
   final title = message.notification?.title ?? data['title'] ?? 'Alert';
   final body = message.notification?.body ?? data['body'] ?? '';
+  final badgeCount = int.tryParse(data['badgeCount']?.toString() ?? '');
 
   // Skip if it's just a generic "Alert" with no body and no other info
   if (title == 'Alert' && body.isEmpty && data['type'] == null) {
@@ -329,6 +375,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
       title: title,
       body: body,
       payload: payload,
+      badgeCount: badgeCount,
     );
   } else if (data['isClose'] == '1' || isSeismicClose) {
     await EarthquakeAlarmService().startCloseAlert(
@@ -341,6 +388,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
       body: body,
       payload: payload,
       isSeismicClose: true,
+      badgeCount: badgeCount,
     );
   } else {
     await notifService.showNotification(
@@ -349,6 +397,7 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
       body: body,
       payload: payload,
       channelId: data['channelId']?.toString() ?? 'info_updates',
+      badgeCount: badgeCount,
     );
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalNotificationHistoryService {
@@ -8,6 +9,20 @@ class LocalNotificationHistoryService {
   static const String _remoteMetaKey = 'remote_notification_cache_meta_v1';
   static const int _maxItems = 100;
   static const int _maxRemoteCacheItems = 200;
+
+  static final ValueNotifier<int> unreadCountNotifier = ValueNotifier<int>(0);
+
+  static Future<void> updateUnreadCount() async {
+    try {
+      final service = LocalNotificationHistoryService();
+      final merged = await service.getMergedNotifications();
+      final unread = merged.where((n) {
+        final isRead = n['isRead'] == true || n['read'] == true;
+        return !isRead;
+      }).length;
+      unreadCountNotifier.value = unread;
+    } catch (_) {}
+  }
 
   Future<List<Map<String, dynamic>>> getNotifications() async {
     return _readList(_storageKey);
@@ -52,6 +67,7 @@ class LocalNotificationHistoryService {
     }
 
     await prefs.setString(_storageKey, jsonEncode(items));
+    await updateUnreadCount();
   }
 
   Future<void> cacheRemoteNotifications(
@@ -69,6 +85,7 @@ class LocalNotificationHistoryService {
     }
 
     await _writeList(_remoteCacheKey, merged);
+    await updateUnreadCount();
   }
 
   Future<List<Map<String, dynamic>>> getMergedNotifications() async {
@@ -114,6 +131,7 @@ class LocalNotificationHistoryService {
     }
     await _writeList(_storageKey, items);
     await _markRemoteAsRead(id);
+    await updateUnreadCount();
   }
 
   Future<void> markAllAsRead() async {
@@ -123,6 +141,7 @@ class LocalNotificationHistoryService {
     }
     await _writeList(_storageKey, items);
     await _markAllRemoteAsRead();
+    await updateUnreadCount();
   }
 
   Future<void> deleteNotification(String id, {String? payload}) async {
@@ -132,6 +151,7 @@ class LocalNotificationHistoryService {
     );
     await _writeList(_storageKey, items);
     await _deleteRemoteNotification(id, payload: payload);
+    await updateUnreadCount();
   }
 
   Future<bool> containsNotification(String id) async {
@@ -145,6 +165,7 @@ class LocalNotificationHistoryService {
     await prefs.remove(_storageKey);
     await prefs.remove(_remoteCacheKey);
     await prefs.remove(_remoteMetaKey);
+    await updateUnreadCount();
   }
 
   Future<String?> getLatestRemoteCreatedAt() async {

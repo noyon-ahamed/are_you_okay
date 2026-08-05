@@ -20,13 +20,15 @@ class NotificationNavigationService {
     if (rootNavigatorKey.currentContext == null) return;
 
     final context = rootNavigatorKey.currentContext!;
-    final targetRoute = route == null || route.isEmpty ? Routes.home : route;
-    
-    if (targetRoute == Routes.home) {
+    final targetRoute =
+        route == null || route.isEmpty ? Routes.notifications : route;
+
+    if (targetRoute == Routes.home && (action == null || action.isEmpty)) {
+      context.go(Routes.home);
+    } else if (targetRoute == Routes.home) {
       context.go(Routes.home);
     } else {
-      // Ensure we have a base stack (Home) before pushing the specific route
-      // This prevents the "back button gone" issue and "exit on back" problem
+      // Ensure base stack (Home) before navigating to specific route
       context.go(Routes.home);
       context.push(targetRoute);
     }
