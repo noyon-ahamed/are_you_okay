@@ -1006,7 +1006,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       await contactBox.clear();
 
       // NEW: Cancel all scheduled and active local notifications
-      await LocalNotificationService().cancelAllNotifications();
+      try {
+        await LocalNotificationService().cancelAllNotifications();
+      } catch (e) {
+        debugPrint('Failed to cancel notifications during clear cache: $e');
+      }
       await LocalNotificationHistoryService().clearHistory();
       await MoodApiService().clearCache();
 

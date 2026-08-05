@@ -8,7 +8,6 @@ import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/ai_chat/ai_chat_screen.dart';
 import '../../presentation/screens/earthquake/earthquake_screen.dart';
-import '../../presentation/screens/fake_call/fake_call_screen.dart';
 import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/profile/edit_profile_screen.dart';
@@ -38,8 +37,6 @@ class Routes {
   static const String home = '/home';
   static const String aiChat = '/ai-chat';
   static const String earthquake = '/earthquake';
-  static const String fakeCall = '/fake-call';
-  static const String fakeCallActive = '/fake-call-active';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
   static const String settings = '/settings';
@@ -177,13 +174,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => const MaterialPage(
           restorationId: 'mood_history_page',
           child: MoodHistoryScreen(),
-        ),
-      ),
-      GoRoute(
-        path: Routes.fakeCall,
-        pageBuilder: (context, state) => const MaterialPage(
-          restorationId: 'fake_call_page',
-          child: FakeCallScreen(),
         ),
       ),
       GoRoute(

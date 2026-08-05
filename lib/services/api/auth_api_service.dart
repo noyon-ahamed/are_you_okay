@@ -170,8 +170,12 @@ class AuthApiService {
     }
 
     // Clear local notifications and history
-    await LocalNotificationService().cancelAllNotifications();
-    await LocalNotificationHistoryService().clearHistory();
+    try {
+      await LocalNotificationService().cancelAllNotifications();
+      await LocalNotificationHistoryService().clearHistory();
+    } catch (e) {
+      debugPrint('Failed to clear notifications during logout: $e');
+    }
 
     // ✅ Now safe to clear auth tokens — FCM removal is already done
     await SharedPrefsService().logout();

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_callkit_incoming/entities/call_event.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -29,12 +26,7 @@ import 'services/notification_navigation_service.dart';
 import 'services/notification_service.dart';
 import 'services/notification_sync_service.dart';
 import 'presentation/widgets/lifecycle_manager.dart';
-import 'presentation/screens/fake_call/fake_call_active_screen.dart';
 import 'services/auth/token_storage_service.dart';
-
-final ValueNotifier<Map<String, dynamic>?> globalActiveCallNotifier =
-    ValueNotifier(null);
-const MethodChannel _appBridgeChannel = MethodChannel('com.areyouokay.app/app');
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +60,6 @@ void main() async {
 
   sharedPrefsService = SharedPrefsService();
   await sharedPrefsService.init();
-  await _primeInitialActiveCallState();
 
   runApp(
     ProviderScope(
@@ -106,9 +97,6 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
   Future<void> _bootstrapNonCriticalServices() async {
     if (_servicesBootstrapped) return;
     _servicesBootstrapped = true;
-
-    _listenToCallKitEvents();
-    unawaited(_checkActiveCalls());
 
     await Future<void>.delayed(const Duration(milliseconds: 800));
 
@@ -177,67 +165,12 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkActiveCalls();
       final authState = ref.read(authProvider);
       if (authState is AuthAuthenticated) {
         ref.read(authProvider.notifier).refreshProfile();
         unawaited(NotificationSyncService().syncMissedNotifications());
       }
     }
-  }
-
-  Future<void> _checkActiveCalls() async {
-    final calls = await FlutterCallkitIncoming.activeCalls();
-    final currentCall = _resolveActiveCall(calls, preferAccepted: true);
-
-    if (currentCall != null) {
-      final nextCallId = currentCall['callId']?.toString() ?? '';
-      final currentCallId =
-          globalActiveCallNotifier.value?['callId']?.toString() ?? '';
-
-      if (currentCallId != nextCallId ||
-          globalActiveCallNotifier.value == null) {
-        globalActiveCallNotifier.value = currentCall;
-      }
-    } else {
-      globalActiveCallNotifier.value = null;
-    }
-  }
-
-  void _listenToCallKitEvents() {
-    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
-      if (event == null) return;
-
-      switch (event.event) {
-        case Event.actionCallAccept:
-          debugPrint('Global CallKit Accept received');
-          unawaited(_bringAppToForeground());
-          final activeCall = _resolveCallInfo(event.body) ??
-              _resolveActiveCall(
-                await FlutterCallkitIncoming.activeCalls(),
-                preferAccepted: true,
-              );
-          if (activeCall != null) {
-            final callId = activeCall['callId']?.toString() ?? '';
-            if (callId.isNotEmpty) {
-              unawaited(FlutterCallkitIncoming.setCallConnected(callId));
-            }
-            globalActiveCallNotifier.value = activeCall;
-          } else {
-            await _checkActiveCalls();
-          }
-          break;
-
-        case Event.actionCallEnded:
-        case Event.actionCallDecline:
-        case Event.actionCallTimeout:
-          globalActiveCallNotifier.value = null;
-          break;
-
-        default:
-          break;
-      }
-    });
   }
 
   @override
@@ -255,108 +188,11 @@ class _AreYouOkayAppState extends ConsumerState<AreYouOkayApp>
       routerConfig: router,
       builder: (context, child) {
         return Scaffold(
-          body: Stack(
-            children: [
-              if (child != null) child,
-              ValueListenableBuilder<Map<String, dynamic>?>(
-                valueListenable: globalActiveCallNotifier,
-                builder: (context, activeCall, _) {
-                  if (activeCall == null) return const SizedBox.shrink();
-                  return Positioned.fill(
-                    child: FakeCallActiveScreen(
-                      callerName: activeCall['callerName'] ?? 'Unknown',
-                      callerNumber: activeCall['callerNumber'] ?? '',
-                      callId: activeCall['callId'] ?? '',
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+          body: child ?? const SizedBox.shrink(),
         );
       },
     );
   }
-
-  Future<void> _bringAppToForeground() async {
-    if (!Platform.isAndroid) return;
-
-    try {
-      await _appBridgeChannel.invokeMethod<bool>('bringToFront');
-    } catch (e) {
-      debugPrint('Bring to foreground failed: $e');
-    }
-  }
-}
-
-Future<void> _primeInitialActiveCallState() async {
-  try {
-    final calls = await FlutterCallkitIncoming.activeCalls();
-    final activeCall = _resolveActiveCall(calls, preferAccepted: true);
-    if (activeCall != null) {
-      globalActiveCallNotifier.value = activeCall;
-    }
-  } catch (e) {
-    debugPrint('Initial active call check failed: $e');
-  }
-}
-
-Map<String, dynamic>? _resolveActiveCall(
-  dynamic rawCalls, {
-  bool preferAccepted = false,
-}) {
-  if (rawCalls is! List || rawCalls.isEmpty) return null;
-
-  final parsedCalls = rawCalls
-      .whereType<Map>()
-      .map<Map<String, dynamic>?>((call) => _resolveCallInfo(call))
-      .whereType<Map<String, dynamic>>()
-      .toList();
-
-  if (parsedCalls.isEmpty) return null;
-
-  if (preferAccepted) {
-    final acceptedCall = parsedCalls.cast<Map<String, dynamic>?>().firstWhere(
-          (call) => call?['isAccepted'] == true,
-          orElse: () => null,
-        );
-    if (acceptedCall != null) return acceptedCall;
-  }
-
-  return parsedCalls.first;
-}
-
-Map<String, dynamic>? _resolveCallInfo(dynamic rawCall) {
-  if (rawCall is! Map) return null;
-
-  final call = Map<String, dynamic>.from(rawCall);
-  final callerFullName =
-      call['nameCaller']?.toString() ?? call['handle']?.toString() ?? 'Unknown';
-  final parts = callerFullName.split('\n');
-  final fallbackNumber = call['handle']?.toString() ?? '';
-  final name = parts.isNotEmpty && parts.first.trim().isNotEmpty
-      ? parts.first.trim()
-      : 'Unknown';
-  final number = parts.length > 1
-      ? parts.sublist(1).join('\n').trim()
-      : fallbackNumber.trim();
-
-  return {
-    'callerName': name,
-    'callerNumber': number,
-    'callId': call['id']?.toString() ?? '',
-    'isAccepted': _asBool(call['isAccepted']),
-  };
-}
-
-bool _asBool(dynamic value) {
-  if (value is bool) return value;
-  if (value is num) return value != 0;
-  if (value is String) {
-    final normalized = value.trim().toLowerCase();
-    return normalized == 'true' || normalized == '1';
-  }
-  return false;
 }
 
 int _localNotificationIdForMessage(RemoteMessage message) {

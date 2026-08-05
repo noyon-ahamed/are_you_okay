@@ -508,10 +508,14 @@ class LocalNotificationService {
 
   /// Cancel all check-in reminders
   Future<void> cancelCheckinReminders() async {
-    await _notifications.cancel(_reminder6hId);
-    await _notifications.cancel(_reminder2hId);
-    await _notifications.cancel(_reminder30mId);
-    debugPrint('Cancelled all check-in reminders');
+    try {
+      await _notifications.cancel(_reminder6hId);
+      await _notifications.cancel(_reminder2hId);
+      await _notifications.cancel(_reminder30mId);
+      debugPrint('Cancelled all check-in reminders');
+    } catch (e) {
+      debugPrint('Error cancelling check-in reminders: $e');
+    }
   }
 
   // Fixed IDs for the 3 daily reminders
@@ -521,10 +525,14 @@ class LocalNotificationService {
 
   /// Cancel the 3 fixed daily reminders
   Future<void> cancelDailyReminders() async {
-    await _notifications.cancel(_dailyMorningId);
-    await _notifications.cancel(_dailyNoonId);
-    await _notifications.cancel(_dailyNightId);
-    debugPrint('Cancelled 3 daily reminders');
+    try {
+      await _notifications.cancel(_dailyMorningId);
+      await _notifications.cancel(_dailyNoonId);
+      await _notifications.cancel(_dailyNightId);
+      debugPrint('Cancelled 3 daily reminders');
+    } catch (e) {
+      debugPrint('Error cancelling daily reminders: $e');
+    }
   }
 
   /// Show emergency alert
@@ -564,25 +572,45 @@ class LocalNotificationService {
 
   /// Cancel notification
   Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
+    try {
+      await _notifications.cancel(id);
+    } catch (e) {
+      debugPrint('Error cancelling notification $id: $e');
+    }
   }
 
   Future<void> cancelActiveReminderNotifications() async {
-    final activeNotifications = await getActiveNotifications();
-    for (final notification in activeNotifications) {
-      if (notification.channelId == 'checkin_reminders' &&
-          notification.id != null) {
-        await _notifications.cancel(notification.id!);
+    try {
+      final activeNotifications = await getActiveNotifications();
+      for (final notification in activeNotifications) {
+        if (notification.channelId == 'checkin_reminders' &&
+            notification.id != null) {
+          try {
+            await _notifications.cancel(notification.id!);
+          } catch (e) {
+            debugPrint('Error cancelling active notification ${notification.id}: $e');
+          }
+        }
       }
+    } catch (e) {
+      debugPrint('Error in cancelActiveReminderNotifications: $e');
     }
   }
 
   Future<void> cancelAllActiveNotifications() async {
-    final activeNotifications = await getActiveNotifications();
-    for (final notification in activeNotifications) {
-      if (notification.id != null) {
-        await _notifications.cancel(notification.id!);
+    try {
+      final activeNotifications = await getActiveNotifications();
+      for (final notification in activeNotifications) {
+        if (notification.id != null) {
+          try {
+            await _notifications.cancel(notification.id!);
+          } catch (e) {
+            debugPrint('Error cancelling active notification ${notification.id}: $e');
+          }
+        }
       }
+    } catch (e) {
+      debugPrint('Error in cancelAllActiveNotifications: $e');
     }
   }
 
@@ -592,45 +620,66 @@ class LocalNotificationService {
     String? body,
     String? payload,
   }) async {
-    if (id != null) {
-      await cancelNotification(id);
-      return;
-    }
-
-    final activeNotifications = await getActiveNotifications();
-    for (final notification in activeNotifications) {
-      final payloadMatches = payload != null &&
-          payload.isNotEmpty &&
-          notification.payload == payload;
-      final contentMatches = title != null &&
-          title.isNotEmpty &&
-          body != null &&
-          body.isNotEmpty &&
-          notification.title == title &&
-          notification.body == body;
-
-      if ((payloadMatches || contentMatches) && notification.id != null) {
-        await _notifications.cancel(notification.id!);
+    try {
+      if (id != null) {
+        await cancelNotification(id);
+        return;
       }
+
+      final activeNotifications = await getActiveNotifications();
+      for (final notification in activeNotifications) {
+        final payloadMatches = payload != null &&
+            payload.isNotEmpty &&
+            notification.payload == payload;
+        final contentMatches = title != null &&
+            title.isNotEmpty &&
+            body != null &&
+            body.isNotEmpty &&
+            notification.title == title &&
+            notification.body == body;
+
+        if ((payloadMatches || contentMatches) && notification.id != null) {
+          try {
+            await _notifications.cancel(notification.id!);
+          } catch (e) {
+            debugPrint('Error cancelling matching notification ${notification.id}: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in cancelMatchingNotification: $e');
     }
   }
 
   /// Cancel all notifications
   Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
+    try {
+      await _notifications.cancelAll();
+    } catch (e) {
+      debugPrint('Error cancelling all notifications: $e');
+    }
   }
 
   /// Get pending notifications
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    return await _notifications.pendingNotificationRequests();
+    try {
+      return await _notifications.pendingNotificationRequests();
+    } catch (e) {
+      debugPrint('Error getting pending notifications: $e');
+      return [];
+    }
   }
 
   /// Get active notifications (Android 6.0+)
   Future<List<ActiveNotification>> getActiveNotifications() async {
-    if (Platform.isAndroid) {
-      final plugin = _notifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      return await plugin?.getActiveNotifications() ?? [];
+    try {
+      if (Platform.isAndroid) {
+        final plugin = _notifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+        return await plugin?.getActiveNotifications() ?? [];
+      }
+    } catch (e) {
+      debugPrint('Error getting active notifications: $e');
     }
     return [];
   }

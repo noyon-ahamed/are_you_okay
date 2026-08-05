@@ -1221,10 +1221,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.invalidate(checkinHistoryProvider); // Refresh local history UI
 
         // Cancel remaining check-in reminder notifications & schedule new ones
-        final notifService = LocalNotificationService();
-        await notifService.cancelCheckinReminders();
-        await notifService.cancelActiveReminderNotifications();
-        await notifService.cancelDailyReminders();
+        try {
+          final notifService = LocalNotificationService();
+          await notifService.cancelCheckinReminders();
+          await notifService.cancelActiveReminderNotifications();
+          await notifService.cancelDailyReminders();
+        } catch (notifErr) {
+          debugPrint('Failed to cancel notifications after check-in: $notifErr');
+        }
 
         // Save check-in time for background service WorkManager
         // Use SharedPrefsService so background_service.dart reads the same key ('last_checkin' int)
