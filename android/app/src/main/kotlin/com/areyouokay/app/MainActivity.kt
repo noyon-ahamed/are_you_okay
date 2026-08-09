@@ -1,13 +1,20 @@
 package com.areyouokay.app
 
 import android.content.Intent
-import io.flutter.embedding.android.FlutterActivity
+import android.os.Bundle
+import androidx.activity.enableEdgeToEdge
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val APP_CHANNEL = "com.areyouokay.app/app"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

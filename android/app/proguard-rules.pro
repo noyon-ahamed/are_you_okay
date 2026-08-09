@@ -16,3 +16,8 @@
 
 # Flutter Engine rules
 -keep class io.flutter.** { *; }
+
+# Suppress warnings for missing Play Core classes used in Flutter PlayStoreSplit / DeferredComponents
+-dontwarn com.google.android.play.core.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
+

@@ -6,6 +6,7 @@ import 'auth/token_storage_service.dart';
 import 'local_notification_history_service.dart';
 import 'notification_navigation_service.dart';
 import 'notification_service.dart';
+import 'shared_prefs_service.dart';
 
 class NotificationSyncService {
   NotificationSyncService._internal();
@@ -129,9 +130,23 @@ class NotificationSyncService {
         final normalizedType = _normalizedType(notification);
         final createdAt = _parseCreatedAt(notification);
         final age = now.difference(createdAt);
+
+        bool isReminderStale = false;
+        if (normalizedType == 'reminder') {
+          final lastCheckIn = SharedPrefsService().lastCheckIn;
+          if (lastCheckIn != null) {
+            final isAfterCreatedAt = lastCheckIn.isAfter(createdAt);
+            final isWithin24h = now.difference(lastCheckIn).inHours < 24;
+            if (isAfterCreatedAt || isWithin24h) {
+              isReminderStale = true;
+            }
+          }
+        }
+
         final shouldSurface = surfacedCount < _maxSurfaceCount &&
             age <= _maxSurfaceAge &&
-            normalizedType != 'system_announcement';
+            normalizedType != 'system_announcement' &&
+            !isReminderStale;
 
         if (shouldSurface) {
           if (normalizedType == 'reminder') {
