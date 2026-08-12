@@ -28,10 +28,24 @@ class ConfigApiService {
       final settings = config['settings'] as Map<String, dynamic>?;
       final maxContacts = settings?['maxEmergencyContacts'];
       if (maxContacts is num && maxContacts > 0) {
-        return maxContacts.toInt();
+        return maxContacts.toInt().clamp(1, AppConstants.maxEmergencyContacts);
       }
     } catch (_) {}
 
     return AppConstants.maxEmergencyContacts;
+  }
+
+  /// Get version and update details from backend config
+  Future<Map<String, dynamic>?> getUpdateConfig() async {
+    try {
+      final config = await getConfig();
+      return {
+        'minAppVersion': config['minAppVersion'],
+        'latestAppVersion': config['latestAppVersion'],
+        'updateInfo': config['updateInfo'],
+      };
+    } catch (_) {
+      return null;
+    }
   }
 }

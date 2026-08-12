@@ -95,9 +95,7 @@ class ContactRepository {
     final maxContacts = await getMaxEmergencyContacts();
     final currentCount = await _getContactCount();
     if (currentCount >= maxContacts) {
-      throw Exception(
-        'সর্বোচ্চ $maxContacts টি কন্টাক্ট যোগ করা যায়',
-      );
+      throw Exception('CONTACT_LIMIT_REACHED:$maxContacts');
     }
 
     final backendContact = await api.addContact(

@@ -576,13 +576,13 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
               fontFamily: 'HindSiliguri', fontWeight: FontWeight.bold),
           unselectedLabelStyle: const TextStyle(fontFamily: 'HindSiliguri'),
           tabs: [
+            Tab(text: s.earthquakeTabGlobal),
+            Tab(text: s.earthquakeTabNearWithRadius(_nearbyRadiusKm)),
             Tab(
               text: _selectedCountry.isEmpty
                   ? s.earthquakeTabCountry
                   : _selectedCountry,
             ),
-            Tab(text: s.earthquakeTabNearWithRadius(_nearbyRadiusKm)),
-            Tab(text: s.earthquakeTabGlobal),
           ],
         ),
       ),
@@ -597,11 +597,10 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                       onRefresh: _fetchEarthquakeData,
                       child: _buildTabContent(
                         context,
-                        _countryQuakes,
+                        _globalQuakes,
                         s,
                         false,
-                        headerMessage:
-                            s.earthquakeCountryRecent(_selectedCountry),
+                        headerMessage: s.earthquakeGlobalRecent,
                       ),
                     ),
                     // TAB 1: Near Me
@@ -616,15 +615,16 @@ class _EarthquakeScreenState extends ConsumerState<EarthquakeScreen>
                             s.earthquakeNearMeRecent(_nearbyRadiusKm),
                       ),
                     ),
-                    // TAB 2: Global
+                    // TAB 2: Country / Bangladesh
                     RefreshIndicator(
                       onRefresh: _fetchEarthquakeData,
                       child: _buildTabContent(
                         context,
-                        _globalQuakes,
+                        _countryQuakes,
                         s,
                         false,
-                        headerMessage: s.earthquakeGlobalRecent,
+                        headerMessage:
+                            s.earthquakeCountryRecent(_selectedCountry),
                       ),
                     ),
                   ],

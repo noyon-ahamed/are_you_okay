@@ -257,24 +257,35 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen>
     final suggestions = s.aiChatSuggestions;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: suggestions.map((s) {
+      height: 44,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: suggestions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = suggestions[index];
           return ActionChip(
-            label: Text(s,
-                style:
-                    const TextStyle(fontFamily: 'HindSiliguri', fontSize: 13)),
-            onPressed: () {
-              _sendMessage(s);
-            },
+            label: Text(
+              item,
+              style: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            onPressed: () => _sendMessage(item),
             // ignore: deprecated_member_use
             backgroundColor: AppColors.primary.withOpacity(0.08),
             // ignore: deprecated_member_use
             side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
           );
-        }).toList(),
+        },
       ),
     );
   }

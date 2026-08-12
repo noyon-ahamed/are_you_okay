@@ -26,6 +26,7 @@ import '../../../services/api/mood_api_service.dart';
 import '../../../services/mood_local_service.dart';
 import '../../../services/shared_prefs_service.dart';
 import '../../../services/voice_detector_service.dart';
+import '../../../services/in_app_update_service.dart';
 import '../../../provider/settings_provider.dart';
 import '../../../provider/mood_provider.dart';
 import '../../widgets/custom_button.dart';
@@ -113,6 +114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // Request permissions after login
       _requestPermissions();
       _checkForMissingEmergencyContacts();
+      _checkInAppUpdate();
     });
     pendingNotificationAction.addListener(_handlePendingReminderAction);
 
@@ -214,6 +216,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     if (!mounted || !shouldOpenContacts) return;
     context.push(Routes.contacts);
+  }
+
+  Future<void> _checkInAppUpdate() async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    final s = ref.read(stringsProvider);
+    await InAppUpdateService().checkAndShowUpdateDialog(context, strings: s);
   }
 
   void _initVoiceSOS() {
@@ -744,49 +753,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(
               AppConstants.moodEmojis.length,
-              (index) => GestureDetector(
-                onTap: _isSavingMood ? null : () => _onMoodSelected(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _selectedMood == index
-                        // ignore: deprecated_member_use
-                        ? AppColors.primary.withOpacity(0.12)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
+              (index) => Expanded(
+                child: GestureDetector(
+                  onTap: _isSavingMood ? null : () => _onMoodSelected(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                    decoration: BoxDecoration(
                       color: _selectedMood == index
-                          ? AppColors.primary
+                          // ignore: deprecated_member_use
+                          ? AppColors.primary.withOpacity(0.12)
                           : Colors.transparent,
-                      width: 2,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedMood == index
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        width: 2,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        AppConstants.moodEmojis[index],
-                        style: TextStyle(
-                          fontSize: _selectedMood == index ? 28 : 24,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            AppConstants.moodEmojis[index],
+                            style: TextStyle(
+                              fontSize: _selectedMood == index ? 26 : 22,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        s.moodLabels[index],
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontFamily: 'HindSiliguri',
-                          fontWeight: _selectedMood == index
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          color: _selectedMood == index
-                              ? AppColors.primary
-                              : (isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondary),
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            s.moodLabels[index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontFamily: 'HindSiliguri',
+                              fontWeight: _selectedMood == index
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: _selectedMood == index
+                                  ? AppColors.primary
+                                  : (isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -805,42 +824,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           if (!_isSavingMood) ...[
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_selectedMood >= 0) ...[
-                  Flexible(
-                    child: CustomButton(
-                      text: s.homeMoodSave,
-                      icon: Icons.check,
-                      onPressed: _isSavingMood ? null : _saveMood,
-                      isLoading: _isSavingMood,
-                      backgroundColor: AppColors.primary,
-                      textColor: Colors.white,
+            Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_selectedMood >= 0)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 160),
+                      child: CustomButton(
+                        text: s.homeMoodSave,
+                        icon: Icons.check,
+                        onPressed: _isSavingMood ? null : _saveMood,
+                        isLoading: _isSavingMood,
+                        backgroundColor: AppColors.primary,
+                        textColor: Colors.white,
+                      ),
+                    ),
+                  TextButton.icon(
+                    onPressed: () => context.push(Routes.moodHistory),
+                    icon: const Icon(Icons.history, size: 18),
+                    label: Text(
+                      s.homeMoodHistory,
+                      style: const TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
                 ],
-                TextButton.icon(
-                  onPressed: () => context.push(Routes.moodHistory),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: Text(
-                    s.homeMoodHistory,
-                    style: const TextStyle(
-                      fontFamily: 'HindSiliguri',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ],
@@ -873,15 +896,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         gradient: [const Color(0xFF00BCD4), const Color(0xFF0097A7)],
         route: Routes.contacts,
       ),
-      /*
-      _QuickAction(
-        icon: Icons.phone_callback_outlined,
-        label: s.actionFakeCall,
-        color: const Color(0xFFFF9800),
-        gradient: [const Color(0xFFFF9800), const Color(0xFFF57C00)],
-        route: Routes.fakeCall,
-      ),
-      */
       _QuickAction(
         icon: Icons.public,
         label: s.actionEarthquake,
@@ -905,7 +919,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisCount: 3,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.0,
+        childAspectRatio: 0.9,
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {

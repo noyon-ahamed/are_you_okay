@@ -252,17 +252,18 @@ class AppStrings {
       ? 'ভাষা নির্বাচন করুন / Select Language'
       : 'Select Language / ভাষা নির্বাচন করুন';
 
-  String get settingsVoiceSOS => isBangla ? 'ভয়েস SOS (চিৎকার শনাক্তকরণ)' : 'Voice SOS (Scream Detection)';
-  String get settingsVoiceSOSDesc => isBangla 
-      ? 'খুব জোরে চিৎকার করলে এটি অটোমেটিক SOS অ্যালার্ট চালু করবে' 
+  String get settingsVoiceSOS => isBangla
+      ? 'ভয়েস SOS (চিৎকার শনাক্তকরণ)'
+      : 'Voice SOS (Scream Detection)';
+  String get settingsVoiceSOSDesc => isBangla
+      ? 'খুব জোরে চিৎকার করলে এটি অটোমেটিক SOS অ্যালার্ট চালু করবে'
       : 'Triggers SOS automatically if a loud scream is detected';
   String get settingsVoiceSOSPermission => isBangla
       ? 'এই ফিচারের জন্য মাইক্রোফোন পারমিশন প্রয়োজন'
       : 'Microphone permission is required for this feature';
 
-  String get settingsVoiceSOSPopupTitle => isBangla
-      ? 'মাইক্রোফোন অ্যাক্সেস'
-      : 'Microphone Access';
+  String get settingsVoiceSOSPopupTitle =>
+      isBangla ? 'মাইক্রোফোন অ্যাক্সেস' : 'Microphone Access';
 
   String get settingsVoiceSOSPopupBody => isBangla
       ? 'ভয়েস SOS জরুরি অবস্থায় চিৎকার শনাক্ত করতে মাইক্রোফোন ব্যবহার করে। আপনার গোপনীয়তা আমাদের কাছে গুরুত্বপূর্ণ; অ্যাপটি শুধু শব্দের উচ্চতা পরীক্ষা করে, কোনো ভয়েস রেকর্ড বা সেভ করে না।'
@@ -366,24 +367,27 @@ class AppStrings {
   String get contactsEmailMissedAlert => isBangla
       ? 'ইমেইল (চেক-ইন মিস করলে অ্যালার্ট পাবে)'
       : 'Email (will get alert if check-in missed)';
-  String get contactsNewContact => isBangla ? 'নতুন কন্টাক্ট' : 'New Contact';
+  String get contactsNewContact =>
+      isBangla ? 'নতুন জরুরি কন্টাক্ট' : 'New Emergency Contact';
   String get contactsNameHint =>
-      isBangla ? 'পূর্ণ নাম লিখুন' : 'Full Name';
-  String get contactsNameReq => isBangla ? 'নাম প্রয়োজন' : 'Name required';
-  String get contactsPhoneHint => isBangla
-      ? '১১ সংখ্যার মোবাইল নম্বর (যেমন: 017XXXXXXXX)'
-      : '11-digit phone number (e.g. 017XXXXXXXX)';
+      isBangla ? 'কন্টাক্টের পূর্ণ নাম লিখুন ' : 'Enter full name ';
+  String get contactsNameReq =>
+      isBangla ? 'কন্টাক্টের পূর্ণ নাম লিখুন' : 'Full name is required';
+  String get contactsPhoneHint =>
+      isBangla ? '১১ সংখ্যার মোবাইল নম্বর ' : '11-digit phone number ';
   String get contactsPhoneReq =>
-      isBangla ? 'ফোন নম্বর প্রয়োজন' : 'Phone number required';
-  String get contactsPhoneInvalid =>
-      isBangla ? 'সঠিক ফোন নম্বর লিখুন' : 'Enter valid phone number';
+      isBangla ? 'ফোন নম্বর দেওয়া আবশ্যক' : 'Phone number is required';
+  String get contactsPhoneInvalid => isBangla
+      ? '১১ সংখ্যার সঠিক ফোন নম্বর লিখুন'
+      : 'Enter a valid 11-digit mobile number';
   String get contactsRelationHint => isBangla
-      ? 'যেমন: মা, বাবা, বন্ধু, ভাই'
-      : 'e.g. Mother, Father, Friend, Brother';
-  String get contactsRelationReq =>
-      isBangla ? 'সম্পর্ক উল্লেখ করুন' : 'Please mention relation';
+      ? 'সম্পর্ক লিখুন (যেমন: মা, বাবা, স্বামী/স্ত্রী, বন্ধু)'
+      : 'Enter relation ';
+  String get contactsRelationReq => isBangla
+      ? 'কন্টাক্টের সাথে সম্পর্ক উল্লেখ করুন'
+      : 'Please specify relation';
   String get contactsPriorityLevel =>
-      isBangla ? 'অগ্রাধিকার লেভেল' : 'Priority Level';
+      isBangla ? 'অগ্রাধিকার লেভেল (Priority)' : 'Priority Level';
   String get contactsPriorityDesc => isBangla
       ? '১ নং স্থান সর্বাধিক অগ্রাধিকার পাবে।'
       : '#1 priority will be alerted first.';
@@ -393,8 +397,9 @@ class AppStrings {
       isBangla ? 'SMS এর মাধ্যমে জানান' : 'Notify via SMS';
   String get contactsNotifyEmail =>
       isBangla ? 'ইমেইলের মাধ্যমে জানান' : 'Notify via Email';
-  String get contactsAddedToast =>
-      isBangla ? 'নতুন কন্টাক্ট যোগ করা হয়েছে।' : 'New contact added.';
+  String get contactsAddedToast => isBangla
+      ? 'জরুরি কন্টাক্ট সফলভাবে যোগ করা হয়েছে।'
+      : 'Emergency contact added successfully.';
   String get contactsLimitTitle =>
       isBangla ? 'কন্টাক্ট সীমা পূর্ণ' : 'Contact limit reached';
   String contactsLimitMessage([int max = AppConstants.maxEmergencyContacts]) =>
@@ -403,20 +408,24 @@ class AppStrings {
           : 'You can add up to $max emergency contacts only.';
   String contactsCounterLabel(int count,
           [int max = AppConstants.maxEmergencyContacts]) =>
-      isBangla ? '$count / $max কন্টাক্ট যুক্ত' : '$count / $max contacts added';
-  String get contactsReminderTitle => isBangla
-      ? 'জরুরি কন্টাক্ট যোগ করুন'
-      : 'Add emergency contacts';
+      isBangla
+          ? '$count / $max কন্টাক্ট যুক্ত'
+          : '$count / $max contacts added';
+  String get contactsReminderTitle =>
+      isBangla ? 'জরুরি কন্টাক্ট যোগ করুন' : 'Add emergency contacts';
   String get contactsReminderMessage => isBangla
       ? 'আপনার নিরাপত্তার জন্য কমপক্ষে একটি জরুরি কন্টাক্ট যোগ করা দরকার। এখনই যোগ করলে SOS ও missed check-in alert দ্রুত পাঠানো যাবে।'
       : 'For your safety, please add at least one emergency contact. This helps SOS and missed check-in alerts reach someone quickly.';
-  String get contactsReminderAdd =>
-      isBangla ? 'এখন যোগ করুন' : 'Add';
-  String get contactsReminderLater =>
-      isBangla ? 'পরে' : 'Later';
+  String get contactsReminderAdd => isBangla ? 'এখন যোগ করুন' : 'Add';
+  String get contactsReminderLater => isBangla ? 'পরে' : 'Later';
   String get contactsFormIntro => isBangla
       ? 'জরুরি অ্যালার্টের জন্য কন্টাক্ট যুক্ত করুন। সর্বোচ্চ ৫ জন যোগ করা যাবে।'
       : 'Add contacts for emergency alerts. You can add up to 5 contacts.';
+  String get contactsQuickRelationTitle =>
+      isBangla ? 'দ্রুত সম্পর্ক বেছে নিন:' : 'Quick select relationship:';
+  List<String> get contactsQuickRelations => isBangla
+      ? ['মা', 'বাবা', 'স্বামী/স্ত্রী', 'বন্ধু', 'ভাই/বোন', 'অন্যান্য']
+      : ['Mother', 'Father', 'Spouse', 'Friend', 'Sibling', 'Other'];
 
   // ===================== Earthquake =====================
   String get earthquakeTitle =>
@@ -452,7 +461,8 @@ class AppStrings {
   String get earthquakeCachedData => isBangla
       ? 'নতুন ডাটা আনার সময় আপাতত সর্বশেষ সংরক্ষিত ভূমিকম্প তথ্য দেখানো হচ্ছে।'
       : 'Showing the last saved earthquake data while refreshing.';
-  String get earthquakeLocTitle => isBangla ? 'লোকেশন চালু করুন' : 'Turn on location';
+  String get earthquakeLocTitle =>
+      isBangla ? 'লোকেশন চালু করুন' : 'Turn on location';
   String get earthquakeLocBody => isBangla
       ? 'ভূমিকম্প স্ক্রিন দেখতে হলে লোকেশন অন এবং পারমিশন দেয়া লাগবে। এতে আপনার দেশ, Near You, আর সতর্কবার্তা ঠিকমতো কাজ করবে।'
       : 'Earthquake alerts need location access to show your country, Near You data, and send accurate alerts.';
@@ -463,7 +473,8 @@ class AppStrings {
   String earthquakeNearMeRecent(int radius) => isBangla
       ? '$radius কিমির মধ্যে থাকা ভূমিকম্প কাছেরটি আগে দেখানো হচ্ছে'
       : 'Showing earthquakes within $radius km, closest first';
-  String get earthquakeGlobalRecent => isBangla ? 'বিশ্বজুড়ে বড় ভূমিকম্প' : 'Major earthquakes worldwide';
+  String get earthquakeGlobalRecent =>
+      isBangla ? 'বিশ্বজুড়ে বড় ভূমিকম্প' : 'Major earthquakes worldwide';
 
   // ===================== Toast Messages =====================
   String get toastCheckinSuccess =>
@@ -659,22 +670,14 @@ class AppStrings {
       ? const [
           '🤕 মাথাব্যথা হচ্ছে',
           '😴 ঘুম হচ্ছে না',
-          '😔 মন খারাপ লাগছে',
+          '🧘 স্ট্রেস কমানোর উপায়',
           '🤒 জ্বর হলে কী করব?',
-          '💊 ওষুধ খাওয়ার নিয়ম',
-          '🧘 স্ট্রেস কমানোর উপায়',
-          '🏃 ব্যায়ামের পরামর্শ',
-          '🍎 সুষম খাদ্যতালিকা',
         ]
       : const [
           '🤕 I have a headache',
-          '😴 I cannot sleep',
-          '😔 I feel low',
-          '🤒 What should I do for fever?',
-          '💊 How should I take medicine?',
-          '🧘 Ways to reduce stress',
-          '🏃 Exercise advice',
-          '🍎 Balanced diet tips',
+          '😴 Trouble sleeping',
+          '🧘 Reduce stress',
+          '🤒 What to do for fever?',
         ];
 
   // ===================== Fake Call =====================
@@ -752,4 +755,16 @@ class AppStrings {
   String get notifMissedDeadlineBody => isBangla
       ? 'আপনি অনেকক্ষণ ধরে অ্যাপে আসেননি। অনুগ্রহ করে চেক-ইন করুন।'
       : 'You haven\'t used the app in a while. Please check in.';
+
+  // ===================== In-App Update =====================
+  String get updateTitle =>
+      isBangla ? 'নতুন আপডেট উপলব্ধ 🚀' : 'New Update Available 🚀';
+  String get updateNowBtn => isBangla ? 'এখনই আপডেট করুন' : 'Update Now';
+  String get updateLaterBtn => isBangla ? 'পরে করবো' : 'Later';
+  String get updateForceWarning => isBangla
+      ? 'আপনার অ্যাপ ভার্সনটি পুরনো। নিরাপত্তা ও সেবার মান নিশ্চিতে এখনই আপডেট করুন।'
+      : 'Your app version is outdated. A required update is needed to continue.';
+  String get updateVersionBadge => isBangla ? 'নতুন ভার্সন' : 'New Version';
+  String get updateCurrentVersion => isBangla ? 'বর্তমান' : 'Current';
+  String get updateWhatsNew => isBangla ? 'নতুন কী থাকছে:' : 'What\'s New:';
 }

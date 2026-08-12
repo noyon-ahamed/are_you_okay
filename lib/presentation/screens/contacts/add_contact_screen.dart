@@ -185,11 +185,55 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
                 prefixIcon: Icons.people_outline,
                 textInputAction: TextInputAction.next,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.trim().isEmpty) {
                     return s.contactsRelationReq;
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                s.contactsQuickRelationTitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: s.contactsQuickRelations.map((relationChoice) {
+                  final isSelected =
+                      _relationshipController.value.text.trim() == relationChoice;
+                  return ChoiceChip(
+                    label: Text(
+                      relationChoice,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary),
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedColor: AppColors.primary,
+                    backgroundColor: isDark
+                        ? AppColors.surfaceVariantDark
+                        : AppColors.surfaceVariant,
+                    onSelected: (selected) {
+                      setState(() {
+                        _relationshipController.value.text =
+                            selected ? relationChoice : '';
+                      });
+                    },
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
 
@@ -355,9 +399,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
+        final errorMsg = e.toString();
+        if (errorMsg.contains('CONTACT_LIMIT_REACHED') || errorMsg.contains('Maximum')) {
+          await _showContactLimitDialog(s, maxContacts);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMsg.replaceFirst('Exception: ', ''))),
+          );
+        }
       }
     }
   }
