@@ -14,7 +14,7 @@ class AppConstants {
   static const String appNameBangla = 'ভালো আছেন কি?';
   static const String appTagline = 'Apnar safety, amader dayitto';
   static const String appTaglineBangla = 'আপনার নিরাপত্তা, আমাদের দায়িত্ব';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '2.0.0+7';
 
   // Timing Constants
   static const int defaultCheckinIntervalDays = 3; // 3 days

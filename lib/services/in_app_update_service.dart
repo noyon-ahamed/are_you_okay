@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:in_app_update/in_app_update.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,34 +21,37 @@ class InAppUpdateService {
   final ConfigApiService _configApi = ConfigApiService();
   bool _isCheckingOrShowing = false;
 
-  /// Compare two semantic version strings (e.g. "1.0.0" vs "1.0.1")
-  /// Returns:
-  /// - negative if v1 < v2
-  /// - 0 if v1 == v2
-  /// - positive if v1 > v2
+  /// Compare two version strings (e.g. "2.0.0+7" vs "2.0.0+8" or "2.0.0" vs "2.0.1")
   int compareVersions(String v1, String v2) {
     try {
-      final cleanV1 = v1.split('+').first.trim();
-      final cleanV2 = v2.split('+').first.trim();
+      final partsV1 = v1.split('+');
+      final partsV2 = v2.split('+');
 
-      final parts1 = cleanV1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      final parts2 = cleanV2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final semV1 = partsV1.first.trim();
+      final semV2 = partsV2.first.trim();
 
-      final maxLength = parts1.length > parts2.length ? parts1.length : parts2.length;
+      final p1 = semV1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final p2 = semV2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+
+      final maxLength = p1.length > p2.length ? p1.length : p2.length;
       for (int i = 0; i < maxLength; i++) {
-        final num1 = i < parts1.length ? parts1[i] : 0;
-        final num2 = i < parts2.length ? parts2[i] : 0;
+        final num1 = i < p1.length ? p1[i] : 0;
+        final num2 = i < p2.length ? p2[i] : 0;
         if (num1 != num2) {
           return num1.compareTo(num2);
         }
       }
-      return 0;
+
+      // If semantic versions are identical, compare build number (e.g. +7 vs +8)
+      final code1 = partsV1.length > 1 ? (int.tryParse(partsV1[1].trim()) ?? 0) : 0;
+      final code2 = partsV2.length > 1 ? (int.tryParse(partsV2[1].trim()) ?? 0) : 0;
+      return code1.compareTo(code2);
     } catch (_) {
       return 0;
     }
   }
 
-  /// Check version from backend config and display in-app update dialog if needed
+  /// Check version from backend config & Google Play InAppUpdate API
   Future<void> checkAndShowUpdateDialog(
     BuildContext context, {
     required AppStrings strings,
@@ -55,6 +60,26 @@ class InAppUpdateService {
     _isCheckingOrShowing = true;
 
     try {
+      // First try official Android Google Play InAppUpdate API if on Android
+      if (Platform.isAndroid) {
+        try {
+          final playUpdateInfo = await InAppUpdate.checkForUpdate();
+          if (playUpdateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+            if (playUpdateInfo.immediateUpdateAllowed) {
+              await InAppUpdate.performImmediateUpdate();
+              return;
+            } else if (playUpdateInfo.flexibleUpdateAllowed) {
+              await InAppUpdate.startFlexibleUpdate();
+              await InAppUpdate.completeFlexibleUpdate();
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Google Play InAppUpdate check failed: $e');
+        }
+      }
+
+      // Check version from backend config endpoint
       final updateData = await _configApi.getUpdateConfig();
       if (updateData == null || !context.mounted) return;
 
@@ -72,7 +97,15 @@ class InAppUpdateService {
           ? (latestVersionObj[platformKey]?.toString() ?? AppConstants.appVersion)
           : AppConstants.appVersion;
 
-      const String currentVersion = AppConstants.appVersion;
+      String currentVersion = AppConstants.appVersion;
+      try {
+        final info = await PackageInfo.fromPlatform();
+        if (info.version.isNotEmpty) {
+          currentVersion = info.buildNumber.isNotEmpty
+              ? '${info.version}+${info.buildNumber}'
+              : info.version;
+        }
+      } catch (_) {}
 
       final isBelowMin = compareVersions(currentVersion, minVersion) < 0;
       final isOutdated = compareVersions(currentVersion, latestVersion) < 0;
@@ -90,13 +123,12 @@ class InAppUpdateService {
           prefs.getString(_keyLastUpdatedClickedVersion);
 
       if (!isForceUpdate && lastClickedVersion == latestVersion) {
-        // User already clicked Update Now for this version; skip until a newer version comes
         return;
       }
 
       if (!context.mounted) return;
 
-      await _showUpdateDialog(
+      await _showUpdateBottomSheet(
         context: context,
         strings: strings,
         currentVersion: currentVersion,
@@ -113,7 +145,8 @@ class InAppUpdateService {
     }
   }
 
-  Future<void> _showUpdateDialog({
+  /// Displays modern, high-end Bottom Sheet with Close (X) Icon & In-App Update flow
+  Future<void> _showUpdateBottomSheet({
     required BuildContext context,
     required AppStrings strings,
     required String currentVersion,
@@ -125,9 +158,8 @@ class InAppUpdateService {
   }) async {
     final lang = strings.isBangla ? 'bn' : 'en';
 
-    // Parse custom release notes/title or use default localized strings
     final titleObj = updateInfo?['title'];
-    final String dialogTitle = (titleObj is Map
+    final String sheetTitle = (titleObj is Map
             ? titleObj[lang]?.toString()
             : null) ??
         strings.updateTitle;
@@ -151,28 +183,50 @@ class InAppUpdateService {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return showDialog<void>(
+    return showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: !isForceUpdate,
+      isScrollControlled: true,
+      isDismissible: !isForceUpdate,
+      enableDrag: !isForceUpdate,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
       builder: (context) {
         return PopScope(
           canPop: !isForceUpdate,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
             ),
-            backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-            contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            content: Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon & Title Header
+                // Top drag handle
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.borderDark
+                          : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Header Row with Icon, Title, and Close (X) Button
                 Row(
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [AppColors.primary, Color(0xFF6C63FF)],
@@ -182,65 +236,38 @@ class InAppUpdateService {
                       child: const Icon(
                         Icons.system_update_rounded,
                         color: Colors.white,
-                        size: 26,
+                        size: 24,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dialogTitle,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimary,
-                              fontFamily: 'HindSiliguri',
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'v$latestVersion',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${strings.updateCurrentVersion}: v$currentVersion',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      child: Text(
+                        sheetTitle,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                          fontFamily: 'HindSiliguri',
+                        ),
                       ),
                     ),
+                    if (!isForceUpdate)
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                        tooltip: 'Close',
+                      ),
                   ],
                 ),
 
                 const SizedBox(height: 16),
 
-                // Force update warning or What's New banner
+                // Force update warning if applicable
                 if (isForceUpdate)
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -275,6 +302,7 @@ class InAppUpdateService {
                     ),
                   ),
 
+                // What's New Title
                 Text(
                   strings.updateWhatsNew,
                   style: TextStyle(
@@ -286,19 +314,21 @@ class InAppUpdateService {
                     fontFamily: 'HindSiliguri',
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
 
+                // Release Notes Card
                 Container(
                   width: double.infinity,
-                  constraints: const BoxConstraints(maxHeight: 140),
+                  constraints: const BoxConstraints(maxHeight: 150),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isDark
                         ? AppColors.surfaceVariantDark
                         : AppColors.surfaceVariant.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Text(
                       releaseNotes,
                       style: TextStyle(
@@ -315,7 +345,7 @@ class InAppUpdateService {
 
                 const SizedBox(height: 20),
 
-                // Action Buttons
+                // Action Buttons (Update Now & Later)
                 Row(
                   children: [
                     if (!isForceUpdate) ...[
@@ -330,9 +360,9 @@ class InAppUpdateService {
                                   ? AppColors.borderDark
                                   : AppColors.divider,
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
@@ -347,17 +377,40 @@ class InAppUpdateService {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                     ],
                     Expanded(
-                      child: ElevatedButton(
+                      flex: 2,
+                      child: ElevatedButton.icon(
                         onPressed: () async {
-                          // Store clicked version so we don't nag again for this version once updated
                           await prefs.setString(
                               _keyLastUpdatedClickedVersion, latestVersion);
                           if (context.mounted) {
                             Navigator.pop(context);
                           }
+
+                          // 1. Try official Play Store InAppUpdate API (Direct In-App Download)
+                          if (Platform.isAndroid) {
+                            try {
+                              final playUpdateInfo =
+                                  await InAppUpdate.checkForUpdate();
+                              if (playUpdateInfo.updateAvailability ==
+                                  UpdateAvailability.updateAvailable) {
+                                if (playUpdateInfo.immediateUpdateAllowed) {
+                                  await InAppUpdate.performImmediateUpdate();
+                                  return;
+                                } else if (playUpdateInfo.flexibleUpdateAllowed) {
+                                  await InAppUpdate.startFlexibleUpdate();
+                                  await InAppUpdate.completeFlexibleUpdate();
+                                  return;
+                                }
+                              }
+                            } catch (e) {
+                              debugPrint('InAppUpdate API error: $e');
+                            }
+                          }
+
+                          // 2. Fallback to Play Store URL if in-app API not available
                           try {
                             final uri = Uri.parse(storeUrl);
                             if (await canLaunchUrl(uri)) {
@@ -370,19 +423,22 @@ class InAppUpdateService {
                             debugPrint('Could not launch store URL: $e');
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: Text(
                           strings.updateNowBtn,
                           style: const TextStyle(
                             fontFamily: 'HindSiliguri',
                             fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
