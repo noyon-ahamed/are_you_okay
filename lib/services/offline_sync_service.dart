@@ -105,9 +105,18 @@ class OfflineSyncService {
 
       if (lastCheckIn == null) return; // No check-in history
 
+      final now = DateTime.now();
+      final isSameDay = lastCheckIn.year == now.year &&
+          lastCheckIn.month == now.month &&
+          lastCheckIn.day == now.day;
+      final hoursSinceCheckIn = now.difference(lastCheckIn).inHours;
+
+      if (isSameDay || hoursSinceCheckIn < 24) {
+        return; // Already checked in today or recently
+      }
+
       // The current app flow treats check-in eligibility as a 24 hour window.
       final deadline = lastCheckIn.add(const Duration(hours: 24));
-      final now = DateTime.now();
       final missedNotificationId = 'missed-${deadline.millisecondsSinceEpoch}';
 
       // If deadline has passed

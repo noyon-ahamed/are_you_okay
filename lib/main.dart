@@ -294,7 +294,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
     surfacedLocally = true;
   } else if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
-    if (message.notification == null) {
+    final checkedInRecently = await _isAlreadyCheckedInRecently();
+    if (checkedInRecently) {
+      debugPrint('Skipping background reminder push — user already checked in recently.');
+    } else if (message.notification == null) {
       await notifService.showCheckinReminder(
         id: localNotificationId,
         title: title,
@@ -322,6 +325,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     notificationIdOverride: localNotificationId,
     surfacedLocally: surfacedLocally,
   );
+}
+
+Future<bool> _isAlreadyCheckedInRecently() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final lastCheckInTs = prefs.getInt(AppConstants.keyLastCheckin);
+    if (lastCheckInTs == null) return false;
+    final lastCheckIn = DateTime.fromMillisecondsSinceEpoch(lastCheckInTs);
+    final now = DateTime.now();
+    final isSameDay = lastCheckIn.year == now.year &&
+        lastCheckIn.month == now.month &&
+        lastCheckIn.day == now.day;
+    final isWithin24h = now.difference(lastCheckIn).inHours < 24;
+    return isSameDay || isWithin24h;
+  } catch (e) {
+    debugPrint('Error checking recent check-in status: $e');
+    return false;
+  }
 }
 
 Future<void> _handleFirebaseMessage(RemoteMessage message) async {
@@ -370,13 +391,18 @@ Future<void> _handleFirebaseMessage(RemoteMessage message) async {
   final localNotificationId = _localNotificationIdForMessage(message);
 
   if (data['type'] == 'checkin_reminder' || data['type'] == 'reminder') {
-    await notifService.showCheckinReminder(
-      id: localNotificationId,
-      title: title,
-      body: body,
-      payload: payload,
-      badgeCount: badgeCount,
-    );
+    final checkedInRecently = await _isAlreadyCheckedInRecently();
+    if (checkedInRecently) {
+      debugPrint('Skipping foreground reminder push — user already checked in recently.');
+    } else {
+      await notifService.showCheckinReminder(
+        id: localNotificationId,
+        title: title,
+        body: body,
+        payload: payload,
+        badgeCount: badgeCount,
+      );
+    }
   } else if (data['isClose'] == '1' || isSeismicClose) {
     await EarthquakeAlarmService().startCloseAlert(
       eventId: data['eventId']?.toString() ??

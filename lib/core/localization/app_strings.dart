@@ -368,25 +368,25 @@ class AppStrings {
       : 'Email (will get alert if check-in missed)';
   String get contactsNewContact => isBangla ? 'নতুন কন্টাক্ট' : 'New Contact';
   String get contactsNameHint =>
-      isBangla ? 'যার সাথে যোগাযোগ করা হবে তার পূর্ণ নাম লিখুন' : 'Enter the full name of your trusted contact';
+      isBangla ? 'পূর্ণ নাম লিখুন' : 'Full Name';
   String get contactsNameReq => isBangla ? 'নাম প্রয়োজন' : 'Name required';
   String get contactsPhoneHint => isBangla
-      ? '১১ সংখ্যার নম্বর লিখুন, যেমন 017XXXXXXXX'
-      : 'Enter an 11-digit number, e.g. 017XXXXXXXX';
+      ? '১১ সংখ্যার মোবাইল নম্বর (যেমন: 017XXXXXXXX)'
+      : '11-digit phone number (e.g. 017XXXXXXXX)';
   String get contactsPhoneReq =>
       isBangla ? 'ফোন নম্বর প্রয়োজন' : 'Phone number required';
   String get contactsPhoneInvalid =>
       isBangla ? 'সঠিক ফোন নম্বর লিখুন' : 'Enter valid phone number';
   String get contactsRelationHint => isBangla
-      ? 'যেমন: মা, বাবা, ভাই, বোন, বন্ধু'
-      : 'e.g. Mother, Father, Sister, Brother, Friend';
+      ? 'যেমন: মা, বাবা, বন্ধু, ভাই'
+      : 'e.g. Mother, Father, Friend, Brother';
   String get contactsRelationReq =>
       isBangla ? 'সম্পর্ক উল্লেখ করুন' : 'Please mention relation';
   String get contactsPriorityLevel =>
       isBangla ? 'অগ্রাধিকার লেভেল' : 'Priority Level';
   String get contactsPriorityDesc => isBangla
-      ? '১ নং অগ্রাধিকার সবচেয়ে বেশি গুরুত্বপূর্ণ।'
-      : '#1 priority is the most important.';
+      ? '১ নং স্থান সর্বাধিক অগ্রাধিকার পাবে।'
+      : '#1 priority will be alerted first.';
   String get contactsNotifType =>
       isBangla ? 'অ্যালার্ট পাঠানোর মাধ্যম' : 'Alert Methods';
   String get contactsNotifySMS =>
@@ -403,7 +403,7 @@ class AppStrings {
           : 'You can add up to $max emergency contacts only.';
   String contactsCounterLabel(int count,
           [int max = AppConstants.maxEmergencyContacts]) =>
-      isBangla ? '$count / $max কন্টাক্ট যোগ করা হয়েছে' : '$count / $max contacts added';
+      isBangla ? '$count / $max কন্টাক্ট যুক্ত' : '$count / $max contacts added';
   String get contactsReminderTitle => isBangla
       ? 'জরুরি কন্টাক্ট যোগ করুন'
       : 'Add emergency contacts';
@@ -415,8 +415,8 @@ class AppStrings {
   String get contactsReminderLater =>
       isBangla ? 'পরে' : 'Later';
   String get contactsFormIntro => isBangla
-      ? 'বিশ্বস্ত মানুষের তথ্য দিন। সর্বোচ্চ ৫টি কন্টাক্ট যোগ করা যাবে।'
-      : 'Add trusted people here. You can save up to 5 contacts.';
+      ? 'জরুরি অ্যালার্টের জন্য কন্টাক্ট যুক্ত করুন। সর্বোচ্চ ৫ জন যোগ করা যাবে।'
+      : 'Add contacts for emergency alerts. You can add up to 5 contacts.';
 
   // ===================== Earthquake =====================
   String get earthquakeTitle =>

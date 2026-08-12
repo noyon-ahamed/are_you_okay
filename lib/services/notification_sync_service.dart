@@ -132,12 +132,15 @@ class NotificationSyncService {
         final age = now.difference(createdAt);
 
         bool isReminderStale = false;
-        if (normalizedType == 'reminder') {
+        if (normalizedType == 'reminder' || normalizedType == 'checkin_reminder') {
           final lastCheckIn = SharedPrefsService().lastCheckIn;
           if (lastCheckIn != null) {
+            final isSameDay = lastCheckIn.year == now.year &&
+                lastCheckIn.month == now.month &&
+                lastCheckIn.day == now.day;
             final isAfterCreatedAt = lastCheckIn.isAfter(createdAt);
             final isWithin24h = now.difference(lastCheckIn).inHours < 24;
-            if (isAfterCreatedAt || isWithin24h) {
+            if (isSameDay || isAfterCreatedAt || isWithin24h) {
               isReminderStale = true;
             }
           }
