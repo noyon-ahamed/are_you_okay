@@ -139,35 +139,31 @@ class NotificationSyncService {
                 lastCheckIn.month == now.month &&
                 lastCheckIn.day == now.day;
             final isAfterCreatedAt = lastCheckIn.isAfter(createdAt);
-            final isWithin24h = now.difference(lastCheckIn).inHours < 24;
-            if (isSameDay || isAfterCreatedAt || isWithin24h) {
+            final intervalDays = SharedPrefsService().checkinInterval;
+            final isWithinInterval =
+                now.difference(lastCheckIn).inHours < (intervalDays * 24);
+            if (isSameDay || isAfterCreatedAt || isWithinInterval) {
               isReminderStale = true;
             }
           }
         }
 
+        // Reminders synced from server should be cached in history without popping up system tray notifications when opening app
         final shouldSurface = surfacedCount < _maxSurfaceCount &&
             age <= _maxSurfaceAge &&
             normalizedType != 'system_announcement' &&
+            normalizedType != 'reminder' &&
+            normalizedType != 'checkin_reminder' &&
             !isReminderStale;
 
         if (shouldSurface) {
-          if (normalizedType == 'reminder') {
-            await _localNotificationService.showCheckinReminder(
-              id: localNotificationId,
-              title: title,
-              body: body,
-              payload: payload,
-            );
-          } else {
-            await _localNotificationService.showNotification(
-              id: localNotificationId,
-              title: title,
-              body: body,
-              payload: payload,
-              channelId: _channelIdFor(notification),
-            );
-          }
+          await _localNotificationService.showNotification(
+            id: localNotificationId,
+            title: title,
+            body: body,
+            payload: payload,
+            channelId: _channelIdFor(notification),
+          );
           surfacedCount += 1;
         }
 

@@ -111,12 +111,14 @@ class OfflineSyncService {
           lastCheckIn.day == now.day;
       final hoursSinceCheckIn = now.difference(lastCheckIn).inHours;
 
-      if (isSameDay || hoursSinceCheckIn < 24) {
-        return; // Already checked in today or recently
+      final intervalDays = ref.read(sharedPrefsServiceProvider).checkinInterval;
+      final thresholdHours = intervalDays * 24;
+
+      if (isSameDay || hoursSinceCheckIn < thresholdHours) {
+        return; // Already checked in within interval
       }
 
-      // The current app flow treats check-in eligibility as a 24 hour window.
-      final deadline = lastCheckIn.add(const Duration(hours: 24));
+      final deadline = lastCheckIn.add(Duration(days: intervalDays));
       final missedNotificationId = 'missed-${deadline.millisecondsSinceEpoch}';
 
       // If deadline has passed

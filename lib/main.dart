@@ -337,8 +337,11 @@ Future<bool> _isAlreadyCheckedInRecently() async {
     final isSameDay = lastCheckIn.year == now.year &&
         lastCheckIn.month == now.month &&
         lastCheckIn.day == now.day;
-    final isWithin24h = now.difference(lastCheckIn).inHours < 24;
-    return isSameDay || isWithin24h;
+    final intervalDays = prefs.getInt(AppConstants.keyCheckinInterval) ??
+        AppConstants.defaultCheckinIntervalDays;
+    final isWithinInterval =
+        now.difference(lastCheckIn).inHours < (intervalDays * 24);
+    return isSameDay || isWithinInterval;
   } catch (e) {
     debugPrint('Error checking recent check-in status: $e');
     return false;

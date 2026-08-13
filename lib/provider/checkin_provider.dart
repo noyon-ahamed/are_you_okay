@@ -212,7 +212,8 @@ class CheckInStatusNotifier extends StateNotifier<CheckInStatusData> {
     try {
       final lastCheckIn = SharedPrefsService().lastCheckIn;
       if (lastCheckIn != null) {
-        final nextCheckInTime = lastCheckIn.add(const Duration(hours: 24));
+        final intervalDays = SharedPrefsService().checkinInterval;
+        final nextCheckInTime = lastCheckIn.add(Duration(days: intervalDays));
         final canCheckIn = DateTime.now().isAfter(nextCheckInTime);
         final hoursSince = DateTime.now().difference(lastCheckIn).inHours;
 

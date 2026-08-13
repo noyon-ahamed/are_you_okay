@@ -342,7 +342,8 @@ class CheckInRepository {
     final hoursSince = effectiveLast != null
         ? DateTime.now().difference(effectiveLast).inHours
         : null;
-    final canCheckIn = hoursSince == null || hoursSince >= 24;
+    final intervalDays = prefs.checkinInterval;
+    final canCheckIn = hoursSince == null || hoursSince >= (intervalDays * 24);
 
     return {
       ...status,
