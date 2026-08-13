@@ -73,6 +73,8 @@ class EmergencyApiService {
     String? email,
     String relation = 'Other',
     int? priority,
+    bool notifyViaSMS = true,
+    bool notifyViaEmail = true,
   }) async {
     try {
       final response = await _dio.post(
@@ -83,6 +85,12 @@ class EmergencyApiService {
           if (email != null) 'email': email,
           'relation': relation,
           if (priority != null) 'priority': priority,
+          'notifyViaSMS': notifyViaSMS,
+          'notifyViaEmail': notifyViaEmail,
+          'alertMethods': {
+            'sms': notifyViaSMS,
+            'email': notifyViaEmail,
+          },
         },
       );
 
@@ -193,6 +201,8 @@ class EmergencyApiService {
     String? email,
     String? relation,
     int? priority,
+    bool? notifyViaSMS,
+    bool? notifyViaEmail,
   }) async {
     try {
       final response = await _dio.put(
@@ -203,6 +213,13 @@ class EmergencyApiService {
           if (email != null) 'email': email,
           if (relation != null) 'relation': relation,
           if (priority != null) 'priority': priority,
+          if (notifyViaSMS != null) 'notifyViaSMS': notifyViaSMS,
+          if (notifyViaEmail != null) 'notifyViaEmail': notifyViaEmail,
+          if (notifyViaSMS != null || notifyViaEmail != null)
+            'alertMethods': {
+              if (notifyViaSMS != null) 'sms': notifyViaSMS,
+              if (notifyViaEmail != null) 'email': notifyViaEmail,
+            },
         },
       );
 

@@ -21,6 +21,7 @@ import '../../presentation/screens/sos/sos_screen.dart';
 import '../../presentation/screens/history/checkin_history_screen.dart';
 import '../../presentation/screens/mood/mood_history_screen.dart';
 import '../../presentation/screens/notification/notification_screen.dart';
+import '../model/emergency_contact_model.dart';
 
 import '../../provider/auth_provider.dart';
 import '../../provider/splash_provider.dart';
@@ -227,21 +228,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.addContact,
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          restorationId: 'add_contact_page',
-          child: const AddContactScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                  parent: animation, curve: Curves.easeOutCubic)),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          final contactToEdit = state.extra as EmergencyContactModel?;
+          return CustomTransitionPage(
+            key: state.pageKey,
+            restorationId: 'add_contact_page',
+            child: AddContactScreen(contactToEdit: contactToEdit),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                    parent: animation, curve: Curves.easeOutCubic)),
+                child: child,
+              );
+            },
+          );
+        },
       ),
       GoRoute(
         path: Routes.sos,

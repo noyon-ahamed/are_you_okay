@@ -232,29 +232,117 @@ class _EmergencyContactsScreenState
                             : AppColors.textSecondary,
                       ),
                     ),
-                    if (contact.relationship.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          // ignore: deprecated_member_use
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          contact.relationship,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: color,
-                            fontFamily: 'HindSiliguri',
-                            fontWeight: FontWeight.w500,
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (contact.relationship.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              contact.relationship,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: color,
+                                fontFamily: 'HindSiliguri',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: contact.notifyViaSMS
+                                ? AppColors.success.withValues(alpha: 0.12)
+                                : Colors.grey.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                contact.notifyViaSMS
+                                    ? Icons.sms_outlined
+                                    : Icons.sms_failed_outlined,
+                                size: 11,
+                                color: contact.notifyViaSMS
+                                    ? AppColors.success
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'SMS ${contact.notifyViaSMS ? "ON" : "OFF"}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: contact.notifyViaSMS
+                                      ? AppColors.success
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                        if (contact.email != null &&
+                            contact.email!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: contact.notifyViaEmail
+                                  ? AppColors.info.withValues(alpha: 0.12)
+                                  : Colors.grey.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  contact.notifyViaEmail
+                                      ? Icons.email_outlined
+                                      : Icons.mail_lock_outlined,
+                                  size: 11,
+                                  color: contact.notifyViaEmail
+                                      ? AppColors.info
+                                      : Colors.grey,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Email ${contact.notifyViaEmail ? "ON" : "OFF"}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: contact.notifyViaEmail
+                                        ? AppColors.info
+                                        : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
+              ),
+              // Edit button
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+                tooltip: 'Edit Contact',
+                onPressed: () {
+                  context.push(Routes.addContact, extra: contact);
+                },
               ),
               // Priority badge
               Container(
@@ -276,7 +364,7 @@ class _EmergencyContactsScreenState
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               // Drag handle
               Icon(
                 Icons.drag_handle,

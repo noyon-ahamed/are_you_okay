@@ -8,10 +8,14 @@ import '../../../provider/language_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
-/// Add Contact Screen
-/// Allows user to add a new emergency contact
+import '../../../model/emergency_contact_model.dart';
+
+/// Add / Edit Contact Screen
+/// Allows user to add or edit an emergency contact
 class AddContactScreen extends ConsumerStatefulWidget {
-  const AddContactScreen({super.key});
+  final EmergencyContactModel? contactToEdit;
+
+  const AddContactScreen({super.key, this.contactToEdit});
 
   @override
   ConsumerState<AddContactScreen> createState() => _AddContactScreenState();
@@ -33,6 +37,8 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
   final RestorableBool _notifyViaEmail = RestorableBool(true);
   final RestorableDouble _scrollOffset = RestorableDouble(0);
   late final ScrollController _scrollController;
+
+  bool get isEditing => widget.contactToEdit != null;
 
   @override
   String? get restorationId => 'add_contact_screen';
@@ -56,6 +62,18 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
     registerForRestoration(_notifyViaSMS, 'notify_sms');
     registerForRestoration(_notifyViaEmail, 'notify_email');
     registerForRestoration(_scrollOffset, 'scroll_offset');
+
+    if (widget.contactToEdit != null) {
+      final c = widget.contactToEdit!;
+      _nameController.value.text = c.name;
+      _phoneController.value.text = c.phoneNumber;
+      _relationshipController.value.text = c.relationship;
+      _emailController.value.text = c.email ?? '';
+      _selectedPriority.value = c.priority;
+      _notifyViaSMS.value = c.notifyViaSMS;
+      _notifyViaEmail.value = c.notifyViaEmail;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollOffset.value);
@@ -88,7 +106,11 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(s.contactsNewContact),
+        title: Text(
+          isEditing
+              ? (s.isBangla ? 'সম্পাদনা করুন' : 'Edit Contact')
+              : s.contactsNewContact,
+        ),
       ),
       body: SingleChildScrollView(
         key: const PageStorageKey('add_contact_scroll'),
@@ -353,7 +375,9 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
               const SizedBox(height: 40),
 
               CustomButton(
-                text: s.contactsAdd,
+                text: isEditing
+                    ? (s.isBangla ? 'আপডেট করুন' : 'Update Contact')
+                    : s.contactsAdd,
                 onPressed: _saveContact,
               ),
             ],
@@ -367,7 +391,8 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
     final s = ref.read(stringsProvider);
     final notifier = ref.read(contactProvider.notifier);
     final maxContacts = await notifier.getMaxEmergencyContacts();
-    if (!await notifier.canAddMoreContacts()) {
+
+    if (!isEditing && !await notifier.canAddMoreContacts()) {
       await _showContactLimitDialog(s, maxContacts);
       return;
     }
@@ -379,22 +404,43 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen>
       final email = _emailController.value.text.trim();
 
       try {
-        await ref.read(contactProvider.notifier).addContact(
-              name: name,
-              phoneNumber: phone,
-              email: email.isEmpty ? null : email,
-              relationship: relation,
-              priority: _selectedPriority.value,
-              notifyViaSMS: _notifyViaSMS.value,
-              notifyViaEmail: _notifyViaEmail.value && email.isNotEmpty,
-              notifyViaApp: false,
-            );
+        if (isEditing) {
+          final updated = widget.contactToEdit!.copyWith(
+            name: name,
+            phoneNumber: phone,
+            relationship: relation,
+            email: email.isEmpty ? null : email,
+            priority: _selectedPriority.value,
+            notifyViaSMS: _notifyViaSMS.value,
+            notifyViaEmail: _notifyViaEmail.value && email.isNotEmpty,
+          );
+          await notifier.updateContact(updated);
+        } else {
+          await notifier.addContact(
+            name: name,
+            phoneNumber: phone,
+            email: email.isEmpty ? null : email,
+            relationship: relation,
+            priority: _selectedPriority.value,
+            notifyViaSMS: _notifyViaSMS.value,
+            notifyViaEmail: _notifyViaEmail.value && email.isNotEmpty,
+            notifyViaApp: false,
+          );
+        }
 
         if (mounted) {
           final messenger = ScaffoldMessenger.of(context);
           Navigator.pop(context);
           messenger.showSnackBar(
-            SnackBar(content: Text(s.contactsAddedToast)),
+            SnackBar(
+              content: Text(
+                isEditing
+                    ? (s.isBangla
+                        ? 'যোগাযোগ সফলভাবে আপডেট করা হয়েছে'
+                        : 'Contact updated successfully')
+                    : s.contactsAddedToast,
+              ),
+            ),
           );
         }
       } catch (e) {

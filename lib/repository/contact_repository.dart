@@ -30,6 +30,15 @@ class ContactRepository {
       // Build the full contacts list from backend data first
       final List<EmergencyContactModel> contacts = [];
       for (final bc in backendContacts) {
+        final alertMethodsMap = bc['alertMethods'] as Map?;
+        final bool smsEnabled = bc['notifyViaSms'] ??
+            bc['notifyViaSMS'] ??
+            alertMethodsMap?['sms'] ??
+            true;
+        final bool emailEnabled = bc['notifyViaEmail'] ??
+            alertMethodsMap?['email'] ??
+            (bc['email'] != null && bc['email'].toString().isNotEmpty);
+
         final contact = EmergencyContactModel(
           id: bc['_id']?.toString() ?? _uuid.v4(),
           userId: bc['userId']?.toString() ?? '',
@@ -38,10 +47,9 @@ class ContactRepository {
           email: bc['email']?.toString(),
           relationship: bc['relation']?.toString() ?? 'Other',
           priority: bc['priority'] as int? ?? 1,
-          notifyViaSMS: true,
+          notifyViaSMS: smsEnabled,
           notifyViaCall: false,
-          notifyViaEmail:
-              bc['email'] != null && bc['email'].toString().isNotEmpty,
+          notifyViaEmail: emailEnabled,
           notifyViaApp: true,
           createdAt: bc['createdAt'] != null
               ? DateTime.tryParse(bc['createdAt'].toString()) ?? DateTime.now()
@@ -104,6 +112,8 @@ class ContactRepository {
       email: email,
       relation: relationship,
       priority: priority,
+      notifyViaSMS: notifyViaSMS,
+      notifyViaEmail: notifyViaEmail,
     );
 
     final now = DateTime.now();
@@ -152,6 +162,8 @@ class ContactRepository {
         email: contact.email,
         relation: contact.relationship,
         priority: contact.priority,
+        notifyViaSMS: contact.notifyViaSMS,
+        notifyViaEmail: contact.notifyViaEmail,
       );
     } catch (e) {
       debugPrint('Backend updateContact failed: $e');
