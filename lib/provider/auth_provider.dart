@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/user_model.dart';
@@ -130,6 +131,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
       });
     } catch (e) {
       debugPrint('AuthNotifier: Login error: $e');
+      state = AuthError(_normalizeAuthMessage(e));
+    }
+  }
+
+  Future<void> googleLogin() async {
+    debugPrint('AuthNotifier: Starting Google login');
+    state = const AuthLoading();
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: '356949727125-hsd1p8lb6tsr57k7p505htbv5ck0prhv.apps.googleusercontent.com',
+      );
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        state = const AuthUnauthenticated();
+        return; // User canceled
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Failed to get Google ID token');
+      }
+
+      final user = await _authRepository.googleLogin(
+        email: googleUser.email,
+        name: googleUser.displayName ?? googleUser.email.split('@')[0],
+        idToken: idToken,
+        firebaseUid: googleUser.id,
+        photoUrl: googleUser.photoUrl,
+      );
+
+      if (!mounted) return;
+      state = AuthAuthenticated(user);
+      _socketService.init();
+      unawaited(
+        NotificationSyncService().syncMissedNotifications(force: true),
+      );
+      
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) _syncProfileQuietly();
+      });
+    } catch (e) {
+      debugPrint('AuthNotifier: Google Login error: $e');
       state = AuthError(_normalizeAuthMessage(e));
     }
   }

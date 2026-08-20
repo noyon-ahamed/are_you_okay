@@ -189,7 +189,39 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     }
   }
 
-  void _showError(String message) {
+  void _showError(String rawMessage) {
+    String message = rawMessage.replaceAll('Exception: ', '');
+    
+    if (message.contains('GOOGLE_LOGIN_REQUIRED')) {
+      final s = ref.read(stringsProvider);
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(s.isBangla ? 'গুগল লগইন আবশ্যক' : 'Google Login Required', style: const TextStyle(color: AppColors.error)),
+          content: Text(
+            s.isBangla
+                ? 'এই ইমেইলটি গুগল দিয়ে লগইন করা হয়েছে। অনুগ্রহ করে গুগল দিয়ে লগইন করুন।'
+                : 'This email is registered with Google. Please login with Google.',
+            style: const TextStyle(fontFamily: 'HindSiliguri'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(s.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.go('/login');
+              },
+              child: Text(s.loginButton),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content:

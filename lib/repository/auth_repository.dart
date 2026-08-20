@@ -27,6 +27,27 @@ class AuthRepository {
     return user;
   }
 
+  Future<UserModel> googleLogin({
+    required String email,
+    required String name,
+    required String idToken,
+    String? firebaseUid,
+    String? photoUrl,
+  }) async {
+    final response = await _apiService.googleLogin(
+      email: email,
+      name: name,
+      idToken: idToken,
+      firebaseUid: firebaseUid,
+      photoUrl: photoUrl,
+    );
+    final user = UserModel.fromJson(response['user']);
+    await _hiveService.saveUser(user);
+    await _syncSettingsFromUserPayload(
+        response['user'] as Map<String, dynamic>?);
+    return user;
+  }
+
   Future<UserModel> register({
     required String email,
     required String password,

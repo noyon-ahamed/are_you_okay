@@ -26,6 +26,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
       RestorableTextEditingController();
   final RestorableTextEditingController _emailController =
       RestorableTextEditingController();
+  final RestorableTextEditingController _phoneController =
+      RestorableTextEditingController();
   final RestorableTextEditingController _addressController =
       RestorableTextEditingController();
   final RestorableStringN _selectedBloodGroupValue = RestorableStringN(null);
@@ -65,6 +67,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
   void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
     registerForRestoration(_nameController, 'name');
     registerForRestoration(_emailController, 'email');
+    registerForRestoration(_phoneController, 'phone');
     registerForRestoration(_addressController, 'address');
     registerForRestoration(_selectedBloodGroupValue, 'blood_group');
     registerForRestoration(_scrollOffset, 'scroll_offset');
@@ -77,6 +80,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
       }
       if (_emailController.value.text.isEmpty) {
         _emailController.value.text = user?.email ?? '';
+      }
+      if (_phoneController.value.text.isEmpty) {
+        _phoneController.value.text = user?.phone ?? '';
       }
       if (_addressController.value.text.isEmpty) {
         _addressController.value.text = user?.address ?? '';
@@ -108,6 +114,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _addressController.dispose();
     _selectedBloodGroupValue.dispose();
     _scrollOffset.dispose();
@@ -190,6 +197,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
                 hint: s.profileEmailHint,
                 prefixIcon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
+                readOnly: true,
+                enabled: false,
+                suffixIcon: const Tooltip(
+                  message: 'Email cannot be changed',
+                  child: Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              CustomTextField(
+                controller: _phoneController.value,
+                label: s.regPhone,
+                hint: '01XXXXXXXXX',
+                prefixIcon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '${s.regPhone} ${s.validationRequired}';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -331,7 +359,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen>
         // Update profile on backend
         await ref.read(authProvider.notifier).updateProfile(
               name: _nameController.value.text.trim(),
-              phone: null, // phone is read-only on this screen
+              phone: _phoneController.value.text.trim(),
               address: _addressController.value.text.trim(),
               bloodGroup: _selectedBloodGroupValue.value,
               profilePicture: base64Image,

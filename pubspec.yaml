@@ -83,8 +83,6 @@ dependencies:
   
   # AI
   google_generative_ai: ^0.4.6
-  
-  # Timezone
   flutter_timezone: ^4.1.1
 
   # Ads
@@ -92,6 +90,8 @@ dependencies:
   pdf: ^3.11.3
   firebase_messaging: ^16.1.2
   firebase_core: ^4.5.0
+  google_sign_in: ^6.2.1
+  firebase_auth: ^6.5.7
 
 dev_dependencies:
   flutter_test:

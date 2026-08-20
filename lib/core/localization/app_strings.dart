@@ -629,7 +629,7 @@ class AppStrings {
       isBangla ? 'আপনার নাম লিখুন' : 'Enter your name';
   String get profileNameReq => isBangla ? 'নাম প্রয়োজন' : 'Name required';
   String get profileEmailOpt =>
-      isBangla ? 'ইমেইল (ঐচ্ছিক)' : 'Email (Optional)';
+      isBangla ? 'ইমেইল' : 'Email';
   String get profileEmailHint =>
       isBangla ? 'আপনার ইমেইল লিখুন' : 'Enter your email';
   String get profileAddress => isBangla ? 'ঠিকানা' : 'Address';

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +16,7 @@ import '../../../services/socket_service.dart';
 import '../../../services/api/emergency_api_service.dart';
 import '../../../provider/language_provider.dart';
 import '../../../provider/settings_provider.dart';
+import '../../../provider/auth_provider.dart';
 
 class SOSScreen extends ConsumerStatefulWidget {
   const SOSScreen({super.key});
@@ -103,6 +105,13 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
   }
 
   void _startSOS() {
+    final authState = ref.read(authProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
+    if (user != null && (user.phone == null || user.phone!.isEmpty)) {
+      _showAddPhoneWarning();
+      return;
+    }
+
     HapticFeedback.heavyImpact();
     setState(() {
       _isActivating = true;
@@ -120,6 +129,35 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
         _triggerSOS();
       }
     });
+  }
+
+  void _showAddPhoneWarning() {
+    final s = ref.read(stringsProvider);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.sosTitle, style: const TextStyle(color: AppColors.error)),
+        content: Text(
+          s.isBangla
+              ? 'জরুরী পরিষেবা ব্যবহার করার আগে অনুগ্রহ করে আপনার প্রোফাইলে একটি ফোন নম্বর যোগ করুন।'
+              : 'Please add a phone number to your profile before using emergency services.',
+          style: const TextStyle(fontFamily: 'HindSiliguri'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(s.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push('/profile/edit');
+            },
+            child: Text(s.profileEdit),
+          ),
+        ],
+      ),
+    );
   }
 
   void _cancelSOS() {
@@ -763,13 +801,17 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                         decoration:
                             AppDecorations.cardDecoration(context: context),
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              n['number']!,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.error,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                n['number']!,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.error,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -780,6 +822,8 @@ class _SOSScreenState extends ConsumerState<SOSScreen>
                                 fontSize: 10,
                                 fontFamily: 'HindSiliguri',
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

@@ -154,6 +154,60 @@ class AuthApiService {
     }
   }
 
+  /// Google Login
+  Future<Map<String, dynamic>> googleLogin({
+    required String email,
+    required String name,
+    required String idToken,
+    String? firebaseUid,
+    String? photoUrl,
+  }) async {
+    try {
+      final response = await _dio
+          .post(
+            '$baseUrl/auth/google-login',
+            data: {
+              'email': email,
+              'name': name,
+              'idToken': idToken,
+              if (firebaseUid != null) 'firebaseUid': firebaseUid,
+              if (photoUrl != null) 'photoUrl': photoUrl,
+            },
+            options: _skipForceLogoutOptions(),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.data['success'] == true) {
+        final token = response.data['data']['token'];
+        final userId = response.data['data']['user']['id'];
+
+        unawaited(_cleanupPreviousSessionFcmToken());
+
+        await TokenStorageService.saveToken(token);
+        await TokenStorageService.saveUserId(userId);
+        await SharedPrefsService().setUserToken(token);
+        await SharedPrefsService().setUserId(userId);
+
+        unawaited(sendFcmToken());
+
+        return response.data['data'];
+      } else {
+        throw Exception(response.data['error'] ?? 'Google login failed');
+      }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.error.toString().contains('SocketException')) {
+        throw Exception('No Internet Connection');
+      }
+      throw Exception(
+        e.response?.data['errorCode'] ??
+            e.response?.data['error'] ??
+            'Network error',
+      );
+    }
+  }
+
   /// Logout user
   Future<void> logout() async {
     try {

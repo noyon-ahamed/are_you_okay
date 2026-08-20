@@ -198,13 +198,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
                 const SizedBox(height: 16),
 
-                // Phone field (optional)
+                // Phone field
                 CustomTextField(
                   controller: _phoneController.value,
-                  label: '${s.regPhone} (${s.commonOptional})',
+                  label: s.regPhone,
                   hint: '01XXXXXXXXX',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '${s.regPhone} ${s.validationRequired}';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 16),

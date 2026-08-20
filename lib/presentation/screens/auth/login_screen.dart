@@ -144,11 +144,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
-        action: SnackBarAction(
-          label: s.ok,
-          textColor: Colors.white,
-          onPressed: () {},
-        ),
       ),
     );
   }
@@ -183,13 +178,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 8),
 
                 // Logo
                 Center(
                   child: Container(
-                    width: 100,
-                    height: 100,
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
                       gradient: AppColors.primaryGradient,
                       shape: BoxShape.circle,
@@ -204,18 +199,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ),
                     child: const Icon(
                       Icons.favorite,
-                      size: 50,
+                      size: 40,
                       color: Colors.white,
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
 
                 Text(
                   s.appName,
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: isDark
                         ? AppColors.textPrimaryDark
@@ -235,7 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
 
                 // Email field
                 CustomTextField(
@@ -305,6 +300,68 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           _handleLogin();
                         },
                   isLoading: _isLoading,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: isDark ? AppColors.borderDark : AppColors.border)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: isDark ? AppColors.borderDark : AppColors.border)),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Google Sign In button
+                SizedBox(
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () async {
+                            setState(() => _isLoading = true);
+                            try {
+                              await ref.read(authProvider.notifier).googleLogin();
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isLoading = false);
+                              }
+                            }
+                          },
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      side: BorderSide(
+                        color: isDark ? AppColors.borderDark : AppColors.border,
+                      ),
+                    ),
+                    icon: Image.network(
+                      'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
+                      width: 24,
+                      height: 24,
+                    ),
+                    label: Text(
+                      'Sign in with Google',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 24),
